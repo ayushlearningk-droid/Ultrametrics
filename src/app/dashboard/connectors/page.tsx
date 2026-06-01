@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { AddConnectorButton } from "@/components/connectors/add-connector-button";
+import { ProviderCard } from "@/components/connectors/provider-card";
 import { getConnectorsByWorkspace } from "@/lib/data/dashboard";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
+import { CONNECTOR_PROVIDERS } from "@/lib/connectors/providers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,13 +17,6 @@ import {
 export const metadata = {
   title: "Connectors",
 };
-
-const PROVIDERS = [
-  { id: "google_ads", name: "Google Ads", color: "bg-blue-500" },
-  { id: "meta_ads", name: "Meta Ads", color: "bg-indigo-500" },
-  { id: "ga4", name: "Google Analytics 4", color: "bg-orange-500" },
-  { id: "shopify", name: "Shopify", color: "bg-emerald-500" },
-];
 
 export default async function ConnectorsPage() {
   const workspaces = await getUserWorkspaces();
@@ -37,28 +32,12 @@ export default async function ConnectorsPage() {
             Manage data source connections for this workspace.
           </p>
         </div>
-        <Button variant="brand" disabled>
-          <Plus className="mr-2 h-4 w-4" />
-          Add connector
-        </Button>
+        <AddConnectorButton />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {PROVIDERS.map((provider) => (
-          <Card
-            key={provider.id}
-            className="cursor-pointer transition-colors hover:border-brand/40"
-          >
-            <CardHeader className="pb-2">
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-lg ${provider.color} text-sm font-bold text-white`}
-              >
-                {provider.name.charAt(0)}
-              </div>
-              <CardTitle className="text-base">{provider.name}</CardTitle>
-              <CardDescription>Connect & sync</CardDescription>
-            </CardHeader>
-          </Card>
+        {CONNECTOR_PROVIDERS.map((provider) => (
+          <ProviderCard key={provider.id} provider={provider} />
         ))}
       </div>
 
@@ -80,8 +59,16 @@ export default async function ConnectorsPage() {
                   <div>
                     <p className="font-medium">{connector.name}</p>
                     <p className="text-sm capitalize text-muted-foreground">
-                      {connector.provider.replace("_", " ")}
+                      {connector.provider.replaceAll("_", " ")}
                     </p>
+                    {connector.external_account_name && (
+                      <p className="text-xs text-muted-foreground">
+                        {connector.external_account_name}
+                        {connector.external_account_id
+                          ? ` · ${connector.external_account_id}`
+                          : null}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     {connector.last_synced_at && (

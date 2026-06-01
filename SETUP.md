@@ -51,7 +51,21 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 ```
 
-### 3. First login
+### 3. Meta Ads OAuth (connectors)
+
+1. Create an app at https://developers.facebook.com/apps/ (type **Business**).
+2. Add **Facebook Login** → Settings → **Valid OAuth Redirect URIs**:
+   - `http://localhost:3000/api/connectors/meta/oauth/callback` (or your `META_OAUTH_REDIRECT_URI`)
+3. App → **Basic** → copy **App ID** and **App Secret** into `.env.local`:
+   ```env
+   META_APP_ID=your_app_id
+   META_APP_SECRET=your_app_secret
+   META_OAUTH_REDIRECT_URI=http://localhost:3000/api/connectors/meta/oauth/callback
+   ```
+4. **App Review** → request `ads_read` (required for ad accounts in a later step). In Development mode, add Facebook users as **Testers** under Roles.
+5. Ensure migration `20250602000000_meta_ads_connectors.sql` is applied (`oauth_pending_sessions` table).
+
+### 4. First login
 
 1. Open http://localhost:3000  
 2. Sign up at `/signup`  
@@ -66,6 +80,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 | `/login` | Login |
 | `/signup` | Sign up |
 | `/dashboard` | Protected dashboard |
+| `/dashboard/connectors/meta` | Meta Ads OAuth connect |
+| `/api/connectors/meta/oauth/start` | Begin Facebook OAuth |
+| `/api/connectors/meta/oauth/callback` | OAuth callback |
 
 ## Folder structure
 

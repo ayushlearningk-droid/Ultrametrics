@@ -117,6 +117,9 @@ export type Database = {
           provider: string;
           status: ConnectorStatus;
           config: Json;
+          external_account_id: string | null;
+          external_account_name: string | null;
+          connected_by: string | null;
           last_synced_at: string | null;
           created_at: string;
           updated_at: string;
@@ -128,6 +131,9 @@ export type Database = {
           provider: string;
           status?: ConnectorStatus;
           config?: Json;
+          external_account_id?: string | null;
+          external_account_name?: string | null;
+          connected_by?: string | null;
           last_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -139,9 +145,78 @@ export type Database = {
           provider?: string;
           status?: ConnectorStatus;
           config?: Json;
+          external_account_id?: string | null;
+          external_account_name?: string | null;
+          connected_by?: string | null;
           last_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      connector_credentials: {
+        Relationships: [];
+        Row: {
+          connector_id: string;
+          access_token_ciphertext: string;
+          access_token_iv: string;
+          access_token_tag: string;
+          token_expires_at: string | null;
+          key_version: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          connector_id: string;
+          access_token_ciphertext: string;
+          access_token_iv: string;
+          access_token_tag: string;
+          token_expires_at?: string | null;
+          key_version?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          connector_id?: string;
+          access_token_ciphertext?: string;
+          access_token_iv?: string;
+          access_token_tag?: string;
+          token_expires_at?: string | null;
+          key_version?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      oauth_pending_sessions: {
+        Relationships: [];
+        Row: {
+          id: string;
+          user_id: string;
+          workspace_id: string;
+          provider: string;
+          state: string;
+          access_token: string;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workspace_id: string;
+          provider?: string;
+          state: string;
+          access_token: string;
+          expires_at: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          workspace_id?: string;
+          provider?: string;
+          state?: string;
+          access_token?: string;
+          expires_at?: string;
+          created_at?: string;
         };
       };
       sync_jobs: {
@@ -239,6 +314,10 @@ export type Database = {
 export type User = Database["public"]["Tables"]["users"]["Row"];
 export type Workspace = Database["public"]["Tables"]["workspaces"]["Row"];
 export type Connector = Database["public"]["Tables"]["connectors"]["Row"];
+export type ConnectorCredential =
+  Database["public"]["Tables"]["connector_credentials"]["Row"];
+export type OAuthPendingSession =
+  Database["public"]["Tables"]["oauth_pending_sessions"]["Row"];
 export type SyncJob = Database["public"]["Tables"]["sync_jobs"]["Row"];
 export type Subscription =
   Database["public"]["Tables"]["subscriptions"]["Row"];
