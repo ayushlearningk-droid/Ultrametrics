@@ -46,6 +46,11 @@ export async function GET(request: Request) {
   }
 
   const { state: cookieState, workspaceId } = await readMetaOAuthCookies();
+  console.log("========== META CALLBACK DEBUG ==========");
+console.log("CALLBACK STATE:", state);
+console.log("COOKIE STATE:", cookieState);
+console.log("WORKSPACE ID:", workspaceId);
+console.log("=========================================");
 
   if (!cookieState || !workspaceId || cookieState !== state) {
     await clearMetaOAuthCookies();

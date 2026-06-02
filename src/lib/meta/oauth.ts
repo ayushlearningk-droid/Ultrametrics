@@ -40,12 +40,13 @@ export function buildMetaAuthorizeUrl(
   state: string
 ): string {
   const params = new URLSearchParams({
-    client_id: config.appId,
-    redirect_uri: config.redirectUri,
-    state,
-    scope: META_OAUTH_SCOPES.join(","),
-    response_type: "code",
-  });
+  client_id: config.appId,
+  config_id: config.configId,
+  redirect_uri: config.redirectUri,
+  state,
+  scope: META_OAUTH_SCOPES.join(","),
+  response_type: "code",
+});
 
   return `${FACEBOOK_OAUTH_BASE}/${META_GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
 }

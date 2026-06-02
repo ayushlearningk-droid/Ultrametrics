@@ -3,6 +3,7 @@ import { getAppOrigin } from "@/lib/app-url";
 export type MetaOAuthConfig = {
   appId: string;
   appSecret: string;
+  configId: string;
   redirectUri: string;
 };
 
@@ -17,18 +18,19 @@ export function getMetaOAuthRedirectUri(): string {
 export function getMetaOAuthConfig(): MetaOAuthConfig | null {
   const appId = process.env.META_APP_ID?.trim();
   const appSecret = process.env.META_APP_SECRET?.trim();
+  const configId = process.env.META_CONFIG_ID?.trim();
 
-  if (!appId || !appSecret) {
+  if (!appId || !appSecret || !configId) {
     return null;
   }
 
   return {
-    appId,
-    appSecret,
-    redirectUri: getMetaOAuthRedirectUri(),
-  };
+  appId,
+  appSecret,
+  configId,
+  redirectUri: getMetaOAuthRedirectUri(),
+};
 }
-
 export function requireMetaOAuthConfig(): MetaOAuthConfig {
   const config = getMetaOAuthConfig();
   if (!config) {
