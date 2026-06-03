@@ -18,12 +18,17 @@ export default async function MetaAdsSelectAccountPage() {
       />
 
       <div>
-        <h2 className="text-2xl font-bold">
-          Select Meta Ad Account
+        <h2 className="text-2xl font-bold text-red-500">
+          AYUSH TEST 999
         </h2>
 
         <p className="text-muted-foreground">
-          Choose which Meta ad account should be connected.
+          If you can see this text, Vercel is using the correct
+          select-account page.
+        </p>
+
+        <p className="mt-2 font-semibold text-green-500">
+          Accounts Loaded: {accounts.length}
         </p>
       </div>
 
