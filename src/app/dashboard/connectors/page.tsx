@@ -21,6 +21,10 @@ export const metadata = {
 export default async function ConnectorsPage() {
   const workspaces = await getUserWorkspaces();
   const workspaceId = await getCurrentWorkspaceId(workspaces);
+  console.log("========== CONNECTORS PAGE ==========");
+console.log("WORKSPACE ID:", workspaceId);
+console.log("WORKSPACES:", workspaces);
+console.log("====================================");
   const connectors = await getConnectorsByWorkspace(workspaceId!);
 
   return (
