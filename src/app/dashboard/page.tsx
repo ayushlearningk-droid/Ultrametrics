@@ -23,11 +23,17 @@ export default async function DashboardPage() {
   const workspaces = await getUserWorkspaces();
   const workspaceId = await getCurrentWorkspaceId(workspaces);
 
+  console.log("[dashboard] page workspaceId:", workspaceId);
+  console.log("[dashboard] page workspace count:", workspaces.length);
+
   const [connectorCount, recentJobs, connectors] = await Promise.all([
     getConnectorCount(workspaceId!),
     getSyncJobsByWorkspace(workspaceId!, 5),
     getConnectorsByWorkspace(workspaceId!),
   ]);
+
+  console.log("[dashboard] page connectorCount:", connectorCount);
+  console.log("[dashboard] page connectors length:", connectors.length);
 
   const stats = [
     {

@@ -69,15 +69,24 @@ export async function getUserProfile(
 export async function getConnectorCount(
   workspaceId: string
 ): Promise<number> {
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  const { count } = await supabase
+  console.log("[dashboard] getConnectorCount workspaceId:", workspaceId);
+
+  const { count, error } = await admin
     .from("connectors")
     .select("*", {
       count: "exact",
       head: true,
     })
     .eq("workspace_id", workspaceId);
+
+  console.log("[dashboard] getConnectorCount result:", { count, error });
+
+  if (error) {
+    console.error("[dashboard] getConnectorCount error:", error);
+    return 0;
+  }
 
   return count ?? 0;
 }
