@@ -50,7 +50,7 @@ export default async function MetaAdsSelectAccountPage() {
       </div>
 
       <div className="space-y-4">
-        {accounts.map((account: any) => (
+        {accounts.map((account) => (
           <div
             key={account.id}
             className="rounded-lg border p-4"
