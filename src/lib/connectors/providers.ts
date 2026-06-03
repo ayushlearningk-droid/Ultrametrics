@@ -1,6 +1,7 @@
 export type ConnectorProviderId =
   | "meta_ads"
   | "google_ads"
+  | "google_sheets"
   | "ga4"
   | "shopify";
 
@@ -19,6 +20,13 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     name: "Google Ads",
     color: "bg-blue-500",
     available: false,
+  },
+  {
+    id: "google_sheets",
+    name: "Google Sheets",
+    color: "bg-emerald-500",
+    available: true,
+    href: "/dashboard/connectors/google",
   },
   {
     id: "meta_ads",
