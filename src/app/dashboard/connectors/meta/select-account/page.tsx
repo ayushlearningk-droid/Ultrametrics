@@ -1,4 +1,5 @@
 import { ConnectorBackLink } from "@/components/connectors/connector-back-link";
+import { MetaAccountConnectButton } from "@/components/connectors/meta-account-connect-button";
 import { META_ADS_CONNECT_PATH } from "@/lib/connectors/providers";
 import { getMockMetaAdAccounts } from "@/lib/meta/ad-accounts";
 
@@ -47,11 +48,7 @@ export default async function MetaAdsSelectAccountPage() {
                 </p>
               </div>
 
-              <button
-                className="rounded bg-blue-600 px-4 py-2 text-white"
-              >
-                Connect
-              </button>
+              <MetaAccountConnectButton account={account} />
             </div>
           </div>
         ))}
