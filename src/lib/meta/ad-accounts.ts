@@ -1,27 +1,35 @@
-import { META_GRAPH_VERSION } from "@/lib/meta/constants";
-
 export type MetaAdAccount = {
   id: string;
   name: string;
-  account_status?: number;
+  account_id: string;
+  currency: string;
+  status: string;
 };
 
-export async function fetchMetaAdAccounts(
-  accessToken: string
-): Promise<MetaAdAccount[]> {
-  const url =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/me/adaccounts` +
-    `?fields=id,name,account_status&access_token=${accessToken}`;
+export const mockMetaAdAccounts: MetaAdAccount[] = [
+  {
+    id: "acct_001",
+    name: "Acme Retail",
+    account_id: "act_1001",
+    currency: "USD",
+    status: "active",
+  },
+  {
+    id: "acct_002",
+    name: "Northwind Commerce",
+    account_id: "act_1002",
+    currency: "USD",
+    status: "active",
+  },
+  {
+    id: "acct_003",
+    name: "Summit Labs",
+    account_id: "act_1003",
+    currency: "EUR",
+    status: "pending",
+  },
+];
 
-  const res = await fetch(url);
-  const body = await res.json();
-
-  if (!res.ok) {
-    throw new Error(
-      body?.error?.message ??
-        "Failed to fetch Meta ad accounts"
-    );
-  }
-
-  return body.data ?? [];
+export function getMockMetaAdAccounts(): MetaAdAccount[] {
+  return mockMetaAdAccounts;
 }
