@@ -23,14 +23,16 @@ export async function getAccountInsights(
   const res = await fetch(url);
 
   if (!res.ok) {
-    throw new Error("Failed to fetch Meta insights");
+    const errorText = await res.text();
+    throw new Error(errorText);
   }
 
   const json = await res.json();
 
-console.log(
-  "META RAW INSIGHTS:",
-  JSON.stringify(json, null, 2)
-);
+  console.log(
+    "META RAW INSIGHTS:",
+    JSON.stringify(json, null, 2)
+  );
 
-return json.data ?? [];
+  return json.data ?? [];
+}
