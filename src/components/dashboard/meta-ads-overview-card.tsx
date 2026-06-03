@@ -26,6 +26,7 @@ type MetaInsightsResponse = {
   success?: boolean;
   insights?: MetaInsightRow[];
   error?: string;
+  currency?: string;
 };
 
 function toNumber(value: string | number | null | undefined): number {
@@ -57,7 +58,15 @@ function formatNumber(value: string | number | null | undefined) {
   }).format(numericValue);
 }
 
-function formatCurrency(value: string | number | null | undefined) {
+function normalizeCurrencyCode(value: string | null | undefined): string {
+  const candidate = (value ?? "INR").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(candidate) ? candidate : "INR";
+}
+
+function formatCurrency(
+  value: string | number | null | undefined,
+  currencyCode?: string | null
+) {
   const numericValue = toNumber(value);
 
   if (Number.isNaN(numericValue)) {
@@ -66,7 +75,7 @@ function formatCurrency(value: string | number | null | undefined) {
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: normalizeCurrencyCode(currencyCode),
     maximumFractionDigits: 2,
   }).format(numericValue);
 }
@@ -130,6 +139,7 @@ export function MetaAdsOverviewCard() {
   }, []);
 
   const insight = useMemo(() => data?.insights?.[0], [data]);
+  const currency = data?.currency ?? "INR";
 
   return (
     <Card>
@@ -164,7 +174,7 @@ export function MetaAdsOverviewCard() {
           </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Metric label="Spend" value={formatCurrency(insight.spend)} />
+            <Metric label="Spend" value={formatCurrency(insight.spend, currency)} />
             <Metric
               label="Impressions"
               value={formatNumber(insight.impressions)}
@@ -172,8 +182,8 @@ export function MetaAdsOverviewCard() {
             <Metric label="Clicks" value={formatNumber(insight.clicks)} />
             <Metric label="Reach" value={formatNumber(insight.reach)} />
             <Metric label="CTR" value={formatPercent(insight.ctr)} />
-            <Metric label="CPC" value={formatCurrency(insight.cpc)} />
-            <Metric label="CPM" value={formatCurrency(insight.cpm)} />
+            <Metric label="CPC" value={formatCurrency(insight.cpc, currency)} />
+            <Metric label="CPM" value={formatCurrency(insight.cpm, currency)} />
           </div>
         )}
       </CardContent>

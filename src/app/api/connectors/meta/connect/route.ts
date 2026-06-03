@@ -15,9 +15,6 @@ export async function POST(request: Request) {
       error: userError,
     } = await supabase.auth.getUser();
 
-    console.log("USER ERROR:", userError);
-    console.log("USER:", user?.id);
-
     if (userError || !user) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -28,9 +25,8 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       accountId?: string;
       name?: string;
+      currency?: string;
     };
-
-    console.log("REQUEST BODY:", body);
 
     if (!body.accountId || !body.name) {
       return NextResponse.json(
@@ -41,12 +37,8 @@ export async function POST(request: Request) {
 
     const workspaces = await getUserWorkspaces();
 
-    console.log("WORKSPACES:", workspaces);
-
     const workspaceId =
       await getCurrentWorkspaceId(workspaces);
-
-    console.log("WORKSPACE ID:", workspaceId);
 
     if (!workspaceId) {
       return NextResponse.json(
@@ -66,9 +58,6 @@ export async function POST(request: Request) {
         .eq("external_account_id", body.accountId)
         .maybeSingle();
 
-    console.log("EXISTING:", existingConnector);
-    console.log("EXISTING ERROR:", existingError);
-
     if (existingError) {
       return NextResponse.json(
         { error: existingError.message },
@@ -77,8 +66,6 @@ export async function POST(request: Request) {
     }
 
     if (existingConnector) {
-      console.log("DUPLICATE CONNECTOR FOUND");
-
       return NextResponse.json({
         ok: true,
         duplicate: true,
@@ -90,21 +77,18 @@ export async function POST(request: Request) {
       provider: "meta_ads",
       name: body.name,
       status: "active",
-      config: {},
+      config: {
+        currency: body.currency ?? "INR",
+      },
       external_account_id: body.accountId,
       external_account_name: body.name,
       connected_by: user.id,
     };
 
-    console.log("INSERT PAYLOAD:", insertPayload);
-
     const { data, error } = await admin
       .from("connectors")
       .insert(insertPayload)
       .select();
-
-    console.log("INSERT DATA:", data);
-    console.log("INSERT ERROR:", error);
 
     if (error) {
       return NextResponse.json(

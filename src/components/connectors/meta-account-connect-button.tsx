@@ -23,6 +23,7 @@ export function MetaAccountConnectButton({
         body: JSON.stringify({
           accountId: account.account_id,
           name: account.name,
+          currency: account.currency,
         }),
       });
 

@@ -71,8 +71,6 @@ export async function getConnectorCount(
 ): Promise<number> {
   const admin = createAdminClient();
 
-  console.log("[dashboard] getConnectorCount workspaceId:", workspaceId);
-
   const { count, error } = await admin
     .from("connectors")
     .select("*", {
@@ -80,8 +78,6 @@ export async function getConnectorCount(
       head: true,
     })
     .eq("workspace_id", workspaceId);
-
-  console.log("[dashboard] getConnectorCount result:", { count, error });
 
   if (error) {
     console.error("[dashboard] getConnectorCount error:", error);
