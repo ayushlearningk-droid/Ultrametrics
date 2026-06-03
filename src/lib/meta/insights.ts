@@ -17,7 +17,7 @@ export async function getAccountInsights(
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/act_${accountId}/insights` +
     `?fields=${fields}` +
-    `&date_preset=yesterday` +
+    `&date_preset=last_30d` +
     `&access_token=${accessToken}`;
 
   const res = await fetch(url);
@@ -28,5 +28,9 @@ export async function getAccountInsights(
 
   const json = await res.json();
 
-  return json.data ?? [];
-}
+console.log(
+  "META RAW INSIGHTS:",
+  JSON.stringify(json, null, 2)
+);
+
+return json.data ?? [];
