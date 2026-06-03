@@ -1,59 +1,61 @@
-import Link from "next/link";
 import { ConnectorBackLink } from "@/components/connectors/connector-back-link";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { META_ADS_CONNECT_PATH } from "@/lib/connectors/providers";
+import { getMockMetaAdAccounts } from "@/lib/meta/ad-accounts";
 
 export const metadata = {
   title: "Select Meta Ad Account",
 };
 
-export default function MetaAdsSelectAccountPage() {
+export default async function MetaAdsSelectAccountPage() {
+  const accounts = getMockMetaAdAccounts();
+
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <ConnectorBackLink
         href={META_ADS_CONNECT_PATH}
         label="Back to Meta connection"
       />
 
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Select ad account
+        <h2 className="text-2xl font-bold">
+          Select Meta Ad Account
         </h2>
+
         <p className="text-muted-foreground">
-          Choose which Meta ad account to connect to this workspace.
+          Choose which Meta ad account should be connected.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Available accounts</CardTitle>
-          <CardDescription>
-            Accounts load from the Meta Graph API after you complete Facebook
-            login.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg border border-dashed p-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              No ad accounts to show yet. Complete Facebook login on the
-              connection page first.
-            </p>
-            <Button variant="outline" className="mt-4" asChild>
-              <Link href={META_ADS_CONNECT_PATH}>Go to connection page</Link>
-            </Button>
+      <div className="space-y-4">
+        {accounts.map((account) => (
+          <div
+            key={account.id}
+            className="rounded-lg border p-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">
+                  {account.name}
+                </p>
+
+                <p className="text-sm text-muted-foreground">
+                  {account.account_id}
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  {account.currency}
+                </p>
+              </div>
+
+              <button
+                className="rounded bg-blue-600 px-4 py-2 text-white"
+              >
+                Connect
+              </button>
+            </div>
           </div>
-          <Button variant="brand" className="w-full sm:w-auto" disabled>
-            Save connection
-          </Button>
-        </CardContent>
-      </Card>
+        ))}
+      </div>
     </div>
   );
 }
