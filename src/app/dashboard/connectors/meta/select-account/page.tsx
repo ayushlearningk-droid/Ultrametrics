@@ -14,17 +14,25 @@ export const metadata = {
   title: "Select Meta Ad Account",
 };
 
+type MetaAccount = {
+  id: string;
+  name: string;
+  account_id?: string;
+  currency?: string;
+};
+
 export default async function MetaAdsSelectAccountPage() {
   const workspaces = await getUserWorkspaces();
 
-  const workspaceId =
-    await getCurrentWorkspaceId(workspaces);
+  const workspaceId = await getCurrentWorkspaceId(
+    workspaces
+  );
 
   const session = workspaceId
     ? await getLatestMetaPendingSession(workspaceId)
     : null;
 
-  const accounts = session?.access_token
+  const accounts: MetaAccount[] = session?.access_token
     ? await getMetaAdAccounts(session.access_token)
     : [];
 
@@ -66,7 +74,7 @@ export default async function MetaAdsSelectAccountPage() {
                 </p>
 
                 <p className="text-xs text-muted-foreground">
-                  {account.currency}
+                  {account.currency || "USD"}
                 </p>
               </div>
 
