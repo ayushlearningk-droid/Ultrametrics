@@ -18,16 +18,16 @@ export default async function MetaAdsSelectAccountPage() {
       />
 
       <div>
-        <h2 className="text-2xl font-bold text-red-500">
+        <h1 className="text-4xl font-bold text-red-500">
           AYUSH TEST 999
-        </h2>
+        </h1>
 
-        <p className="text-muted-foreground">
+        <p className="mt-2 text-muted-foreground">
           If you can see this text, Vercel is using the correct
           select-account page.
         </p>
 
-        <p className="mt-2 font-semibold text-green-500">
+        <p className="mt-4 text-lg font-semibold text-green-500">
           Accounts Loaded: {accounts.length}
         </p>
       </div>
