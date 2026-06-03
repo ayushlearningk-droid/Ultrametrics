@@ -113,3 +113,29 @@ export async function exchangeForLongLivedToken(
 
   return parseTokenResponse(body);
 }
+export async function getMetaAdAccounts(
+  accessToken: string
+) {
+  const params = new URLSearchParams({
+    fields: "id,name,account_id,currency",
+    access_token: accessToken,
+  });
+
+  const res = await fetch(
+    `${GRAPH_BASE}/me/adaccounts?${params.toString()}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  const body = await res.json();
+
+  if (!res.ok) {
+    throw new Error(
+      body?.error?.message ??
+      "Failed to load Meta ad accounts"
+    );
+  }
+
+  return body.data ?? [];
+}
