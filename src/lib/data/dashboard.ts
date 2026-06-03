@@ -1,59 +1,19 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Connector, Subscription, SyncJob, User } from "@/types/database";
 
 export async function getConnectorsByWorkspace(
   workspaceId: string
 ): Promise<Connector[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
     .from("connectors")
     .select("*")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
+
+  console.log("ADMIN CONNECTORS:", data);
+  console.log("ADMIN ERROR:", error);
+
   return (data ?? []) as Connector[];
-}
-
-export async function getSyncJobsByWorkspace(
-  workspaceId: string,
-  limit = 50
-): Promise<SyncJob[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("sync_jobs")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return (data ?? []) as SyncJob[];
-}
-
-export async function getSubscriptionByWorkspace(
-  workspaceId: string
-): Promise<Subscription | null> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .single();
-  return data as Subscription | null;
-}
-
-export async function getUserProfile(userId: string): Promise<User | null> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", userId)
-    .single();
-  return data as User | null;
-}
-
-export async function getConnectorCount(workspaceId: string): Promise<number> {
-  const supabase = await createClient();
-  const { count } = await supabase
-    .from("connectors")
-    .select("*", { count: "exact", head: true })
-    .eq("workspace_id", workspaceId);
-  return count ?? 0;
 }
