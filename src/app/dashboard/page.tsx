@@ -1,4 +1,5 @@
 import { Activity, Plug, RefreshCw, TrendingUp } from "lucide-react";
+import { MetaAdsOverviewCard } from "@/components/dashboard/meta-ads-overview-card";
 import {
   getConnectorCount,
   getConnectorsByWorkspace,
@@ -83,6 +84,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <MetaAdsOverviewCard />
+
         <Card>
           <CardHeader>
             <CardTitle>Recent sync jobs</CardTitle>
