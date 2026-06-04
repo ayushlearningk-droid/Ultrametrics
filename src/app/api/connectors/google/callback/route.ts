@@ -76,6 +76,8 @@ export async function GET(request: Request) {
     }
 
     console.log("[GOOGLE_PROFILE_DEBUG] access_token_present", Boolean(tokenJson.access_token));
+    console.log("[GOOGLE_PROFILE_DEBUG] access_token_length", tokenJson.access_token?.length ?? 0);
+    console.log("[GOOGLE_PROFILE_DEBUG] refresh_token_present", Boolean(tokenJson.refresh_token));
     console.log("[GOOGLE_PROFILE_DEBUG] profile_endpoint", "https://www.googleapis.com/oauth2/v2/userinfo");
     console.log("[GOOGLE_PROFILE_DEBUG] auth_header", tokenJson.access_token ? `Bearer ${tokenJson.access_token}` : "MISSING");
 
@@ -86,6 +88,7 @@ export async function GET(request: Request) {
     });
 
     console.log("[GOOGLE_PROFILE_DEBUG] profile_status", profileRes.status);
+    console.log("[GOOGLE_PROFILE_DEBUG] profile_status_text", profileRes.statusText);
 
     const profile = (await profileRes.json()) as {
       email?: string;
