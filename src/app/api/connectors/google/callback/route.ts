@@ -60,11 +60,24 @@ export async function GET(request: Request) {
       access_token?: string;
       refresh_token?: string;
       error?: { message?: string };
+      error_description?: string;
     };
 
+    console.log("[GOOGLE_TOKEN_DEBUG] status", tokenRes.status);
+    console.log("[GOOGLE_TOKEN_DEBUG] tokenJson", tokenJson);
+    console.log("[GOOGLE_TOKEN_DEBUG] error", tokenJson.error);
+    console.log("[GOOGLE_TOKEN_DEBUG] error_description", tokenJson.error_description);
+    console.log("[GOOGLE_TOKEN_DEBUG] redirect_uri", config.redirectUri);
+    console.log("[GOOGLE_TOKEN_DEBUG] client_id_present", Boolean(config.clientId));
+    console.log("[GOOGLE_TOKEN_DEBUG] client_secret_present", Boolean(config.clientSecret));
+
     if (!tokenRes.ok || !tokenJson.access_token) {
-      throw new Error(tokenJson.error?.message ?? "Failed to exchange Google code");
+      throw new Error(tokenJson.error?.message ?? tokenJson.error_description ?? "Failed to exchange Google code");
     }
+
+    console.log("[GOOGLE_PROFILE_DEBUG] access_token_present", Boolean(tokenJson.access_token));
+    console.log("[GOOGLE_PROFILE_DEBUG] profile_endpoint", "https://www.googleapis.com/oauth2/v2/userinfo");
+    console.log("[GOOGLE_PROFILE_DEBUG] auth_header", tokenJson.access_token ? `Bearer ${tokenJson.access_token}` : "MISSING");
 
     const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: {
@@ -72,14 +85,22 @@ export async function GET(request: Request) {
       },
     });
 
+    console.log("[GOOGLE_PROFILE_DEBUG] profile_status", profileRes.status);
+
     const profile = (await profileRes.json()) as {
       email?: string;
       name?: string;
       id?: string;
+      error?: { message?: string };
+      error_description?: string;
     };
 
+    console.log("[GOOGLE_PROFILE_DEBUG] profile_json", profile);
+    console.log("[GOOGLE_PROFILE_DEBUG] profile_email_present", Boolean(profile.email));
+    console.log("[GOOGLE_PROFILE_DEBUG] profile_id_present", Boolean(profile.id));
+
     if (!profileRes.ok) {
-      throw new Error("Failed to load Google profile");
+      throw new Error(profile.error?.message ?? profile.error_description ?? "Failed to load Google profile");
     }
 
     const admin = createAdminClient();
