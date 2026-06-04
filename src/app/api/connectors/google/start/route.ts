@@ -8,6 +8,9 @@ import { setGoogleOAuthCookies } from "@/lib/google/oauth-cookies";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_SCOPES = [
+  "openid",
+  "email",
+  "profile",
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.file",
 ];
