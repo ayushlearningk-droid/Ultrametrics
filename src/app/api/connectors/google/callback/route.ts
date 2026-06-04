@@ -140,7 +140,7 @@ export async function GET(request: Request) {
     }
 
     await clearGoogleOAuthCookies();
-    return NextResponse.redirect(new URL("/dashboard/connectors?google=success", request.url));
+    return NextResponse.redirect(new URL("/dashboard/connectors/google?google=success", request.url));
   } catch (error) {
     console.error("Google OAuth callback error:", error);
     await clearGoogleOAuthCookies();
