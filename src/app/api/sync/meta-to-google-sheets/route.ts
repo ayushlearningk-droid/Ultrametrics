@@ -37,7 +37,7 @@ async function fetchMetaInsightsLast7Days(
     fields: "date_start,campaign_name,spend,impressions,clicks",
     level: "campaign",
     time_increment: "1",
-    date_preset: "last_7d",
+    date_preset: "last_30d",
     limit: "5000",
     access_token: accessToken,
   });
