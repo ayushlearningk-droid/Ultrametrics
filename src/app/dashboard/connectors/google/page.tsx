@@ -1,6 +1,7 @@
 import { ConnectorBackLink } from "@/components/connectors/connector-back-link";
 import { GoogleConnectButton } from "@/components/connectors/google-connect-button";
 import { GoogleSpreadsheetSelection } from "@/components/connectors/google-spreadsheet-selection";
+import { GoogleSyncNowButton } from "@/components/connectors/google-sync-now-button";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 import { getGoogleOAuthConfig } from "@/lib/google/config";
 
@@ -48,6 +49,16 @@ export default async function GoogleSheetsConnectorPage() {
 
         <div className="mt-6">
           <GoogleSpreadsheetSelection />
+        </div>
+
+        <div className="mt-6 border-t pt-6">
+          <h4 className="text-sm font-medium">Manual sync</h4>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Trigger an immediate sync from Meta Ads into the selected spreadsheet.
+          </p>
+          <div className="mt-4">
+            <GoogleSyncNowButton />
+          </div>
         </div>
       </div>
     </div>
