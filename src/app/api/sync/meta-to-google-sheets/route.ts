@@ -152,7 +152,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  const [{ data: googleConnector, error: googleConnectorError }, { data: metaConnector, error: metaConnectorError }] = await Promise.all([
+  const [{ data: googleConnector, error: googleConnectorError }, { data: metaConnectors, error: metaConnectorError }] = await Promise.all([
     admin
       .from("connectors")
       .select("id, config")
@@ -168,8 +168,10 @@ export async function POST(request: Request) {
       .eq("provider", "meta_ads")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .maybeSingle(),
+      .limit(1),
   ]);
+
+  const metaConnector = metaConnectors?.[0] ?? null;
 
   if (googleConnectorError) {
     return NextResponse.json({ error: googleConnectorError.message }, { status: 500 });
