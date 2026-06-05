@@ -172,6 +172,7 @@ export async function POST(request: Request) {
   ]);
 
   const metaConnector = metaConnectors?.[0] ?? null;
+  const startedAt = new Date().toISOString();
 
   if (googleConnectorError) {
     return NextResponse.json({ error: googleConnectorError.message }, { status: 500 });
@@ -185,7 +186,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Google Sheets connector not found" }, { status: 404 });
   }
 
+  const { data: syncJob, error: syncJobCreateError } = await admin
+    .from("sync_jobs")
+    .insert({
+      connector_id: googleConnector.id,
+      workspace_id: workspaceId,
+      status: "running",
+      started_at: startedAt,
+      records_processed: 0,
+    })
+    .select("id")
+    .single();
+
+  if (syncJobCreateError || !syncJob) {
+    return NextResponse.json(
+      { error: syncJobCreateError?.message ?? "Failed to create sync job" },
+      { status: 500 }
+    );
+  }
+
+  const syncJobId = syncJob.id;
+
+  async function failSyncJob(message: string) {
+    await admin
+      .from("sync_jobs")
+      .update({
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        records_processed: 0,
+        error_message: message,
+      })
+      .eq("id", syncJobId);
+  }
+
   if (!metaConnector?.external_account_id) {
+    await failSyncJob("Meta Ads connector not found");
     return NextResponse.json({ error: "Meta Ads connector not found" }, { status: 404 });
   }
 
@@ -193,15 +228,18 @@ export async function POST(request: Request) {
   const spreadsheetId = googleConfig.spreadsheet_id;
 
   if (!spreadsheetId) {
+    await failSyncJob("No spreadsheet selected");
     return NextResponse.json({ error: "No spreadsheet selected" }, { status: 400 });
   }
 
   if (!googleConfig.access_token && !googleConfig.refresh_token) {
+    await failSyncJob("Google connector is missing OAuth tokens");
     return NextResponse.json({ error: "Google connector is missing OAuth tokens" }, { status: 400 });
   }
 
   const pendingSession = await getLatestMetaPendingSession(workspaceId);
   if (!pendingSession?.access_token) {
+    await failSyncJob("Meta OAuth session not found");
     return NextResponse.json({ error: "Meta OAuth session not found" }, { status: 400 });
   }
 
@@ -236,6 +274,15 @@ export async function POST(request: Request) {
         .from("connectors")
         .update({ last_synced_at: syncedAt, updated_at: syncedAt })
         .eq("id", metaConnector.id),
+      admin
+        .from("sync_jobs")
+        .update({
+          status: "completed",
+          completed_at: syncedAt,
+          records_processed: rowsWritten,
+          error_message: null,
+        })
+        .eq("id", syncJobId),
     ]);
 
     return NextResponse.json({
@@ -245,8 +292,19 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Meta to Google Sheets sync failed", error);
+    const message = error instanceof Error ? error.message : "Sync failed";
+    await admin
+      .from("sync_jobs")
+      .update({
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        records_processed: 0,
+        error_message: message,
+      })
+      .eq("id", syncJobId);
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Sync failed" },
+      { error: message },
       { status: 500 }
     );
   }
