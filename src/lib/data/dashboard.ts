@@ -26,7 +26,7 @@ export async function getSyncJobsByWorkspace(
   workspaceId: string,
   limit = 50
 ): Promise<SyncJob[]> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data } = await supabase
     .from("sync_jobs")
