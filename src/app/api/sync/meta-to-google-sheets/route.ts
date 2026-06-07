@@ -105,11 +105,19 @@ async function ensureSheetHeaders(
   });
 }
 
-async function appendInsightRows(
+async function writeInsightRowsFromRow2(
   spreadsheetId: string,
   tokens: { accessToken?: string; refreshToken?: string },
   insights: MetaInsightRow[]
 ) {
+  const sheets = getGoogleSheetsClient(tokens);
+
+  // Keep header row intact, clear all previous data rows.
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: "A2:E",
+  });
+
   if (insights.length === 0) {
     return 0;
   }
@@ -122,13 +130,10 @@ async function appendInsightRows(
     row.clicks ?? "0",
   ]);
 
-  const sheets = getGoogleSheetsClient(tokens);
-
-  await sheets.spreadsheets.values.append({
+  await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: "A:E",
+    range: "A2:E",
     valueInputOption: "RAW",
-    insertDataOption: "INSERT_ROWS",
     requestBody: {
       values: rows,
     },
@@ -254,7 +259,7 @@ export async function POST(request: Request) {
       refreshToken: googleConfig.refresh_token,
     });
 
-    const rowsWritten = await appendInsightRows(
+    const rowsWritten = await writeInsightRowsFromRow2(
       spreadsheetId,
       {
         accessToken: googleConfig.access_token,
