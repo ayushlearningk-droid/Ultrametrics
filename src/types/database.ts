@@ -219,6 +219,39 @@ export type Database = {
           created_at?: string;
         };
       };
+      workspace_sync_schedules: {
+        Relationships: [];
+        Row: {
+          id: string;
+          workspace_id: string;
+          frequency: "hourly" | "daily" | "weekly";
+          enabled: boolean;
+          next_run_at: string | null;
+          last_saved_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          frequency: "hourly" | "daily" | "weekly";
+          enabled?: boolean;
+          next_run_at?: string | null;
+          last_saved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          frequency?: "hourly" | "daily" | "weekly";
+          enabled?: boolean;
+          next_run_at?: string | null;
+          last_saved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       sync_jobs: {
         Relationships: [];
         Row: {
@@ -318,6 +351,8 @@ export type ConnectorCredential =
   Database["public"]["Tables"]["connector_credentials"]["Row"];
 export type OAuthPendingSession =
   Database["public"]["Tables"]["oauth_pending_sessions"]["Row"];
+export type WorkspaceSyncSchedule =
+  Database["public"]["Tables"]["workspace_sync_schedules"]["Row"];
 export type SyncJob = Database["public"]["Tables"]["sync_jobs"]["Row"];
 export type Subscription =
   Database["public"]["Tables"]["subscriptions"]["Row"];

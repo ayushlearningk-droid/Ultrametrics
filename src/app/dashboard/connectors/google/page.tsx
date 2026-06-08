@@ -1,5 +1,6 @@
 import { ConnectorBackLink } from "@/components/connectors/connector-back-link";
 import { GoogleConnectButton } from "@/components/connectors/google-connect-button";
+import { GoogleScheduleConfig } from "@/components/connectors/google-schedule-config";
 import { GoogleSpreadsheetSelection } from "@/components/connectors/google-spreadsheet-selection";
 import { GoogleSyncNowButton } from "@/components/connectors/google-sync-now-button";
 import { getSyncJobsByWorkspace } from "@/lib/data/dashboard";
@@ -63,6 +64,19 @@ export default async function GoogleSheetsConnectorPage() {
           <div className="mt-4">
             <GoogleSyncNowButton />
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-card p-6 shadow-sm">
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold">Scheduler</h3>
+          <p className="text-sm text-muted-foreground">
+            Configure automated sync frequency for this workspace.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <GoogleScheduleConfig />
         </div>
       </div>
 
