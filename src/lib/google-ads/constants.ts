@@ -1,5 +1,5 @@
 /** Google Ads REST API version — https://developers.google.com/google-ads/api/docs/release-notes */
-export const GOOGLE_ADS_API_VERSION = "v19";
+export const GOOGLE_ADS_API_VERSION = "v24";
 
 /** Base URL for all Google Ads REST API calls */
 export const GOOGLE_ADS_API_BASE = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
