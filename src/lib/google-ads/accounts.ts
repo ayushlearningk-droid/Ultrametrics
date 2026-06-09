@@ -57,13 +57,16 @@ async function fetchCustomerDetail(
   developerToken: string,
   mccCustomerId: string
 ): Promise<GoogleAdsAccount | null> {
-  const res = await fetch(`${GOOGLE_ADS_API_BASE}/customers/${customerId}`, {
+  const requestUrl = `${GOOGLE_ADS_API_BASE}/customers/${customerId}`;
+  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) request URL:`, requestUrl);
+  const res = await fetch(requestUrl, {
     headers: buildHeaders(accessToken, developerToken, mccCustomerId),
     cache: "no-store",
   });
 
   const rawText = await res.text();
   console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) status:`, res.status);
+  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) response URL (after redirects):`, res.url);
   console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) headers:`, Object.fromEntries(res.headers.entries()));
   console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) body (first 1000):`, rawText.slice(0, 1000));
 
@@ -96,8 +99,10 @@ export async function listAccessibleCustomers(
   developerToken: string,
   mccCustomerId: string
 ): Promise<GoogleAdsAccount[]> {
+  const requestUrl = `${GOOGLE_ADS_API_BASE}/customers:listAccessibleCustomers`;
+  console.debug("[GoogleAds] listAccessibleCustomers request URL:", requestUrl);
   const res = await fetch(
-    `${GOOGLE_ADS_API_BASE}/customers:listAccessibleCustomers`,
+    requestUrl,
     {
       // login-customer-id is not required for this endpoint
       headers: buildHeaders(accessToken, developerToken),
@@ -107,6 +112,7 @@ export async function listAccessibleCustomers(
 
   const rawText = await res.text();
   console.debug("[GoogleAds] listAccessibleCustomers status:", res.status);
+  console.debug("[GoogleAds] listAccessibleCustomers response URL (after redirects):", res.url);
   console.debug("[GoogleAds] listAccessibleCustomers headers:", Object.fromEntries(res.headers.entries()));
   console.debug("[GoogleAds] listAccessibleCustomers body (first 1000):", rawText.slice(0, 1000));
 
