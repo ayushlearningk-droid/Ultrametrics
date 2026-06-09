@@ -62,7 +62,18 @@ async function fetchCustomerDetail(
     cache: "no-store",
   });
 
-  const body = (await res.json()) as CustomerDetailResponse & GoogleAdsApiError;
+  const rawText = await res.text();
+  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) status:`, res.status);
+  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) headers:`, Object.fromEntries(res.headers.entries()));
+  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) body (first 1000):`, rawText.slice(0, 1000));
+
+  let body: CustomerDetailResponse & GoogleAdsApiError;
+  try {
+    body = JSON.parse(rawText) as CustomerDetailResponse & GoogleAdsApiError;
+  } catch {
+    console.error(`[GoogleAds] fetchCustomerDetail(${customerId}) non-JSON response:\n`, rawText);
+    return null;
+  }
 
   if (!res.ok || body.error) {
     console.error(
@@ -94,8 +105,18 @@ export async function listAccessibleCustomers(
     }
   );
 
-  const body = (await res.json()) as ListAccessibleCustomersResponse &
-    GoogleAdsApiError;
+  const rawText = await res.text();
+  console.debug("[GoogleAds] listAccessibleCustomers status:", res.status);
+  console.debug("[GoogleAds] listAccessibleCustomers headers:", Object.fromEntries(res.headers.entries()));
+  console.debug("[GoogleAds] listAccessibleCustomers body (first 1000):", rawText.slice(0, 1000));
+
+  let body: ListAccessibleCustomersResponse & GoogleAdsApiError;
+  try {
+    body = JSON.parse(rawText) as ListAccessibleCustomersResponse & GoogleAdsApiError;
+  } catch {
+    console.error("[GoogleAds] listAccessibleCustomers non-JSON response:\n", rawText);
+    throw new Error(`Google Ads API returned non-JSON response (status ${res.status})`);
+  }
 
   if (!res.ok || body.error) {
     throw new Error(
