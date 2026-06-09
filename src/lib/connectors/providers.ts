@@ -19,7 +19,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     id: "google_ads",
     name: "Google Ads",
     color: "bg-blue-500",
-    available: false,
+    available: true,
+    href: "/dashboard/connectors/google-ads",
   },
   {
     id: "google_sheets",
