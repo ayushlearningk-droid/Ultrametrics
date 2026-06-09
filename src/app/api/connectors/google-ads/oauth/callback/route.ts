@@ -15,15 +15,15 @@ import {
   googleAdsConnectUrl,
   GOOGLE_ADS_SELECT_ACCOUNT_PATH,
 } from "@/lib/google-ads/oauth-redirect";
-import { GOOGLE_ADS_OAUTH_PENDING_TTL_SECONDS } from "@/lib/google-ads/constants";
+import {
+  GOOGLE_ADS_OAUTH_PENDING_TTL_SECONDS,
+  GOOGLE_ADS_REFRESH_TOKEN_COOKIE,
+} from "@/lib/google-ads/constants";
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
-// Must match the cookie name read by the connect route (Step 6).
-export const GOOGLE_ADS_REFRESH_TOKEN_COOKIE =
-  "ultrametrics_google_ads_refresh_token";
 
 export async function GET(request: Request) {
   const user = await requireUser();

@@ -7,7 +7,7 @@ import {
   getUserWorkspaces,
 } from "@/lib/data/workspaces";
 import { deleteOAuthPendingForUserWorkspace } from "@/lib/data/oauth-pending";
-import { GOOGLE_ADS_REFRESH_TOKEN_COOKIE } from "@/app/api/connectors/google-ads/oauth/callback/route";
+import { GOOGLE_ADS_REFRESH_TOKEN_COOKIE } from "@/lib/google-ads/constants";
 
 type ConnectBody = {
   customerId?: string;
