@@ -63,6 +63,15 @@ export async function GET() {
     const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim();
     const mccCustomerId = process.env.GOOGLE_ADS_MCC_CUSTOMER_ID?.trim();
 
+    // --- DIAGNOSTIC: env and connector values before API call ---
+    console.log("[GoogleAds][test-insights] === PRE-CALL DIAGNOSTIC ===");
+    console.log("[GoogleAds][test-insights] connector.external_account_id:", connector.external_account_id);
+    console.log("[GoogleAds][test-insights] GOOGLE_ADS_DEVELOPER_TOKEN present:", !!developerToken);
+    console.log("[GoogleAds][test-insights] GOOGLE_ADS_DEVELOPER_TOKEN length:", developerToken?.length ?? 0);
+    console.log("[GoogleAds][test-insights] GOOGLE_ADS_MCC_CUSTOMER_ID raw value:", mccCustomerId ?? "(not set)");
+    console.log("[GoogleAds][test-insights] GOOGLE_ADS_MCC_CUSTOMER_ID has dashes:", mccCustomerId?.includes("-") ?? false);
+    console.log("[GoogleAds][test-insights] config.refresh_token present:", !!config.refresh_token);
+
     if (!developerToken || !mccCustomerId) {
       return NextResponse.json(
         { error: "GOOGLE_ADS_DEVELOPER_TOKEN or GOOGLE_ADS_MCC_CUSTOMER_ID is not set" },
@@ -72,8 +81,10 @@ export async function GET() {
 
     // Exchange refresh_token for a fresh access_token.
     const accessToken = await refreshGoogleAdsAccessToken(config.refresh_token);
+    console.log("[GoogleAds][test-insights] access token refreshed successfully, length:", accessToken.length);
 
     const customerId = String(connector.external_account_id);
+    console.log("[GoogleAds][test-insights] customerId to query:", customerId);
 
     const insights = await getCampaignInsights(
       accessToken,

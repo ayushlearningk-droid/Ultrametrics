@@ -10,6 +10,16 @@ export type GoogleAdsCampaignRow = {
   conversions: number;
 };
 
+type GaqlErrorDetail = {
+  "@type"?: string;
+  errors?: Array<{
+    errorCode?: Record<string, string>;
+    message?: string;
+    location?: unknown;
+  }>;
+  requestId?: string;
+};
+
 type GaqlSearchResponse = {
   results?: Array<{
     campaign?: {
@@ -27,6 +37,7 @@ type GaqlSearchResponse = {
     code?: number;
     message?: string;
     status?: string;
+    details?: GaqlErrorDetail[];
   };
 };
 
@@ -93,10 +104,17 @@ export async function getCampaignInsights(
 ): Promise<GoogleAdsCampaignRow[]> {
   const url = `${GOOGLE_ADS_API_BASE}/customers/${customerId}/googleAds:search`;
 
-  console.log("[GoogleAds][insights] request URL:", url);
-  console.log("[GoogleAds][insights] customerId:", customerId);
-  console.log("[GoogleAds][insights] login-customer-id:", mccCustomerId);
-  console.log("[GoogleAds][insights] query:", CAMPAIGN_INSIGHTS_QUERY);
+  // --- DIAGNOSTIC: outbound request ---
+  console.log("[GoogleAds][insights] === OUTBOUND REQUEST ===");
+  console.log("[GoogleAds][insights] URL:", url);
+  console.log("[GoogleAds][insights] customerId (in URL path):", customerId);
+  console.log("[GoogleAds][insights] customerId has dashes:", customerId.includes("-"));
+  console.log("[GoogleAds][insights] mccCustomerId (login-customer-id header):", mccCustomerId || "(empty — header NOT sent)");
+  console.log("[GoogleAds][insights] mccCustomerId has dashes:", mccCustomerId?.includes("-") ?? false);
+  console.log("[GoogleAds][insights] developerToken length:", developerToken.length);
+  console.log("[GoogleAds][insights] developerToken prefix (first 5):", developerToken.slice(0, 5));
+  console.log("[GoogleAds][insights] accessToken length:", accessToken.length);
+  console.log("[GoogleAds][insights] accessToken prefix (first 20):", accessToken.slice(0, 20));
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
@@ -108,6 +126,9 @@ export async function getCampaignInsights(
     headers["login-customer-id"] = mccCustomerId;
   }
 
+  console.log("[GoogleAds][insights] outbound header keys:", Object.keys(headers));
+  console.log("[GoogleAds][insights] login-customer-id header value:", headers["login-customer-id"] ?? "(not set)");
+
   const res = await fetch(url, {
     method: "POST",
     headers,
@@ -116,8 +137,12 @@ export async function getCampaignInsights(
   });
 
   const rawText = await res.text();
-  console.log("[GoogleAds][insights] response status:", res.status);
-  console.log("[GoogleAds][insights] response body:", rawText);
+
+  // --- DIAGNOSTIC: response ---
+  console.log("[GoogleAds][insights] === RESPONSE ===");
+  console.log("[GoogleAds][insights] HTTP status:", res.status, res.statusText);
+  console.log("[GoogleAds][insights] response URL (after redirects):", res.url);
+  console.log("[GoogleAds][insights] raw response body:", rawText);
 
   let body: GaqlSearchResponse;
   try {
@@ -129,6 +154,20 @@ export async function getCampaignInsights(
   }
 
   if (!res.ok || body.error) {
+    // --- DIAGNOSTIC: structured error breakdown ---
+    console.log("[GoogleAds][insights] === ERROR BREAKDOWN ===");
+    console.log("[GoogleAds][insights] error.code:", body.error?.code);
+    console.log("[GoogleAds][insights] error.status:", body.error?.status);
+    console.log("[GoogleAds][insights] error.message:", body.error?.message);
+    console.log("[GoogleAds][insights] error.details (full):", JSON.stringify(body.error?.details ?? [], null, 2));
+
+    // Extract the innermost Google Ads error codes from details[].errors[].errorCode
+    const innerErrors = body.error?.details?.flatMap((d) => d.errors ?? []) ?? [];
+    innerErrors.forEach((e, i) => {
+      console.log(`[GoogleAds][insights] error.details[${i}].errorCode:`, JSON.stringify(e.errorCode));
+      console.log(`[GoogleAds][insights] error.details[${i}].message:`, e.message);
+    });
+
     throw new Error(
       body.error?.message ?? `Google Ads API error: ${res.status}`
     );
