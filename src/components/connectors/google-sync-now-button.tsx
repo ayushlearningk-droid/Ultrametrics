@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 type SyncResponse = {
   ok?: boolean;
   rowsWritten?: number;
+  isSample?: boolean;
   error?: string;
 };
 
@@ -30,8 +31,11 @@ export function GoogleSyncNowButton() {
         throw new Error(payload.error ?? response.statusText ?? "Sync failed");
       }
 
-      const rowsWritten = payload.rowsWritten ?? 0;
-      setSuccessMessage(`Successfully synced ${rowsWritten} rows`);
+      const rows = payload.rowsWritten ?? 0;
+      const msg = payload.isSample
+        ? `Sheet created with ${rows} sample rows. Connect Meta Ads to sync real data.`
+        : `Synced ${rows} rows from Meta Ads successfully.`;
+      setSuccessMessage(msg);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Sync failed");
     } finally {

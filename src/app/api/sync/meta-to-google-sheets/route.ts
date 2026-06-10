@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       ok: true,
       rowsWritten: result.rowsWritten,
       spreadsheetId: result.spreadsheetId,
+      isSample: result.isSample,
     },
     { status: result.status }
   );
