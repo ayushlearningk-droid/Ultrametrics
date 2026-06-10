@@ -56,6 +56,7 @@ const config: Config = {
           foreground: "hsl(var(--brand-foreground))",
           muted: "hsl(var(--brand-muted))",
         },
+        sidebar: "hsl(var(--sidebar))",
       },
       borderRadius: {
         lg: "var(--radius)",
