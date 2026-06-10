@@ -1,6 +1,7 @@
 import { ConnectorBackLink } from "@/components/connectors/connector-back-link";
 import { GoogleAdsConnectButton } from "@/components/connectors/google-ads-connect-button";
 import { GoogleAdsOAuthAlerts } from "@/components/connectors/google-ads-oauth-alerts";
+import { GoogleSyncNowButton } from "@/components/connectors/google-sync-now-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,15 +96,21 @@ export default async function GoogleAdsConnectPage({
                 </p>
               )}
             </div>
-            {workspaceId && googleAdsConfig ? (
-              <Button variant="outline" asChild>
-                <a
-                  href={`/api/connectors/google-ads/oauth/start?workspaceId=${encodeURIComponent(workspaceId)}`}
-                >
-                  Reconnect
-                </a>
-              </Button>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+              <GoogleSyncNowButton
+                endpoint="/api/sync/google-ads-to-google-sheets"
+                source="Google Ads"
+              />
+              {workspaceId && googleAdsConfig ? (
+                <Button variant="outline" asChild>
+                  <a
+                    href={`/api/connectors/google-ads/oauth/start?workspaceId=${encodeURIComponent(workspaceId)}`}
+                  >
+                    Reconnect
+                  </a>
+                </Button>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
       ) : (

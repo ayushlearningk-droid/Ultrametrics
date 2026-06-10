@@ -3,11 +3,13 @@ import { GOOGLE_ADS_API_BASE } from "@/lib/google-ads/constants";
 export type GoogleAdsCampaignRow = {
   campaignId: string;
   campaignName: string;
+  date: string; // YYYY-MM-DD from segments.date
   impressions: number;
   clicks: number;
   costMicros: number;
   costCurrency: number; // costMicros / 1_000_000
   conversions: number;
+  conversionsValue: number; // metrics.conversions_value (monetary)
 };
 
 type GaqlErrorDetail = {
@@ -26,11 +28,15 @@ type GaqlSearchResponse = {
       id?: string;
       name?: string;
     };
+    segments?: {
+      date?: string;
+    };
     metrics?: {
       impressions?: string;
       clicks?: string;
       costMicros?: string;
       conversions?: string;
+      conversionsValue?: string;
     };
   }>;
   error?: {
@@ -45,15 +51,17 @@ const CAMPAIGN_INSIGHTS_QUERY = `
   SELECT
     campaign.id,
     campaign.name,
+    segments.date,
     metrics.impressions,
     metrics.clicks,
     metrics.cost_micros,
-    metrics.conversions
+    metrics.conversions,
+    metrics.conversions_value
   FROM campaign
   WHERE segments.date DURING LAST_30_DAYS
     AND campaign.status != 'REMOVED'
-  ORDER BY metrics.impressions DESC
-  LIMIT 100
+  ORDER BY segments.date DESC, metrics.impressions DESC
+  LIMIT 2000
 `.trim();
 
 export async function refreshGoogleAdsAccessToken(
@@ -178,11 +186,13 @@ export async function getCampaignInsights(
     return {
       campaignId: row.campaign?.id ?? "",
       campaignName: row.campaign?.name ?? "",
+      date: row.segments?.date ?? "",
       impressions: parseInt(row.metrics?.impressions ?? "0", 10),
       clicks: parseInt(row.metrics?.clicks ?? "0", 10),
       costMicros,
       costCurrency: costMicros / 1_000_000,
       conversions: parseFloat(row.metrics?.conversions ?? "0"),
+      conversionsValue: parseFloat(row.metrics?.conversionsValue ?? "0"),
     };
   });
 }

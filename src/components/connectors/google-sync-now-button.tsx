@@ -10,7 +10,15 @@ type SyncResponse = {
   error?: string;
 };
 
-export function GoogleSyncNowButton() {
+type GoogleSyncNowButtonProps = {
+  endpoint?: string;
+  source?: string;
+};
+
+export function GoogleSyncNowButton({
+  endpoint = "/api/sync/meta-to-google-sheets",
+  source = "Meta Ads",
+}: GoogleSyncNowButtonProps = {}) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -21,7 +29,7 @@ export function GoogleSyncNowButton() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/sync/meta-to-google-sheets", {
+      const response = await fetch(endpoint, {
         method: "POST",
       });
 
@@ -33,8 +41,8 @@ export function GoogleSyncNowButton() {
 
       const rows = payload.rowsWritten ?? 0;
       const msg = payload.isSample
-        ? `Sheet created with ${rows} sample rows. Connect Meta Ads to sync real data.`
-        : `Synced ${rows} rows from Meta Ads successfully.`;
+        ? `Sheet created with ${rows} sample rows. Connect ${source} to sync real data.`
+        : `Synced ${rows} rows from ${source} successfully.`;
       setSuccessMessage(msg);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Sync failed");

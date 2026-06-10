@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMetaToGoogleSheetsSyncForWorkspace } from "@/lib/sync/meta-to-google-sheets";
+import { runGoogleAdsToGoogleSheetsSyncForWorkspace } from "@/lib/sync/google-ads-to-google-sheets";
 
 type ScheduleFrequency = "hourly" | "daily" | "weekly";
 
@@ -65,15 +66,15 @@ export async function GET(request: Request) {
 
   const results: Array<{
     workspaceId: string;
-    ok: boolean;
-    status: number;
-    error?: string;
+    meta: { ok: boolean; status: number; error?: string };
+    googleAds: { ok: boolean; status: number; error?: string };
   }> = [];
 
   for (const schedule of dueSchedules) {
-    const result = await runMetaToGoogleSheetsSyncForWorkspace(
-      schedule.workspace_id
-    );
+    const [metaResult, googleAdsResult] = await Promise.all([
+      runMetaToGoogleSheetsSyncForWorkspace(schedule.workspace_id),
+      runGoogleAdsToGoogleSheetsSyncForWorkspace(schedule.workspace_id),
+    ]);
 
     const nextRunAt = addScheduleInterval(now, schedule.frequency).toISOString();
 
@@ -87,9 +88,16 @@ export async function GET(request: Request) {
 
     results.push({
       workspaceId: schedule.workspace_id,
-      ok: result.ok,
-      status: result.status,
-      error: result.ok ? undefined : result.error,
+      meta: {
+        ok: metaResult.ok,
+        status: metaResult.status,
+        error: metaResult.ok ? undefined : metaResult.error,
+      },
+      googleAds: {
+        ok: googleAdsResult.ok,
+        status: googleAdsResult.status,
+        error: googleAdsResult.ok ? undefined : googleAdsResult.error,
+      },
     });
   }
 
