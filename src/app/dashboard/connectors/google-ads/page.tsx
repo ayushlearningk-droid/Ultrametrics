@@ -1,6 +1,7 @@
 import { ConnectorBackLink } from "@/components/connectors/connector-back-link";
 import { GoogleAdsConnectButton } from "@/components/connectors/google-ads-connect-button";
 import { GoogleAdsOAuthAlerts } from "@/components/connectors/google-ads-oauth-alerts";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getConnectorsByWorkspace } from "@/lib/data/dashboard";
 import { getGoogleAdsConfig } from "@/lib/google-ads/config";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 
@@ -36,6 +38,11 @@ export default async function GoogleAdsConnectPage({
   const workspaceId = await getCurrentWorkspaceId(workspaces);
   const googleAdsConfig = getGoogleAdsConfig();
 
+  const allConnectors = workspaceId
+    ? await getConnectorsByWorkspace(workspaceId)
+    : [];
+  const connector = allConnectors.find((c) => c.provider === "google_ads") ?? null;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <ConnectorBackLink href="/dashboard/connectors" />
@@ -53,52 +60,100 @@ export default async function GoogleAdsConnectPage({
         reason={params.reason}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Connection steps</CardTitle>
-          <CardDescription>
-            Sign in with Google to authorize Ultrametrics for this workspace.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-            {STEPS.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-          {workspaceId ? (
-            <GoogleAdsConnectButton
-              workspaceId={workspaceId}
-              configured={googleAdsConfig !== null}
-            />
-          ) : (
-            <Button variant="brand" className="w-full sm:w-auto" disabled>
-              Connect Google Ads
-            </Button>
-          )}
-          {!googleAdsConfig && (
-            <p className="text-xs text-muted-foreground">
-              Set{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
-                GOOGLE_ADS_DEVELOPER_TOKEN
-              </code>
-              ,{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
-                GOOGLE_ADS_MCC_CUSTOMER_ID
-              </code>
-              , and{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
-                GOOGLE_ADS_OAUTH_REDIRECT_URI
-              </code>{" "}
-              in{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
-                .env.local
-              </code>
-              .
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {connector ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle>Google Ads</CardTitle>
+                <CardDescription className="mt-1">
+                  An account is connected to this workspace.
+                </CardDescription>
+              </div>
+              <Badge
+                variant={connector.status === "active" ? "success" : "secondary"}
+                className="mt-0.5 shrink-0"
+              >
+                {connector.status}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm space-y-1">
+              <p className="font-medium">
+                {connector.external_account_name ?? connector.name}
+              </p>
+              {connector.external_account_id && (
+                <p className="text-muted-foreground">
+                  Account ID: {connector.external_account_id}
+                </p>
+              )}
+              {connector.last_synced_at && (
+                <p className="text-muted-foreground">
+                  Last synced:{" "}
+                  {new Date(connector.last_synced_at).toLocaleString()}
+                </p>
+              )}
+            </div>
+            {workspaceId && googleAdsConfig ? (
+              <Button variant="outline" asChild>
+                <a
+                  href={`/api/connectors/google-ads/oauth/start?workspaceId=${encodeURIComponent(workspaceId)}`}
+                >
+                  Reconnect
+                </a>
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Connection steps</CardTitle>
+            <CardDescription>
+              Sign in with Google to authorize Ultrametrics for this workspace.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+              {STEPS.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            {workspaceId ? (
+              <GoogleAdsConnectButton
+                workspaceId={workspaceId}
+                configured={googleAdsConfig !== null}
+              />
+            ) : (
+              <Button variant="brand" className="w-full sm:w-auto" disabled>
+                Connect Google Ads
+              </Button>
+            )}
+            {!googleAdsConfig && (
+              <p className="text-xs text-muted-foreground">
+                Set{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
+                  GOOGLE_ADS_DEVELOPER_TOKEN
+                </code>
+                ,{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
+                  GOOGLE_ADS_MCC_CUSTOMER_ID
+                </code>
+                , and{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
+                  GOOGLE_ADS_OAUTH_REDIRECT_URI
+                </code>{" "}
+                in{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
+                  .env.local
+                </code>
+                .
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
