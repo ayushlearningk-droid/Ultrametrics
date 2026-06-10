@@ -97,6 +97,11 @@ export default async function GoogleAdsSelectAccountPage() {
 
   const session = await getGoogleAdsPendingSession(workspaceId);
 
+  console.log("[GoogleAds] pending session lookup:", session
+    ? { found: true, hasAccessToken: !!session.access_token, accessTokenLength: session.access_token.length }
+    : { found: false }
+  );
+
   if (!session?.access_token) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">

@@ -101,6 +101,10 @@ export async function GET(request: Request) {
       );
     }
 
+    console.log("[GoogleAds] token exchange success");
+    console.log("[GoogleAds] access_token length:", tokenJson.access_token.length);
+    console.log("[GoogleAds] has refresh_token:", !!tokenJson.refresh_token);
+
     await deleteOAuthPendingForUserWorkspace(user.id, workspaceId, "google_ads");
     await createOAuthPendingSession({
       userId: user.id,
@@ -109,6 +113,8 @@ export async function GET(request: Request) {
       accessToken: tokenJson.access_token,
       provider: "google_ads",
     });
+
+    console.log("[GoogleAds] access_token stored in oauth_pending_sessions");
 
     // Store the refresh_token in a short-lived httpOnly cookie so the connect
     // route can persist it to connectors.config when the connector row is

@@ -100,12 +100,15 @@ export async function listAccessibleCustomers(
   mccCustomerId: string
 ): Promise<GoogleAdsAccount[]> {
   const requestUrl = `${GOOGLE_ADS_API_BASE}/customers:listAccessibleCustomers`;
+  console.log("[GoogleAds] listAccessibleCustomers access_token length:", accessToken.length);
+  console.log("[GoogleAds] listAccessibleCustomers Authorization header (masked):", `Bearer ${accessToken.slice(0, 10)}...`);
   console.debug("[GoogleAds] listAccessibleCustomers request URL:", requestUrl);
+  const requestHeaders = buildHeaders(accessToken, developerToken);
   const res = await fetch(
     requestUrl,
     {
       // login-customer-id is not required for this endpoint
-      headers: buildHeaders(accessToken, developerToken),
+      headers: requestHeaders,
       cache: "no-store",
     }
   );
