@@ -100,31 +100,38 @@ export async function listAccessibleCustomers(
   mccCustomerId: string
 ): Promise<GoogleAdsAccount[]> {
   const requestUrl = `${GOOGLE_ADS_API_BASE}/customers:listAccessibleCustomers`;
-  console.log("[GoogleAds] listAccessibleCustomers access_token length:", accessToken.length);
-  console.log("[GoogleAds] listAccessibleCustomers access_token prefix (first 20):", accessToken.slice(0, 20));
-  console.log("[GoogleAds] listAccessibleCustomers developer-token length:", developerToken.length);
-  console.log("[GoogleAds] listAccessibleCustomers developer-token prefix (first 5):", developerToken.slice(0, 5));
+
+  // --- DIAGNOSTIC: inputs ---
+  console.log("[GoogleAds][diag] access_token length:", accessToken.length);
+  console.log("[GoogleAds][diag] access_token prefix (first 20):", accessToken.slice(0, 20));
+  console.log("[GoogleAds][diag] developer-token length:", developerToken.length);
+  console.log("[GoogleAds][diag] developer-token prefix (first 5):", developerToken.slice(0, 5));
+  console.log("[GoogleAds][diag] mccCustomerId received:", mccCustomerId ? `"${mccCustomerId}" (len=${mccCustomerId.length})` : "(empty or undefined)");
+
+  // --- DIAGNOSTIC: headers being built ---
+  // buildHeaders() is called WITHOUT mccCustomerId for this endpoint.
+  // login-customer-id is therefore NOT included in the request.
   const requestHeaders = buildHeaders(accessToken, developerToken);
-  console.log("[GoogleAds] listAccessibleCustomers outbound headers:", {
+  console.log("[GoogleAds][diag] login-customer-id sent:", "login-customer-id" in requestHeaders ? requestHeaders["login-customer-id"] : "NOT SENT");
+  console.log("[GoogleAds][diag] exact outbound headers (masked):", {
     Authorization: `Bearer ${accessToken.slice(0, 20)}...[len=${accessToken.length}]`,
     "developer-token": `${developerToken.slice(0, 5)}...[len=${developerToken.length}]`,
-    "header-keys-sent": Object.keys(requestHeaders),
+    "login-customer-id": "login-customer-id" in requestHeaders ? requestHeaders["login-customer-id"] : "(not present)",
+    "all header keys": Object.keys(requestHeaders),
   });
-  console.debug("[GoogleAds] listAccessibleCustomers request URL:", requestUrl);
-  const res = await fetch(
-    requestUrl,
-    {
-      // login-customer-id is not required for this endpoint
-      headers: requestHeaders,
-      cache: "no-store",
-    }
-  );
+
+  const res = await fetch(requestUrl, {
+    headers: requestHeaders,
+    cache: "no-store",
+  });
 
   const rawText = await res.text();
-  console.debug("[GoogleAds] listAccessibleCustomers status:", res.status);
-  console.debug("[GoogleAds] listAccessibleCustomers response URL (after redirects):", res.url);
-  console.debug("[GoogleAds] listAccessibleCustomers headers:", Object.fromEntries(res.headers.entries()));
-  console.debug("[GoogleAds] listAccessibleCustomers body (first 1000):", rawText.slice(0, 1000));
+
+  // --- DIAGNOSTIC: response ---
+  console.log("[GoogleAds][diag] response status:", res.status);
+  console.log("[GoogleAds][diag] response URL (after redirects):", res.url);
+  console.log("[GoogleAds][diag] response headers:", Object.fromEntries(res.headers.entries()));
+  console.log("[GoogleAds][diag] response body (full):", rawText);
 
   let body: ListAccessibleCustomersResponse & GoogleAdsApiError;
   try {
