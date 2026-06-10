@@ -89,6 +89,7 @@ export async function GET(request: Request) {
     const tokenJson = (await tokenRes.json()) as {
       access_token?: string;
       refresh_token?: string;
+      scope?: string;
       error?: string;
       error_description?: string;
     };
@@ -105,6 +106,7 @@ export async function GET(request: Request) {
     console.log("[GoogleAds] access_token length:", tokenJson.access_token.length);
     console.log("[GoogleAds] access_token prefix (first 20):", tokenJson.access_token.slice(0, 20));
     console.log("[GoogleAds] has refresh_token:", !!tokenJson.refresh_token);
+    console.log("[GoogleAds] granted scopes:", tokenJson.scope ?? "(scope not in response)");
 
     await deleteOAuthPendingForUserWorkspace(user.id, workspaceId, "google_ads");
     await createOAuthPendingSession({
