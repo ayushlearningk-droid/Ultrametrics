@@ -11,11 +11,16 @@ type ListAccessibleCustomersResponse = {
   resourceNames?: string[];
 };
 
-type CustomerDetailResponse = {
-  resourceName?: string;
-  id?: string;
-  descriptiveName?: string;
-  currencyCode?: string;
+// Response shape for POST /customers/{id}/googleAds:search
+type SearchResponse = {
+  results?: Array<{
+    customer?: {
+      resourceName?: string;
+      id?: string;
+      descriptiveName?: string;
+      currencyCode?: string;
+    };
+  }>;
 };
 
 type GoogleAdsApiError = {
@@ -57,40 +62,67 @@ async function fetchCustomerDetail(
   developerToken: string,
   mccCustomerId: string
 ): Promise<GoogleAdsAccount | null> {
-  const requestUrl = `${GOOGLE_ADS_API_BASE}/customers/${customerId}`;
-  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) request URL:`, requestUrl);
+  // Google Ads REST API has no GET /customers/{id}.
+  // Customer details are fetched via POST .../googleAds:search with GAQL.
+  const requestUrl = `${GOOGLE_ADS_API_BASE}/customers/${customerId}/googleAds:search`;
+  const query =
+    "SELECT customer.id, customer.descriptive_name, customer.currency_code, customer.resource_name FROM customer LIMIT 1";
+
+  console.log(`[GoogleAds][diag] fetchCustomerDetail(${customerId}) URL:`, requestUrl);
+  console.log(`[GoogleAds][diag] fetchCustomerDetail(${customerId}) login-customer-id:`, mccCustomerId || "(not set)");
+
+  const requestHeaders = {
+    ...buildHeaders(accessToken, developerToken, mccCustomerId),
+    "Content-Type": "application/json",
+  };
+
   const res = await fetch(requestUrl, {
-    headers: buildHeaders(accessToken, developerToken, mccCustomerId),
+    method: "POST",
+    headers: requestHeaders,
+    body: JSON.stringify({ query }),
     cache: "no-store",
   });
 
   const rawText = await res.text();
-  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) status:`, res.status);
-  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) response URL (after redirects):`, res.url);
-  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) headers:`, Object.fromEntries(res.headers.entries()));
-  console.debug(`[GoogleAds] fetchCustomerDetail(${customerId}) body (first 1000):`, rawText.slice(0, 1000));
+  console.log(`[GoogleAds][diag] fetchCustomerDetail(${customerId}) status:`, res.status);
+  console.log(`[GoogleAds][diag] fetchCustomerDetail(${customerId}) response body:`, rawText);
 
-  let body: CustomerDetailResponse & GoogleAdsApiError;
+  const fallback: GoogleAdsAccount = {
+    id: customerId,
+    name: customerId,
+    currencyCode: "",
+    resourceName: `customers/${customerId}`,
+  };
+
+  let body: SearchResponse & GoogleAdsApiError;
   try {
-    body = JSON.parse(rawText) as CustomerDetailResponse & GoogleAdsApiError;
+    body = JSON.parse(rawText) as SearchResponse & GoogleAdsApiError;
   } catch {
-    console.error(`[GoogleAds] fetchCustomerDetail(${customerId}) non-JSON response:\n`, rawText);
-    return null;
+    console.error(`[GoogleAds] fetchCustomerDetail(${customerId}) non-JSON response:`, rawText);
+    return fallback;
   }
 
   if (!res.ok || body.error) {
     console.error(
-      `Google Ads: failed to fetch customer ${customerId}:`,
+      `[GoogleAds] fetchCustomerDetail(${customerId}) API error:`,
       body.error?.message ?? res.statusText
     );
-    return null;
+    // Return fallback so the account still appears in the UI even when
+    // detail fetch fails (e.g. test-access token on a production account).
+    return fallback;
+  }
+
+  const customer = body.results?.[0]?.customer;
+  if (!customer) {
+    console.warn(`[GoogleAds] fetchCustomerDetail(${customerId}) no results in search response`);
+    return fallback;
   }
 
   return {
-    id: body.id ?? customerId,
-    name: body.descriptiveName ?? `Account ${customerId}`,
-    currencyCode: body.currencyCode ?? "",
-    resourceName: body.resourceName ?? `customers/${customerId}`,
+    id: customer.id ?? customerId,
+    name: customer.descriptiveName ?? `Account ${customerId}`,
+    currencyCode: customer.currencyCode ?? "",
+    resourceName: customer.resourceName ?? `customers/${customerId}`,
   };
 }
 
