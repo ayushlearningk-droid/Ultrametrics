@@ -95,13 +95,13 @@ async function fetchMetaInsightsLast30Days(
   return payload.data ?? [];
 }
 
-function generateSampleData(): string[][] {
+function generateSampleData(): (string | number)[][] {
   return [
-    ["2024-06-01", "Brand Awareness", "150.00", "320", "12000", "450.00", "3.00"],
-    ["2024-06-01", "Retargeting", "200.00", "410", "15500", "640.00", "3.20"],
-    ["2024-06-02", "Brand Awareness", "165.00", "355", "13200", "495.00", "3.00"],
-    ["2024-06-02", "Prospecting", "300.00", "580", "22000", "810.00", "2.70"],
-    ["2024-06-03", "Retargeting", "220.00", "445", "16800", "704.00", "3.20"],
+    ["2024-06-01", "Brand Awareness", 150, 320, 12000, 450, 3.0],
+    ["2024-06-01", "Retargeting",      200, 410, 15500, 640, 3.2],
+    ["2024-06-02", "Brand Awareness",  165, 355, 13200, 495, 3.0],
+    ["2024-06-02", "Prospecting",      300, 580, 22000, 810, 2.7],
+    ["2024-06-03", "Retargeting",      220, 445, 16800, 704, 3.2],
   ];
 }
 
@@ -150,7 +150,7 @@ async function ensureSheetHeaders(
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: HEADER_RANGE,
-      valueInputOption: "RAW",
+      valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [Array.from(SHEET_HEADERS)],
       },
@@ -170,7 +170,7 @@ async function writeInsightRows(
     range: DATA_RANGE,
   });
 
-  let rows: string[][];
+  let rows: (string | number)[][];
   let isSample = false;
 
   if (insights.length === 0) {
@@ -186,15 +186,15 @@ async function writeInsightRows(
             a.action_type === "purchase"
         )?.value ?? "0";
       const revenue = parseFloat(purchaseRevenue);
-      const roas = spend > 0 ? (revenue / spend).toFixed(2) : "0.00";
+      const roas = spend > 0 ? parseFloat((revenue / spend).toFixed(2)) : 0;
 
       return [
         row.date_start ?? "",
         row.campaign_name ?? "",
-        spend.toFixed(2),
-        row.clicks ?? "0",
-        row.impressions ?? "0",
-        revenue.toFixed(2),
+        spend,
+        parseInt(row.clicks ?? "0", 10),
+        parseInt(row.impressions ?? "0", 10),
+        revenue,
         roas,
       ];
     });
@@ -204,7 +204,7 @@ async function writeInsightRows(
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: DATA_RANGE,
-      valueInputOption: "RAW",
+      valueInputOption: "USER_ENTERED",
       requestBody: { values: rows },
     });
   }

@@ -3,7 +3,9 @@ import { GoogleConnectButton } from "@/components/connectors/google-connect-butt
 import { GoogleScheduleConfig } from "@/components/connectors/google-schedule-config";
 import { GoogleSpreadsheetSelection } from "@/components/connectors/google-spreadsheet-selection";
 import { GoogleSyncNowButton } from "@/components/connectors/google-sync-now-button";
+import { LookerStudioPanel } from "@/components/connectors/looker-studio-panel";
 import { getSyncJobsByWorkspace } from "@/lib/data/dashboard";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 import { getGoogleOAuthConfig } from "@/lib/google/config";
 
@@ -15,9 +17,28 @@ export default async function GoogleSheetsConnectorPage() {
   const workspaces = await getUserWorkspaces();
   const workspaceId = await getCurrentWorkspaceId(workspaces);
   const configured = Boolean(getGoogleOAuthConfig());
-  const syncJobs = workspaceId
-    ? await getSyncJobsByWorkspace(workspaceId, 10)
-    : [];
+
+  const admin = createAdminClient();
+  const [syncJobs, sheetsConnectorResult] = await Promise.all([
+    workspaceId ? getSyncJobsByWorkspace(workspaceId, 10) : Promise.resolve([]),
+    workspaceId
+      ? admin
+          .from("connectors")
+          .select("config")
+          .eq("workspace_id", workspaceId)
+          .eq("provider", "google_sheets")
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const sheetsConfig = (sheetsConnectorResult.data?.config ?? {}) as {
+    spreadsheet_id?: string;
+    spreadsheet_name?: string;
+  };
+  const spreadsheetId = sheetsConfig.spreadsheet_id;
+  const spreadsheetName = sheetsConfig.spreadsheet_name;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -77,6 +98,21 @@ export default async function GoogleSheetsConnectorPage() {
 
         <div className="mt-6">
           <GoogleScheduleConfig />
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-card p-6 shadow-sm">
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold">Looker Studio</h3>
+          <p className="text-sm text-muted-foreground">
+            Connect your synced spreadsheet to Looker Studio for live dashboards.
+          </p>
+        </div>
+        <div className="mt-6">
+          <LookerStudioPanel
+            spreadsheetId={spreadsheetId}
+            spreadsheetName={spreadsheetName}
+          />
         </div>
       </div>
 
