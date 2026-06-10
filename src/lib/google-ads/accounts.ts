@@ -147,7 +147,12 @@ export async function listAccessibleCustomers(
     );
   }
 
+  console.log("[GoogleAds][diag] parsed resourceNames:", body.resourceNames ?? "(key absent from response)");
+  console.log("[GoogleAds][diag] resourceNames count:", (body.resourceNames ?? []).length);
+
   const resourceNames = (body.resourceNames ?? []).slice(0, MAX_ACCOUNTS);
+
+  console.log("[GoogleAds][diag] accounts to detail-fetch (after MAX_ACCOUNTS slice):", resourceNames.length);
 
   const results = await Promise.allSettled(
     resourceNames.map((name) =>
