@@ -101,9 +101,16 @@ export async function listAccessibleCustomers(
 ): Promise<GoogleAdsAccount[]> {
   const requestUrl = `${GOOGLE_ADS_API_BASE}/customers:listAccessibleCustomers`;
   console.log("[GoogleAds] listAccessibleCustomers access_token length:", accessToken.length);
-  console.log("[GoogleAds] listAccessibleCustomers Authorization header (masked):", `Bearer ${accessToken.slice(0, 10)}...`);
-  console.debug("[GoogleAds] listAccessibleCustomers request URL:", requestUrl);
+  console.log("[GoogleAds] listAccessibleCustomers access_token prefix (first 20):", accessToken.slice(0, 20));
+  console.log("[GoogleAds] listAccessibleCustomers developer-token length:", developerToken.length);
+  console.log("[GoogleAds] listAccessibleCustomers developer-token prefix (first 5):", developerToken.slice(0, 5));
   const requestHeaders = buildHeaders(accessToken, developerToken);
+  console.log("[GoogleAds] listAccessibleCustomers outbound headers:", {
+    Authorization: `Bearer ${accessToken.slice(0, 20)}...[len=${accessToken.length}]`,
+    "developer-token": `${developerToken.slice(0, 5)}...[len=${developerToken.length}]`,
+    "header-keys-sent": Object.keys(requestHeaders),
+  });
+  console.debug("[GoogleAds] listAccessibleCustomers request URL:", requestUrl);
   const res = await fetch(
     requestUrl,
     {

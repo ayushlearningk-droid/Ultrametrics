@@ -98,7 +98,14 @@ export default async function GoogleAdsSelectAccountPage() {
   const session = await getGoogleAdsPendingSession(workspaceId);
 
   console.log("[GoogleAds] pending session lookup:", session
-    ? { found: true, hasAccessToken: !!session.access_token, accessTokenLength: session.access_token.length }
+    ? {
+        found: true,
+        provider: session.provider,
+        workspace_id: session.workspace_id,
+        hasAccessToken: !!session.access_token,
+        accessTokenLength: session.access_token.length,
+        accessTokenPrefix: session.access_token.slice(0, 20),
+      }
     : { found: false }
   );
 

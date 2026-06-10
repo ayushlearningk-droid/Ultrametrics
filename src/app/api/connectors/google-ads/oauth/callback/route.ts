@@ -103,6 +103,7 @@ export async function GET(request: Request) {
 
     console.log("[GoogleAds] token exchange success");
     console.log("[GoogleAds] access_token length:", tokenJson.access_token.length);
+    console.log("[GoogleAds] access_token prefix (first 20):", tokenJson.access_token.slice(0, 20));
     console.log("[GoogleAds] has refresh_token:", !!tokenJson.refresh_token);
 
     await deleteOAuthPendingForUserWorkspace(user.id, workspaceId, "google_ads");
