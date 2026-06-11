@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { HealthRing } from "@/components/ui/health-ring";
 import { SparkLine } from "@/components/ui/spark-line";
+import { BRAND_ICON_MAP, GenericPlatformIcon } from "@/components/ui/brand-icons";
 import type { HealthStatus } from "@/components/ui/health-ring";
 
 export type ConnectorTokenHealth = "ok" | "expired" | "missing" | "sync_failed";
@@ -113,13 +114,15 @@ export function ConnectorHealthPanel({ connectors }: ConnectorHealthPanelProps) 
                         : "border-white/[0.06] bg-white/[0.025] hover:border-white/[0.1] hover:bg-white/[0.04]"
                     )}
                   >
-                    <div
-                      className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white text-xs font-bold",
-                        connector.gradient
+                    <div className="shrink-0">
+                      {BRAND_ICON_MAP[connector.provider] ? (
+                        (() => {
+                          const Icon = BRAND_ICON_MAP[connector.provider];
+                          return <Icon className="h-8 w-8" />;
+                        })()
+                      ) : (
+                        <GenericPlatformIcon className="h-8 w-8" label={connector.providerName} />
                       )}
-                    >
-                      {connector.providerName.slice(0, 2)}
                     </div>
 
                     <div className="min-w-0 flex-1">

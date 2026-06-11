@@ -36,3 +36,37 @@ export async function getAccountInsights(
 
   return json.data ?? [];
 }
+
+export interface DailyInsightRow {
+  date_start: string;
+  impressions: string;
+  clicks: string;
+  spend: string;
+  ctr: string;
+}
+
+/** Fetch day-by-day breakdown for the last `days` days (default 14). */
+export async function getAccountInsightsByDay(
+  accessToken: string,
+  accountId: string,
+  days = 14
+): Promise<DailyInsightRow[]> {
+  const fields = ["impressions", "clicks", "spend", "ctr"].join(",");
+  const params = new URLSearchParams({
+    fields,
+    date_preset: `last_${days}d`,
+    time_increment: "1",
+    access_token: accessToken,
+  });
+
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/act_${accountId}/insights?${params}`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText);
+  }
+
+  const json = await res.json();
+  return (json.data ?? []) as DailyInsightRow[];
+}

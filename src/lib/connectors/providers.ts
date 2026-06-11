@@ -4,6 +4,8 @@ import {
   ShoppingCart,
   Table2,
   TrendingUp,
+  Music2,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -12,7 +14,9 @@ export type ConnectorProviderId =
   | "google_ads"
   | "google_sheets"
   | "ga4"
-  | "shopify";
+  | "shopify"
+  | "tiktok_ads"
+  | "amazon_ads";
 
 export type ConnectorProvider = {
   id: ConnectorProviderId;
@@ -72,6 +76,24 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     color: "bg-green-600",
     gradient: "from-[#5E8E3E] to-[#96BF48]",
     icon: ShoppingCart,
+    available: false,
+  },
+  {
+    id: "tiktok_ads",
+    name: "TikTok Ads",
+    description: "TikTok campaign performance",
+    color: "bg-neutral-900",
+    gradient: "from-[#010101] to-[#2b2b2b]",
+    icon: Music2,
+    available: false,
+  },
+  {
+    id: "amazon_ads",
+    name: "Amazon Ads",
+    description: "Sponsored product campaigns",
+    color: "bg-amber-500",
+    gradient: "from-[#FF9900] to-[#E68200]",
+    icon: ShoppingBag,
     available: false,
   },
 ];

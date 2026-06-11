@@ -2,7 +2,6 @@ import {
   getConnectorsByWorkspace,
   getSyncJobsByWorkspace,
 } from "@/lib/data/dashboard";
-import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 import { CONNECTOR_PROVIDERS } from "@/lib/connectors/providers";
 import { WelcomeBar } from "@/components/dashboard/welcome-bar";
 import { MetricGrid } from "@/components/dashboard/metric-grid";
@@ -10,6 +9,7 @@ import { PipelineActivity } from "@/components/dashboard/pipeline-activity";
 import { ConnectorHealthPanel } from "@/components/dashboard/connector-health-panel";
 import { SpendByPlatform } from "@/components/dashboard/spend-by-platform";
 import { QuickActions } from "@/components/dashboard/quick-actions";
+import { SyncActivityChart } from "@/components/dashboard/sync-activity-chart";
 import type { SyncJobStatus, ConnectorStatus } from "@/types/database";
 import { getDashboardContext } from "@/lib/data/workspaces";
 import type { ConnectorTokenHealth } from "@/components/dashboard/connector-health-panel";
@@ -19,17 +19,11 @@ export const metadata = {
   title: "Overview",
 };
 
-/**
- * Derives token-level health from the connector's stored config.
- * Only Meta Ads currently uses a non-refreshing long-lived token;
- * Google connectors use refresh tokens handled by googleapis automatically.
- */
 function resolveTokenHealth(
   provider: string,
   status: string,
   config: unknown
 ): ConnectorTokenHealth {
-  // Non-active connectors: the connector-level status drives the ring.
   if (status !== "active") return "ok";
 
   if (provider === "meta_ads") {
@@ -41,7 +35,6 @@ function resolveTokenHealth(
     return "ok";
   }
 
-  // Google connectors auto-refresh; treat as ok when active.
   return "ok";
 }
 
@@ -60,7 +53,7 @@ export default async function DashboardPage() {
   const workspaceName = currentWorkspace?.name ?? "Workspace";
 
   const [allJobs, connectors] = await Promise.all([
-    currentWorkspaceId ? getSyncJobsByWorkspace(currentWorkspaceId, 50) : Promise.resolve([]),
+    currentWorkspaceId ? getSyncJobsByWorkspace(currentWorkspaceId, 100) : Promise.resolve([]),
     currentWorkspaceId ? getConnectorsByWorkspace(currentWorkspaceId) : Promise.resolve([]),
   ]);
 
@@ -68,7 +61,7 @@ export default async function DashboardPage() {
   const activeConnectors = connectors.filter((c) => c.status === "active");
   const recentSyncs = allJobs.filter((j) => j.status === "completed").slice(0, 10);
 
-  // Zone C left — last 8 jobs shaped for timeline
+  // Pipeline jobs timeline (last 8)
   const connectorMap = Object.fromEntries(connectors.map((c) => [c.id, c]));
   const pipelineJobs = allJobs.slice(0, 8).map((job) => {
     const connector = connectorMap[job.connector_id];
@@ -83,7 +76,7 @@ export default async function DashboardPage() {
     };
   });
 
-  // Zone C right — connector health items
+  // Connector health items
   const connectorHealthItems = connectors.map((connector) => {
     const providerInfo = CONNECTOR_PROVIDERS.find((p) => p.id === connector.provider);
     const connectorJobs = allJobs
@@ -91,7 +84,6 @@ export default async function DashboardPage() {
       .slice(0, 7)
       .reverse();
 
-    // Compute token-level health for OAuth connectors that store tokens in config.
     const tokenHealth = resolveTokenHealth(connector.provider, connector.status, connector.config);
 
     return {
@@ -108,7 +100,7 @@ export default async function DashboardPage() {
     };
   });
 
-  // Zone D left — records per active connector
+  // Records by active platform
   const recordsByPlatform = connectors
     .filter((c) => c.status === "active")
     .map((connector) => {
@@ -125,30 +117,24 @@ export default async function DashboardPage() {
     })
     .sort((a, b) => b.records - a.records);
 
+  // Daily sync activity for activity chart (last 14 days)
+  const dailySyncData = buildDailySyncData(allJobs, 14);
+
   return (
     <div className="relative min-h-full">
       {/* Aurora background */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-      >
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="absolute -top-40 -left-40 h-[600px] w-[600px] opacity-[0.06]"
-          style={{
-            background:
-              "radial-gradient(circle at center, hsl(221 83% 60%), transparent 70%)",
-          }}
+          style={{ background: "radial-gradient(circle at center, hsl(221 83% 60%), transparent 70%)" }}
         />
         <div
           className="absolute -bottom-40 -right-40 h-[500px] w-[500px] opacity-[0.04]"
-          style={{
-            background:
-              "radial-gradient(circle at center, hsl(280 65% 60%), transparent 70%)",
-          }}
+          style={{ background: "radial-gradient(circle at center, hsl(280 65% 60%), transparent 70%)" }}
         />
       </div>
 
-      <div className="relative space-y-6 pb-8">
+      <div className="relative space-y-5 pb-8">
         {/* Zone A — Welcome Bar */}
         <WelcomeBar
           userName={profile?.full_name ?? null}
@@ -157,16 +143,21 @@ export default async function DashboardPage() {
           recentSyncsCount={recentSyncs.length}
         />
 
-        {/* Zone B — Metric Grid (client, fetches Meta API) */}
+        {/* Zone B — Metric Grid */}
         <MetricGrid />
 
-        {/* Zone C — Pipeline + Health (8+4 grid) */}
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:grid-cols-2">
+        {/* Zone B2 — Sync Activity Chart */}
+        {dailySyncData.length >= 2 && (
+          <SyncActivityChart data={dailySyncData} />
+        )}
+
+        {/* Zone C — Pipeline + Health */}
+        <div className="grid gap-4 lg:grid-cols-2">
           <PipelineActivity jobs={pipelineJobs} />
           <ConnectorHealthPanel connectors={connectorHealthItems} />
         </div>
 
-        {/* Zone D — Records by Platform + Quick Actions (6+6 grid) */}
+        {/* Zone D — Records by Platform + Quick Actions */}
         <div className="grid gap-4 lg:grid-cols-2">
           <SpendByPlatform data={recordsByPlatform} />
           <QuickActions />
@@ -176,10 +167,40 @@ export default async function DashboardPage() {
   );
 }
 
+function buildDailySyncData(
+  jobs: { created_at: string; records_processed?: number | null; status: string }[],
+  days: number
+): { label: string; value: number }[] {
+  const now = new Date();
+  const buckets: Record<string, number> = {};
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    buckets[key] = 0;
+  }
+
+  for (const job of jobs) {
+    if (job.status !== "completed") continue;
+    const key = job.created_at.slice(0, 10);
+    if (key in buckets) {
+      buckets[key] += job.records_processed ?? 0;
+    }
+  }
+
+  return Object.entries(buckets).map(([date, value]) => ({
+    label: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    value,
+  }));
+}
+
 const PLATFORM_COLORS: Record<string, string> = {
   meta_ads: "#4F8BEE",
   google_ads: "#34A853",
   google_sheets: "#0F9D58",
   ga4: "#E37400",
   shopify: "#5E8E3E",
+  tiktok_ads: "#010101",
+  amazon_ads: "#FF9900",
 };
