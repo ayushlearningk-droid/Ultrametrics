@@ -5,6 +5,7 @@ import { Menu, Search } from "lucide-react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { NotificationCenter } from "@/components/dashboard/notification-center";
+import { BottomCommandBar } from "@/components/os/bottom-command-bar";
 import type { User, Workspace } from "@/types/database";
 
 interface DashboardShellProps {
@@ -76,6 +77,8 @@ export function DashboardShell({
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
+
+        <BottomCommandBar />
       </div>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />

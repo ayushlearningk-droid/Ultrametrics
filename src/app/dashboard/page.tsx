@@ -5,50 +5,55 @@ import {
 } from "@/lib/data/dashboard";
 import { getDashboardContext } from "@/lib/data/workspaces";
 import { CONNECTOR_PROVIDERS } from "@/lib/connectors/providers";
-import { MetricsRow } from "@/components/os/metrics-row";
+import { AIDigest } from "@/components/home/ai-digest";
+import { CampaignHealthStrip } from "@/components/home/campaign-health-strip";
+import type { HealthConnector } from "@/components/home/campaign-health-strip";
 import { BRAND_ICON_MAP, GenericPlatformIcon } from "@/components/ui/brand-icons";
 import type { SyncJobStatus, ConnectorStatus } from "@/types/database";
-import type { ConnectorTokenHealth } from "@/components/dashboard/connector-health-panel";
 import type { MetaConnectorConfig } from "@/lib/meta/token";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Overview" };
+export const metadata = { title: "Home" };
 
-function resolveTokenHealth(provider: string, status: string, config: unknown): ConnectorTokenHealth {
-  if (status !== "active") return "ok";
+function formatProvider(provider: string) {
+  return (
+    CONNECTOR_PROVIDERS.find((p) => p.id === provider)?.name ??
+    provider.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+function relativeTime(d: string | null) {
+  if (!d) return "Never";
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "Just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function getGreeting() {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+function resolveTokenHealth(
+  provider: string,
+  status: string,
+  config: unknown
+): boolean {
+  if (status !== "active") return false;
   if (provider === "meta_ads") {
     const c = (config ?? {}) as MetaConnectorConfig;
-    if (!c.access_token) return "missing";
-    if (c.token_expires_at && new Date(c.token_expires_at) <= new Date()) return "expired";
-    return "ok";
+    if (!c.access_token) return true;
+    if (c.token_expires_at && new Date(c.token_expires_at) <= new Date())
+      return true;
   }
-  return "ok";
+  return false;
 }
 
-function formatProvider(provider: string): string {
-  const found = CONNECTOR_PROVIDERS.find((p) => p.id === provider);
-  return found?.name ?? provider.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function relativeTime(dateStr: string | null): string {
-  if (!dateStr) return "Never";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-const STATUS_DOT: Record<SyncJobStatus, string> = {
+const JOB_DOT: Record<SyncJobStatus, string> = {
   completed: "bg-emerald-400",
   failed: "bg-red-400",
   running: "bg-brand animate-pulse",
@@ -56,262 +61,330 @@ const STATUS_DOT: Record<SyncJobStatus, string> = {
   cancelled: "bg-white/20",
 };
 
-const CONNECTOR_STATUS_DOT: Record<ConnectorStatus, string> = {
-  active: "bg-emerald-400",
-  paused: "bg-amber-400",
-  error: "bg-red-400",
-  disconnected: "bg-white/20",
-};
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
-      {children}
-    </p>
-  );
-}
-
-function HRule() {
-  return <div className="my-10 h-px bg-white/[0.05]" />;
-}
-
 export default async function DashboardPage() {
-  const context = await getDashboardContext();
-  const profile = context?.profile ?? null;
-  const workspaces = context?.workspaces ?? [];
-  const currentWorkspaceId = context?.currentWorkspaceId ?? null;
-  const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId);
-  const workspaceName = currentWorkspace?.name ?? "Workspace";
+  const ctx = await getDashboardContext();
+  const profile = ctx?.profile ?? null;
+  const workspaces = ctx?.workspaces ?? [];
+  const wsId = ctx?.currentWorkspaceId ?? null;
+  const wsName =
+    workspaces.find((w) => w.id === wsId)?.name ?? "Workspace";
 
   const [allJobs, connectors] = await Promise.all([
-    currentWorkspaceId ? getSyncJobsByWorkspace(currentWorkspaceId, 50) : Promise.resolve([]),
-    currentWorkspaceId ? getConnectorsByWorkspace(currentWorkspaceId) : Promise.resolve([]),
+    wsId ? getSyncJobsByWorkspace(wsId, 8) : Promise.resolve([]),
+    wsId ? getConnectorsByWorkspace(wsId) : Promise.resolve([]),
   ]);
 
   const activeConnectors = connectors.filter((c) => c.status === "active");
-  const lastSyncAt = allJobs.find((j) => j.status === "completed")?.created_at ?? null;
+  const lastSync =
+    allJobs.find((j) => j.status === "completed")?.created_at ?? null;
 
-  const connectorMap = Object.fromEntries(connectors.map((c) => [c.id, c]));
+  // For AI digest — lightweight connector info
+  const digestConnectors = connectors.map((c) => ({
+    provider: c.provider,
+    status: c.status,
+    name: c.name,
+  }));
 
-  const recentJobs = allJobs.slice(0, 10).map((job) => {
-    const connector = connectorMap[job.connector_id];
+  // For campaign health strip
+  const connectorCards: HealthConnector[] = connectors.map((c) => {
+    const info = CONNECTOR_PROVIDERS.find((p) => p.id === c.provider);
     return {
-      id: job.id,
-      status: job.status as SyncJobStatus,
-      connectorName: connector?.name ?? "Unknown",
-      providerName: formatProvider(connector?.provider ?? ""),
-      provider: connector?.provider ?? "unknown",
-      records: job.records_processed ?? 0,
-      createdAt: job.created_at,
+      id: c.id,
+      provider: c.provider,
+      providerName: info?.name ?? formatProvider(c.provider),
+      status: c.status as ConnectorStatus,
+      lastSync: c.last_synced_at,
+      href: info?.href ?? "/dashboard/connectors",
     };
   });
 
-  const connectorItems = connectors.map((connector) => {
-    const providerInfo = CONNECTOR_PROVIDERS.find((p) => p.id === connector.provider);
-    const tokenHealth = resolveTokenHealth(connector.provider, connector.status, connector.config);
-    const needsReconnect = tokenHealth !== "ok";
+  // For pipeline activity
+  const cMap = Object.fromEntries(connectors.map((c) => [c.id, c]));
+  const recentJobs = allJobs.map((j) => {
+    const con = cMap[j.connector_id];
     return {
-      id: connector.id,
-      name: connector.name,
-      provider: connector.provider,
-      providerName: providerInfo?.name ?? formatProvider(connector.provider),
-      connectorStatus: connector.status as ConnectorStatus,
-      needsReconnect,
-      reconnectHref: providerInfo?.href,
-      lastSyncedAt: connector.last_synced_at,
+      id: j.id,
+      status: j.status as SyncJobStatus,
+      provider: con?.provider ?? "unknown",
+      providerName: formatProvider(con?.provider ?? ""),
+      connectorName: con?.name ?? "Unknown source",
+      records: j.records_processed ?? 0,
+      at: j.created_at,
+    };
+  });
+
+  // For sources list
+  const sourceItems = connectors.map((c) => {
+    const info = CONNECTOR_PROVIDERS.find((p) => p.id === c.provider);
+    const hasTokenIssue = resolveTokenHealth(c.provider, c.status, c.config);
+    return {
+      id: c.id,
+      provider: c.provider,
+      providerName: info?.name ?? formatProvider(c.provider),
+      status: c.status as ConnectorStatus,
+      warn: hasTokenIssue,
+      reconnectHref: info?.href,
+      lastSync: c.last_synced_at,
     };
   });
 
   const firstName = profile?.full_name?.split(" ")[0] ?? null;
-  const greeting = getGreeting();
 
   return (
-    <div className="min-h-full px-8 py-10 lg:px-14 xl:px-20">
-      {/* ── Header ──────────────────────────────────────── */}
-      <div className="mb-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          {greeting}{firstName ? `, ${firstName}` : ""}.
-        </h1>
-        <p className="mt-1.5 text-sm text-white/35">
-          {workspaceName}
-          {activeConnectors.length > 0 && (
-            <> · <span className="text-emerald-400/70">{activeConnectors.length} source{activeConnectors.length > 1 ? "s" : ""} active</span></>
-          )}
-          {lastSyncAt && <> · last sync {relativeTime(lastSyncAt)}</>}
-        </p>
-      </div>
+    <div className="relative min-h-full">
+      {/* Background depth: subtle top-left light source */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 select-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 40% at 0% 0%, hsl(234 80% 62% / 0.05) 0%, transparent 100%)",
+        }}
+      />
 
-      {/* ── Performance metrics ─────────────────────────── */}
-      <section>
-        <SectionLabel>Performance · last 30 days</SectionLabel>
-        <MetricsRow />
-      </section>
+      <div className="relative px-6 pb-12 pt-10 sm:px-8 lg:px-12 xl:px-16">
 
-      <HRule />
+        {/* ── Greeting ─────────────────────────────────────────────── */}
+        <div className="mb-8">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
+            {wsName}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+            {getGreeting()}
+            {firstName ? `, ${firstName}` : ""}.
+          </h1>
+          <p className="mt-1 text-[13px] text-white/30">
+            {activeConnectors.length > 0 ? (
+              <>
+                {activeConnectors.length} active source
+                {activeConnectors.length > 1 ? "s" : ""}
+                {lastSync && <> · synced {relativeTime(lastSync)}</>}
+              </>
+            ) : (
+              "No active sources — connect your first data source to get started."
+            )}
+          </p>
+        </div>
 
-      {/* ── Activity + Sources ──────────────────────────── */}
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_260px]">
-
-        {/* Activity feed */}
-        <section>
-          <div className="flex items-center justify-between">
-            <SectionLabel>Activity</SectionLabel>
-            <Link
-              href="/dashboard/sync-jobs"
-              className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/20 transition-colors hover:text-white/50"
-            >
-              All jobs →
-            </Link>
-          </div>
-
-          {recentJobs.length === 0 ? (
-            <div className="flex h-20 items-center">
-              <p className="text-sm text-white/25">No activity yet. Run a sync to get started.</p>
-            </div>
-          ) : (
-            <div>
-              {recentJobs.map((job, i) => {
-                const BrandIcon = BRAND_ICON_MAP[job.provider];
-                return (
-                  <div
-                    key={job.id}
-                    className={cn(
-                      "flex items-center gap-4 py-3.5",
-                      i < recentJobs.length - 1 && "border-b border-white/[0.04]"
-                    )}
-                  >
-                    {/* Status dot */}
-                    <div className={cn("h-[7px] w-[7px] shrink-0 rounded-full", STATUS_DOT[job.status] ?? "bg-white/20")} />
-
-                    {/* Icon */}
-                    <div className="shrink-0">
-                      {BrandIcon ? (
-                        <BrandIcon className="h-6 w-6 opacity-80" />
-                      ) : (
-                        <GenericPlatformIcon className="h-6 w-6 opacity-80" label={job.providerName} />
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-foreground/90">
-                        {job.connectorName}
-                        {job.status === "completed" && job.records > 0 && (
-                          <span className="ml-2 font-mono text-xs text-white/35">
-                            {job.records.toLocaleString()} rows
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-white/30">
-                        {job.providerName} · {job.status}
-                      </p>
-                    </div>
-
-                    {/* Time */}
-                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-white/20">
-                      {relativeTime(job.createdAt)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        {/* ── AI Digest — first visible ────────────────────────────── */}
+        <section className="mb-10">
+          <AIDigest connectors={digestConnectors} />
         </section>
 
-        {/* Sources panel */}
-        <section>
-          <div className="flex items-center justify-between">
-            <SectionLabel>Sources</SectionLabel>
-            <Link
-              href="/dashboard/connectors"
-              className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/20 transition-colors hover:text-white/50"
-            >
-              Manage →
-            </Link>
-          </div>
-
-          {connectorItems.length === 0 ? (
-            <div className="flex h-20 items-center">
+        {/* ── Campaign Health Strip ────────────────────────────────── */}
+        <section className="mb-10">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
+              Campaign Health · Last 7 days
+            </p>
+            {connectorCards.length > 0 && (
               <Link
                 href="/dashboard/connectors"
-                className="text-sm text-brand/70 transition-colors hover:text-brand"
+                className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/20 transition-colors hover:text-white/50"
               >
-                + Connect your first source
+                Manage →
+              </Link>
+            )}
+          </div>
+          <CampaignHealthStrip connectors={connectorCards} />
+        </section>
+
+        {/* ── Divider ──────────────────────────────────────────────── */}
+        <div className="mb-10 h-px bg-white/[0.05]" />
+
+        {/* ── Activity + Sources ───────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_280px]">
+
+          {/* Pipeline Activity */}
+          <section>
+            <div className="mb-5 flex items-center justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
+                Pipeline Activity
+              </p>
+              <Link
+                href="/dashboard/sync-jobs"
+                className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/20 transition-colors hover:text-white/50"
+              >
+                Full history →
               </Link>
             </div>
-          ) : (
-            <div>
-              {connectorItems.map((c, i) => {
-                const BrandIcon = BRAND_ICON_MAP[c.provider];
-                return (
-                  <div
-                    key={c.id}
-                    className={cn(
-                      "flex items-center gap-3 py-3.5",
-                      i < connectorItems.length - 1 && "border-b border-white/[0.04]"
-                    )}
-                  >
-                    <div className="shrink-0">
-                      {BrandIcon ? (
-                        <BrandIcon className="h-6 w-6 opacity-80" />
-                      ) : (
-                        <GenericPlatformIcon className="h-6 w-6 opacity-80" label={c.providerName} />
-                      )}
-                    </div>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground/90">{c.name}</p>
-                      <p className="text-[11px] text-white/30">
-                        {c.needsReconnect ? (
-                          <Link href={c.reconnectHref ?? "/dashboard/connectors"} className="text-red-400/70 hover:text-red-400">
-                            Needs reconnect
-                          </Link>
-                        ) : (
-                          relativeTime(c.lastSyncedAt)
+            {recentJobs.length === 0 ? (
+              <div className="flex flex-col gap-2 rounded-xl border border-dashed border-white/[0.07] px-5 py-8 text-center">
+                <p className="text-[13px] text-white/25">
+                  No pipeline activity yet.
+                </p>
+                <Link
+                  href="/dashboard/connectors"
+                  className="text-[13px] text-brand/60 transition-colors hover:text-brand"
+                >
+                  Connect a source to start syncing →
+                </Link>
+              </div>
+            ) : (
+              <div className="relative">
+                {/* Timeline guide */}
+                <div className="absolute bottom-2 left-[7px] top-2 w-px bg-white/[0.05]" />
+
+                <div className="space-y-0">
+                  {recentJobs.map((job, i) => {
+                    const BrandIcon = BRAND_ICON_MAP[job.provider];
+                    return (
+                      <div
+                        key={job.id}
+                        className={cn(
+                          "flex items-start gap-4 py-3.5 pl-7",
+                          i < recentJobs.length - 1 &&
+                            "border-b border-white/[0.035]"
                         )}
-                      </p>
-                    </div>
+                      >
+                        {/* Timeline dot */}
+                        <div
+                          className={cn(
+                            "absolute left-[4px] h-[7px] w-[7px] rounded-full ring-2 ring-background",
+                            JOB_DOT[job.status]
+                          )}
+                          style={{ marginTop: `${i * 56 + 20}px` }}
+                        />
 
-                    <div
-                      className={cn(
-                        "h-[7px] w-[7px] shrink-0 rounded-full",
-                        c.needsReconnect ? "bg-red-400" : CONNECTOR_STATUS_DOT[c.connectorStatus] ?? "bg-white/20"
-                      )}
-                    />
-                  </div>
-                );
-              })}
+                        <div className="shrink-0">
+                          {BrandIcon ? (
+                            <BrandIcon className="h-[20px] w-[20px] opacity-65" />
+                          ) : (
+                            <GenericPlatformIcon
+                              className="h-[20px] w-[20px] opacity-65"
+                              label={job.providerName}
+                            />
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] text-foreground/80">
+                            {job.connectorName}
+                            {job.status === "running" && (
+                              <span className="ml-2 text-brand/70">
+                                syncing…
+                              </span>
+                            )}
+                            {job.status === "completed" && job.records > 0 && (
+                              <span className="ml-2 font-mono text-[11px] tabular-nums text-white/25">
+                                {job.records.toLocaleString()} rows
+                              </span>
+                            )}
+                            {job.status === "failed" && (
+                              <span className="ml-2 text-[11px] text-red-400/70">
+                                failed
+                              </span>
+                            )}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-white/25">
+                            {job.providerName}
+                          </p>
+                        </div>
+
+                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-white/18">
+                          {relativeTime(job.at)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Sources health */}
+          <section>
+            <div className="mb-5 flex items-center justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
+                Sources
+              </p>
+              <Link
+                href="/dashboard/connectors"
+                className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/20 transition-colors hover:text-white/50"
+              >
+                Manage →
+              </Link>
             </div>
-          )}
-        </section>
-      </div>
 
-      <HRule />
+            {sourceItems.length === 0 ? (
+              <Link
+                href="/dashboard/connectors"
+                className="block rounded-xl border border-dashed border-white/[0.07] px-4 py-4 text-center text-[13px] text-brand/60 transition-colors hover:border-white/[0.12] hover:text-brand"
+              >
+                + Connect a data source
+              </Link>
+            ) : (
+              <div className="space-y-0">
+                {sourceItems.map((s, i) => {
+                  const BrandIcon = BRAND_ICON_MAP[s.provider];
+                  return (
+                    <Link
+                      key={s.id}
+                      href={
+                        s.reconnectHref ??
+                        `/dashboard/connectors/${s.provider.replace(/_/g, "-")}`
+                      }
+                      className={cn(
+                        "flex items-center gap-3 py-3 transition-colors hover:bg-white/[0.02]",
+                        i < sourceItems.length - 1 &&
+                          "border-b border-white/[0.035]"
+                      )}
+                    >
+                      {BrandIcon ? (
+                        <BrandIcon className="h-5 w-5 shrink-0 opacity-75" />
+                      ) : (
+                        <GenericPlatformIcon
+                          className="h-5 w-5 shrink-0 opacity-75"
+                          label={s.providerName}
+                        />
+                      )}
 
-      {/* ── Quick commands ──────────────────────────────── */}
-      <section>
-        <SectionLabel>Quick actions</SectionLabel>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/dashboard/connectors"
-            className="rounded-md border border-white/[0.08] bg-white/[0.02] px-4 py-2 text-sm text-white/50 transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/90"
-          >
-            + Add connector
-          </Link>
-          <Link
-            href="/dashboard/sync-jobs"
-            className="rounded-md border border-white/[0.08] bg-white/[0.02] px-4 py-2 text-sm text-white/50 transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/90"
-          >
-            View sync history
-          </Link>
-          <button
-            className="rounded-md border border-white/[0.08] bg-white/[0.02] px-4 py-2 text-sm text-white/50 transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/90"
-            onClick={undefined}
-          >
-            ⌘K  Command palette
-          </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-medium text-foreground/80">
+                          {s.providerName}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-white/25">
+                          {s.warn ? (
+                            <span className="text-red-400/70">
+                              Needs reconnect
+                            </span>
+                          ) : (
+                            relativeTime(s.lastSync)
+                          )}
+                        </p>
+                      </div>
+
+                      <div
+                        className={cn(
+                          "h-[6px] w-[6px] shrink-0 rounded-full",
+                          s.warn
+                            ? "bg-red-400 shadow-[0_0_6px_1px] shadow-red-400/30"
+                            : s.status === "active"
+                            ? "bg-emerald-400 shadow-[0_0_6px_1px] shadow-emerald-400/30"
+                            : s.status === "paused"
+                            ? "bg-amber-400"
+                            : "bg-white/20"
+                        )}
+                      />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add source CTA */}
+            {sourceItems.length > 0 && (
+              <Link
+                href="/dashboard/connectors"
+                className="mt-4 block rounded-xl border border-dashed border-white/[0.06] px-4 py-2.5 text-center text-[12px] text-white/22 transition-colors hover:border-white/[0.12] hover:text-white/50"
+              >
+                + Add source
+              </Link>
+            )}
+          </section>
         </div>
-      </section>
+      </div>
     </div>
   );
 }
