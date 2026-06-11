@@ -7,6 +7,7 @@ type StatusDotVariant =
   | "failed"
   | "completed"
   | "pending"
+  | "cancelled"
   | "paused"
   | "error"
   | "disconnected";
@@ -16,6 +17,7 @@ const variantStyles: Record<StatusDotVariant, string> = {
   completed: "bg-emerald-500",
   inactive: "bg-slate-400",
   disconnected: "bg-slate-400",
+  cancelled: "bg-slate-400",
   paused: "bg-yellow-400",
   pending: "bg-yellow-400",
   running: "bg-blue-500 animate-pulse",
