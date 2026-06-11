@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Menu, Search } from "lucide-react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
-import { TopNavbar } from "@/components/dashboard/top-navbar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { NotificationCenter } from "@/components/dashboard/notification-center";
 import type { User, Workspace } from "@/types/database";
@@ -22,12 +22,10 @@ export function DashboardShell({
   currentWorkspaceId,
   workspaceName,
 }: DashboardShellProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  // Global Ctrl+K / Cmd+K listener
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -40,25 +38,42 @@ export function DashboardShell({
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       <DashboardSidebar
         workspaceName={workspaceName}
         workspaces={workspaces}
         currentWorkspaceId={currentWorkspaceId}
         user={user}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={() => setIsCollapsed((c) => !c)}
         isMobileOpen={isMobileOpen}
         onMobileOpenChange={setIsMobileOpen}
+        onCommandOpen={() => setCmdOpen(true)}
+        onNotifToggle={() => setNotifOpen((v) => !v)}
       />
+
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNavbar
-          user={user}
-          onMobileMenuToggle={() => setIsMobileOpen(true)}
-          onCommandOpen={() => setCmdOpen(true)}
-          onNotifToggle={() => setNotifOpen((v) => !v)}
-        />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        {/* Mobile-only top strip */}
+        <div className="flex h-11 shrink-0 items-center gap-3 border-b border-white/[0.05] px-4 md:hidden">
+          <button
+            onClick={() => setIsMobileOpen(true)}
+            className="text-white/40 hover:text-white/70"
+            aria-label="Open menu"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-semibold tracking-tight">
+            Ultra<span className="text-brand">metrics</span>
+          </span>
+          <div className="flex-1" />
+          <button
+            onClick={() => setCmdOpen(true)}
+            className="text-white/40 hover:text-white/70"
+            aria-label="Search"
+          >
+            <Search className="h-4 w-4" />
+          </button>
+        </div>
+
+        <main className="flex-1 overflow-y-auto">
           {children}
         </main>
       </div>

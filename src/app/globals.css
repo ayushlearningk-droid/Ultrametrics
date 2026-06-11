@@ -25,46 +25,36 @@
     --input: 214 32% 91%;
     --ring: 221 83% 53%;
     --radius: 0.625rem;
-    --chart-1: 221 83% 53%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
     --brand: 221 83% 53%;
     --brand-foreground: 210 40% 98%;
     --brand-muted: 221 83% 96%;
   }
 
   .dark {
-    /* Obsidian palette — deep, layered, premium */
-    --background: 224 50% 4%;
-    --foreground: 210 38% 97%;
-    --card: 222 44% 6%;
-    --card-foreground: 210 38% 97%;
-    --popover: 222 44% 7%;
-    --popover-foreground: 210 38% 97%;
-    --primary: 210 38% 97%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 30% 10%;
-    --secondary-foreground: 210 38% 97%;
-    --muted: 217 30% 10%;
-    --muted-foreground: 215 20% 58%;
-    --accent: 217 30% 10%;
-    --accent-foreground: 210 38% 97%;
+    /* Void — true near-black OS canvas */
+    --background: 228 14% 3.5%;
+    --foreground: 210 20% 94%;
+    --card: 228 12% 5.5%;
+    --card-foreground: 210 20% 94%;
+    --popover: 228 12% 6%;
+    --popover-foreground: 210 20% 94%;
+    --primary: 210 20% 94%;
+    --primary-foreground: 228 14% 6%;
+    --secondary: 228 10% 8%;
+    --secondary-foreground: 210 20% 94%;
+    --muted: 228 10% 8%;
+    --muted-foreground: 220 10% 48%;
+    --accent: 228 10% 8%;
+    --accent-foreground: 210 20% 94%;
     --destructive: 0 63% 45%;
-    --destructive-foreground: 210 38% 97%;
-    --border: 217 28% 12%;
-    --input: 217 28% 12%;
+    --destructive-foreground: 210 20% 94%;
+    --border: 228 8% 10%;
+    --input: 228 8% 10%;
     --ring: 221 83% 60%;
-    --chart-1: 221 83% 60%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
     --brand: 221 83% 60%;
-    --brand-foreground: 210 38% 97%;
-    --brand-muted: 221 40% 12%;
-    --sidebar: 222 50% 3%;
+    --brand-foreground: 210 20% 98%;
+    --brand-muted: 221 40% 10%;
+    --sidebar: 230 18% 2.5%;
   }
 }
 
@@ -75,15 +65,23 @@
 
   html {
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01" 1, "cv01" 1, "tnum" 0;
+  }
+
+  ::selection {
+    background: hsl(var(--brand) / 0.25);
+    color: hsl(var(--foreground));
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
 
   ::-webkit-scrollbar-track {
@@ -92,16 +90,22 @@
 
   ::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
-    border-radius: 3px;
+    border-radius: 2px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.4);
+    background: hsl(var(--muted-foreground) / 0.3);
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Mono numerals for data-dense displays */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 }
