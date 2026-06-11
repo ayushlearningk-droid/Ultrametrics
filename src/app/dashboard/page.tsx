@@ -1,31 +1,17 @@
-import Link from "next/link";
-import {
-  Activity,
-  ArrowRight,
-  Database,
-  Plug,
-  RefreshCw,
-} from "lucide-react";
-import { MetaAdsOverviewCard } from "@/components/dashboard/meta-ads-overview-card";
 import {
   getConnectorsByWorkspace,
   getSyncJobsByWorkspace,
 } from "@/lib/data/dashboard";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
-import { AnimatedPage } from "@/components/ui/animated-page";
-import { EmptyState } from "@/components/ui/empty-state";
-import { StatusDot } from "@/components/ui/status-dot";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { CONNECTOR_PROVIDERS } from "@/lib/connectors/providers";
-import type { ConnectorStatus, SyncJobStatus } from "@/types/database";
+import { WelcomeBar } from "@/components/dashboard/welcome-bar";
+import { MetricGrid } from "@/components/dashboard/metric-grid";
+import { PipelineActivity } from "@/components/dashboard/pipeline-activity";
+import { ConnectorHealthPanel } from "@/components/dashboard/connector-health-panel";
+import { SpendByPlatform } from "@/components/dashboard/spend-by-platform";
+import { QuickActions } from "@/components/dashboard/quick-actions";
+import type { SyncJobStatus } from "@/types/database";
+import { getDashboardContext } from "@/lib/data/workspaces";
 
 export const metadata = {
   title: "Overview",
@@ -37,249 +23,131 @@ function formatProvider(provider: string): string {
   return provider.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatRelativeTime(dateStr: string | null): string {
-  if (!dateStr) return "Never";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
-}
-
 export default async function DashboardPage() {
-  const workspaces = await getUserWorkspaces();
-  const workspaceId = await getCurrentWorkspaceId(workspaces);
+  const context = await getDashboardContext();
+  const profile = context?.profile ?? null;
+  const workspaces = context?.workspaces ?? [];
+  const currentWorkspaceId = context?.currentWorkspaceId ?? null;
+  const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId);
+  const workspaceName = currentWorkspace?.name ?? "Workspace";
 
   const [allJobs, connectors] = await Promise.all([
-    getSyncJobsByWorkspace(workspaceId!, 50),
-    getConnectorsByWorkspace(workspaceId!),
+    currentWorkspaceId ? getSyncJobsByWorkspace(currentWorkspaceId, 50) : Promise.resolve([]),
+    currentWorkspaceId ? getConnectorsByWorkspace(currentWorkspaceId) : Promise.resolve([]),
   ]);
 
+  // Zone A data
   const activeConnectors = connectors.filter((c) => c.status === "active");
-  const completedJobs = allJobs.filter((j) => j.status === "completed");
-  const recordsSynced = completedJobs.reduce(
-    (sum, j) => sum + (j.records_processed ?? 0),
-    0
-  );
-  const lastSyncAt =
-    completedJobs[0]?.completed_at ?? completedJobs[0]?.created_at ?? null;
-  const connectorMap = Object.fromEntries(connectors.map((c) => [c.id, c]));
+  const recentSyncs = allJobs.filter((j) => j.status === "completed").slice(0, 10);
 
-  const stats = [
-    {
-      title: "Active connectors",
-      value: activeConnectors.length,
-      icon: Plug,
-      description: `${connectors.length} total configured`,
-    },
-    {
-      title: "Sync jobs",
-      value: allJobs.length,
-      icon: RefreshCw,
-      description: "Last 50 pipeline runs",
-    },
-    {
-      title: "Records synced",
-      value: recordsSynced.toLocaleString(),
-      icon: Database,
-      description: "Across all connectors",
-    },
-    {
-      title: "Last sync",
-      value: formatRelativeTime(lastSyncAt),
-      icon: Activity,
-      description: lastSyncAt
-        ? new Date(lastSyncAt).toLocaleString()
-        : "No syncs yet",
-    },
-  ];
+  // Zone C left — last 8 jobs shaped for timeline
+  const connectorMap = Object.fromEntries(connectors.map((c) => [c.id, c]));
+  const pipelineJobs = allJobs.slice(0, 8).map((job) => {
+    const connector = connectorMap[job.connector_id];
+    return {
+      id: job.id,
+      status: job.status as SyncJobStatus,
+      connectorName: connector?.name ?? "Unknown",
+      providerName: formatProvider(connector?.provider ?? ""),
+      records: job.records_processed ?? 0,
+      createdAt: job.created_at,
+      completedAt: job.completed_at,
+    };
+  });
+
+  // Zone C right — connector health items
+  const connectorHealthItems = connectors.map((connector) => {
+    const providerInfo = CONNECTOR_PROVIDERS.find((p) => p.id === connector.provider);
+    // Last 7 jobs for this connector's sparkline
+    const connectorJobs = allJobs
+      .filter((j) => j.connector_id === connector.id && j.status === "completed")
+      .slice(0, 7)
+      .reverse();
+    return {
+      id: connector.id,
+      name: connector.name,
+      provider: connector.provider,
+      providerName: providerInfo?.name ?? formatProvider(connector.provider),
+      status: connector.status,
+      gradient: providerInfo?.gradient ?? "from-brand to-brand/60",
+      lastSyncedAt: connector.last_synced_at,
+      recentRecords: connectorJobs.map((j) => j.records_processed ?? 0),
+      href: providerInfo?.href,
+    };
+  });
+
+  // Zone D left — records per active connector
+  const recordsByPlatform = connectors
+    .filter((c) => c.status === "active")
+    .map((connector) => {
+      const providerInfo = CONNECTOR_PROVIDERS.find((p) => p.id === connector.provider);
+      const totalRecords = allJobs
+        .filter((j) => j.connector_id === connector.id && j.status === "completed")
+        .reduce((sum, j) => sum + (j.records_processed ?? 0), 0);
+      return {
+        provider: connector.provider,
+        providerName: providerInfo?.name ?? formatProvider(connector.provider),
+        records: totalRecords,
+        color: PLATFORM_COLORS[connector.provider] ?? "#4F8BEE",
+      };
+    })
+    .sort((a, b) => b.records - a.records);
 
   return (
-    <AnimatedPage className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {stat.description}
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
+    <div className="relative min-h-full">
+      {/* Aurora background */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <div
+          className="absolute -top-40 -left-40 h-[600px] w-[600px] opacity-[0.06]"
+          style={{
+            background:
+              "radial-gradient(circle at center, hsl(221 83% 60%), transparent 70%)",
+          }}
+        />
+        <div
+          className="absolute -bottom-40 -right-40 h-[500px] w-[500px] opacity-[0.04]"
+          style={{
+            background:
+              "radial-gradient(circle at center, hsl(280 65% 60%), transparent 70%)",
+          }}
+        />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <MetaAdsOverviewCard />
+      <div className="relative space-y-6 pb-8">
+        {/* Zone A — Welcome Bar */}
+        <WelcomeBar
+          userName={profile?.full_name ?? null}
+          workspaceName={workspaceName}
+          activeSourcesCount={activeConnectors.length}
+          recentSyncsCount={recentSyncs.length}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between pb-3">
-            <div>
-              <CardTitle>Recent syncs</CardTitle>
-              <CardDescription>Latest pipeline activity</CardDescription>
-            </div>
-            {allJobs.length > 0 && (
-              <Button variant="ghost" size="sm" asChild className="-mr-2 h-8 text-xs">
-                <Link href="/dashboard/sync-jobs">
-                  View all
-                  <ArrowRight className="ml-1 h-3 w-3" />
-                </Link>
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent>
-            {allJobs.length > 0 ? (
-              <ul className="space-y-2">
-                {allJobs.slice(0, 5).map((job) => {
-                  const jobConnector = connectorMap[job.connector_id];
-                  const label = jobConnector
-                    ? `${formatProvider(jobConnector.provider)} Sync`
-                    : "Sync job";
-                  return (
-                    <li
-                      key={job.id}
-                      className="flex items-center justify-between rounded-lg border bg-card px-3 py-2.5"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <StatusDot
-                          status={job.status as SyncJobStatus}
-                          className="shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{label}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatRelativeTime(job.created_at)} ·{" "}
-                            {job.records_processed.toLocaleString()} records
-                          </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant={
-                          job.status === "completed"
-                            ? "success"
-                            : job.status === "failed"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                        className="ml-3 shrink-0 capitalize"
-                      >
-                        {job.status}
-                      </Badge>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <EmptyState
-                icon={RefreshCw}
-                title="No syncs yet"
-                description="Connect a data source and run your first sync."
-                action={
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href="/dashboard/connectors">Add connector</Link>
-                  </Button>
-                }
-              />
-            )}
-          </CardContent>
-        </Card>
+        {/* Zone B — Metric Grid (client, fetches Meta API) */}
+        <MetricGrid />
 
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-start justify-between pb-3">
-            <div>
-              <CardTitle>Connected sources</CardTitle>
-              <CardDescription>Your active data pipelines</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild className="-mr-2 h-8 text-xs">
-              <Link href="/dashboard/connectors">
-                Manage
-                <ArrowRight className="ml-1 h-3 w-3" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {connectors.length > 0 ? (
-              <div className="divide-y rounded-lg border">
-                {connectors.slice(0, 4).map((connector) => {
-                  const providerInfo = CONNECTOR_PROVIDERS.find(
-                    (p) => p.id === connector.provider
-                  );
-                  const Icon = providerInfo?.icon;
-                  const providerHref = providerInfo?.href;
-                  return (
-                    <div
-                      key={connector.id}
-                      className="flex items-center justify-between px-4 py-3"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        {Icon && providerInfo && (
-                          <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${providerInfo.color}`}
-                          >
-                            <Icon className="h-4 w-4 text-white" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {connector.name}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {formatProvider(connector.provider)}
-                            {connector.last_synced_at && (
-                              <> · {formatRelativeTime(connector.last_synced_at)}</>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="ml-3 flex shrink-0 items-center gap-3">
-                        <Badge
-                          variant={
-                            connector.status === "active" ? "success" : "secondary"
-                          }
-                          className="capitalize"
-                        >
-                          {connector.status}
-                        </Badge>
-                        {providerHref && (
-                          <Button variant="ghost" size="sm" asChild className="h-7 text-xs">
-                            <Link href={providerHref}>Manage</Link>
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Plug}
-                title="No connectors configured"
-                description="Add your first connector to start syncing data into Google Sheets."
-                action={
-                  <Button variant="brand" size="sm" asChild>
-                    <Link href="/dashboard/connectors">Add connector</Link>
-                  </Button>
-                }
-              />
-            )}
-          </CardContent>
-        </Card>
+        {/* Zone C — Pipeline + Health (8+4 grid) */}
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:grid-cols-2">
+          <PipelineActivity jobs={pipelineJobs} />
+          <ConnectorHealthPanel connectors={connectorHealthItems} />
+        </div>
+
+        {/* Zone D — Records by Platform + Quick Actions (6+6 grid) */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SpendByPlatform data={recordsByPlatform} />
+          <QuickActions />
+        </div>
       </div>
-    </AnimatedPage>
+    </div>
   );
 }
+
+const PLATFORM_COLORS: Record<string, string> = {
+  meta_ads: "#4F8BEE",
+  google_ads: "#34A853",
+  google_sheets: "#0F9D58",
+  ga4: "#E37400",
+  shopify: "#5E8E3E",
+};

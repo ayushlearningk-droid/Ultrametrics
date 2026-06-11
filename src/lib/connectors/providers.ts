@@ -19,6 +19,7 @@ export type ConnectorProvider = {
   name: string;
   description: string;
   color: string;
+  gradient: string;
   icon: LucideIcon;
   available: boolean;
   href?: string;
@@ -30,6 +31,7 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     name: "Google Ads",
     description: "Sync campaign performance data",
     color: "bg-blue-500",
+    gradient: "from-[#4285F4] to-[#34A853]",
     icon: TrendingUp,
     available: true,
     href: "/dashboard/connectors/google-ads",
@@ -39,6 +41,7 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     name: "Google Sheets",
     description: "Your data destination",
     color: "bg-emerald-500",
+    gradient: "from-[#0F9D58] to-[#34A853]",
     icon: Table2,
     available: true,
     href: "/dashboard/connectors/google",
@@ -48,6 +51,7 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     name: "Meta Ads",
     description: "Import ad account insights",
     color: "bg-indigo-500",
+    gradient: "from-[#0866FF] to-[#0064E0]",
     icon: BarChart2,
     available: true,
     href: "/dashboard/connectors/meta",
@@ -57,6 +61,7 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     name: "Google Analytics 4",
     description: "Website analytics insights",
     color: "bg-orange-500",
+    gradient: "from-[#E37400] to-[#F9AB00]",
     icon: LineChart,
     available: false,
   },
@@ -65,6 +70,7 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     name: "Shopify",
     description: "E-commerce order data",
     color: "bg-green-600",
+    gradient: "from-[#5E8E3E] to-[#96BF48]",
     icon: ShoppingCart,
     available: false,
   },
