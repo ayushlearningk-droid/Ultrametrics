@@ -5,6 +5,8 @@ import {
 } from "@/lib/data/workspaces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { getLatestMetaPendingSession } from "@/lib/meta/pending";
+import { metaTokenExpiresAt, type MetaConnectorConfig } from "@/lib/meta/token";
 
 export async function POST(request: Request) {
   try {
@@ -49,10 +51,21 @@ export async function POST(request: Request) {
 
     const admin = createAdminClient();
 
+    // Read the pending session token so we can persist it into the connector.
+    const pendingSession = await getLatestMetaPendingSession(workspaceId);
+    const accessToken = pendingSession?.access_token ?? null;
+    const tokenConfig: MetaConnectorConfig = {
+      currency: body.currency ?? "INR",
+      ...(accessToken && {
+        access_token: accessToken,
+        token_expires_at: metaTokenExpiresAt(),
+      }),
+    };
+
     const { data: existingConnector, error: existingError } =
       await admin
         .from("connectors")
-        .select("id")
+        .select("id, config")
         .eq("workspace_id", workspaceId)
         .eq("provider", "meta_ads")
         .eq("external_account_id", body.accountId)
@@ -65,29 +78,34 @@ export async function POST(request: Request) {
       );
     }
 
+    // Existing connector — update token and re-activate rather than
+    // returning a no-op duplicate response.
     if (existingConnector) {
-      return NextResponse.json({
-        ok: true,
-        duplicate: true,
-      });
-    }
+      const prevConfig = (existingConnector.config ?? {}) as MetaConnectorConfig;
+      await admin
+        .from("connectors")
+        .update({
+          config: { ...prevConfig, ...tokenConfig },
+          status: "active",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingConnector.id);
 
-    const insertPayload = {
-      workspace_id: workspaceId,
-      provider: "meta_ads",
-      name: body.name,
-      status: "active",
-      config: {
-        currency: body.currency ?? "INR",
-      },
-      external_account_id: body.accountId,
-      external_account_name: body.name,
-      connected_by: user.id,
-    };
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
 
     const { data, error } = await admin
       .from("connectors")
-      .insert(insertPayload)
+      .insert({
+        workspace_id: workspaceId,
+        provider: "meta_ads",
+        name: body.name,
+        status: "active",
+        config: tokenConfig,
+        external_account_id: body.accountId,
+        external_account_name: body.name,
+        connected_by: user.id,
+      })
       .select();
 
     if (error) {
@@ -97,10 +115,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      connector: data,
-    });
+    return NextResponse.json({ ok: true, connector: data });
   } catch (err) {
     console.error("CONNECT API CRASH:", err);
 

@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  getCurrentWorkspaceId,
-  getUserWorkspaces,
-} from "@/lib/data/workspaces";
+import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 import { getAccountInsights } from "@/lib/meta/insights";
-import { getLatestMetaPendingSession } from "@/lib/meta/pending";
+import { getActiveMetaToken, markMetaConnectorTokenError } from "@/lib/meta/token";
 
 export async function GET() {
   try {
@@ -13,66 +9,51 @@ export async function GET() {
     const workspaceId = await getCurrentWorkspaceId(workspaces);
 
     if (!workspaceId) {
+      return NextResponse.json({ error: "No workspace found" }, { status: 400 });
+    }
+
+    const token = await getActiveMetaToken(workspaceId);
+
+    if (token.status === "not_connected") {
+      return NextResponse.json({ error: "No active Meta connector" }, { status: 404 });
+    }
+
+    if (token.status === "missing") {
       return NextResponse.json(
-        { error: "No workspace found" },
-        { status: 400 }
+        { error: "Meta connector has no stored token. Reconnect Meta Ads.", needs_reconnect: true },
+        { status: 401 }
       );
     }
 
-    const session = await getLatestMetaPendingSession(workspaceId);
-
-    if (!session) {
+    if (token.status === "expired") {
       return NextResponse.json(
-        { error: "No Meta session found" },
-        { status: 404 }
+        { error: "Meta access token has expired. Reconnect Meta Ads.", needs_reconnect: true, token_expired: true },
+        { status: 401 }
       );
     }
 
-    const admin = createAdminClient();
-    const { data: connector, error: connectorError } = await admin
-      .from("connectors")
-      .select("external_account_id, external_account_name, config")
-      .eq("workspace_id", workspaceId)
-      .eq("provider", "meta_ads")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (connectorError) {
-      console.error("Meta test-insights connector lookup failed", connectorError);
-      return NextResponse.json(
-        { error: "Failed to resolve Meta connector" },
-        { status: 500 }
-      );
+    try {
+      const insights = await getAccountInsights(token.accessToken, token.accountId);
+      return NextResponse.json({
+        success: true,
+        insights,
+        accountId: token.accountId,
+        currency: token.currency,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Meta error code 190 = invalid/expired OAuth token
+      if (message.includes('"code":190') || message.includes("Invalid OAuth")) {
+        await markMetaConnectorTokenError(token.connectorId);
+        return NextResponse.json(
+          { error: "Meta token rejected by API. Reconnect Meta Ads.", needs_reconnect: true },
+          { status: 401 }
+        );
+      }
+      return NextResponse.json({ error: "Failed to fetch Meta insights" }, { status: 500 });
     }
-
-    if (!connector?.external_account_id) {
-      return NextResponse.json(
-        { error: "No active Meta connector found" },
-        { status: 404 }
-      );
-    }
-
-    const insights = await getAccountInsights(
-      session.access_token as string,
-      String(connector.external_account_id)
-    );
-
-    const config = (connector.config ?? {}) as { currency?: string };
-
-    return NextResponse.json({
-      success: true,
-      insights,
-      accountId: connector.external_account_id,
-      accountName: connector.external_account_name,
-      currency: config.currency ?? "INR",
-    });
   } catch (error) {
     console.error("Meta test-insights failed", error);
-    return NextResponse.json(
-      { error: "Failed to fetch Meta insights" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch Meta insights" }, { status: 500 });
   }
 }

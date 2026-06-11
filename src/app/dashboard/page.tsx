@@ -10,12 +10,40 @@ import { PipelineActivity } from "@/components/dashboard/pipeline-activity";
 import { ConnectorHealthPanel } from "@/components/dashboard/connector-health-panel";
 import { SpendByPlatform } from "@/components/dashboard/spend-by-platform";
 import { QuickActions } from "@/components/dashboard/quick-actions";
-import type { SyncJobStatus } from "@/types/database";
+import type { SyncJobStatus, ConnectorStatus } from "@/types/database";
 import { getDashboardContext } from "@/lib/data/workspaces";
+import type { ConnectorTokenHealth } from "@/components/dashboard/connector-health-panel";
+import type { MetaConnectorConfig } from "@/lib/meta/token";
 
 export const metadata = {
   title: "Overview",
 };
+
+/**
+ * Derives token-level health from the connector's stored config.
+ * Only Meta Ads currently uses a non-refreshing long-lived token;
+ * Google connectors use refresh tokens handled by googleapis automatically.
+ */
+function resolveTokenHealth(
+  provider: string,
+  status: string,
+  config: unknown
+): ConnectorTokenHealth {
+  // Non-active connectors: the connector-level status drives the ring.
+  if (status !== "active") return "ok";
+
+  if (provider === "meta_ads") {
+    const c = (config ?? {}) as MetaConnectorConfig;
+    if (!c.access_token) return "missing";
+    if (c.token_expires_at && new Date(c.token_expires_at) <= new Date()) {
+      return "expired";
+    }
+    return "ok";
+  }
+
+  // Google connectors auto-refresh; treat as ok when active.
+  return "ok";
+}
 
 function formatProvider(provider: string): string {
   const found = CONNECTOR_PROVIDERS.find((p) => p.id === provider);
@@ -58,21 +86,25 @@ export default async function DashboardPage() {
   // Zone C right — connector health items
   const connectorHealthItems = connectors.map((connector) => {
     const providerInfo = CONNECTOR_PROVIDERS.find((p) => p.id === connector.provider);
-    // Last 7 jobs for this connector's sparkline
     const connectorJobs = allJobs
       .filter((j) => j.connector_id === connector.id && j.status === "completed")
       .slice(0, 7)
       .reverse();
+
+    // Compute token-level health for OAuth connectors that store tokens in config.
+    const tokenHealth = resolveTokenHealth(connector.provider, connector.status, connector.config);
+
     return {
       id: connector.id,
       name: connector.name,
       provider: connector.provider,
       providerName: providerInfo?.name ?? formatProvider(connector.provider),
-      status: connector.status,
+      connectorStatus: connector.status as ConnectorStatus,
+      tokenHealth,
       gradient: providerInfo?.gradient ?? "from-brand to-brand/60",
       lastSyncedAt: connector.last_synced_at,
       recentRecords: connectorJobs.map((j) => j.records_processed ?? 0),
-      href: providerInfo?.href,
+      reconnectHref: providerInfo?.href,
     };
   });
 

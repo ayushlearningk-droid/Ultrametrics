@@ -16,6 +16,8 @@ import {
   exchangeForLongLivedToken,
 } from "@/lib/meta/oauth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { metaTokenExpiresAt, type MetaConnectorConfig } from "@/lib/meta/token";
 
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -83,6 +85,34 @@ console.log("=========================================");
       state,
       accessToken,
     });
+
+    // Persist token into the existing connector so reconnect survives
+    // beyond the 15-minute pending-session TTL.
+    const admin = createAdminClient();
+    const { data: existingConnector } = await admin
+      .from("connectors")
+      .select("id, config")
+      .eq("workspace_id", workspaceId)
+      .eq("provider", "meta_ads")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingConnector) {
+      const prevConfig = (existingConnector.config ?? {}) as MetaConnectorConfig;
+      await admin
+        .from("connectors")
+        .update({
+          config: {
+            ...prevConfig,
+            access_token: accessToken,
+            token_expires_at: metaTokenExpiresAt(),
+          },
+          status: "active",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingConnector.id);
+    }
 
     await clearMetaOAuthCookies();
 

@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { requireGoogleOAuthConfig } from "@/lib/google/config";
-import { getLatestMetaPendingSession } from "@/lib/meta/pending";
+import { getActiveMetaToken, markMetaConnectorTokenError } from "@/lib/meta/token";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const META_GRAPH_VERSION = "v23.0";
@@ -314,23 +314,26 @@ export async function runMetaToGoogleSheetsSyncForWorkspace(
     refreshToken: googleConfig.refresh_token,
   };
 
-  // Fetch Meta insights; fall back to sample data if not connected or fetch fails.
+  // Fetch Meta insights using the persisted connector token (not a pending session).
   let insights: MetaInsightRow[] = [];
-  if (metaConnector?.external_account_id) {
-    const pendingSession = await getLatestMetaPendingSession(workspaceId);
-    if (pendingSession?.access_token) {
-      try {
-        insights = await fetchMetaInsightsLast30Days(
-          pendingSession.access_token,
-          String(metaConnector.external_account_id)
-        );
-      } catch (err) {
-        console.warn(
-          "[Sync] Meta insights fetch failed, using sample data:",
-          err
-        );
+  const metaToken = await getActiveMetaToken(workspaceId);
+
+  if (metaToken.status === "ok") {
+    try {
+      insights = await fetchMetaInsightsLast30Days(
+        metaToken.accessToken,
+        metaToken.accountId
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn("[Sync] Meta insights fetch failed:", message);
+      // Token rejected by Meta API — mark connector so health panel shows warning.
+      if (message.includes('"code":190') || message.includes("Invalid OAuth")) {
+        await markMetaConnectorTokenError(metaToken.connectorId);
       }
     }
+  } else if (metaToken.status === "expired" || metaToken.status === "missing") {
+    console.warn("[Sync] Meta token unavailable (status:", metaToken.status, ") — using sample data");
   }
 
   try {
