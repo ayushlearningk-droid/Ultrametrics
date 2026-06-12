@@ -44,9 +44,7 @@ export async function GET(request: Request) {
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
         client_id: config.clientId,
@@ -59,36 +57,20 @@ export async function GET(request: Request) {
     const tokenJson = (await tokenRes.json()) as {
       access_token?: string;
       refresh_token?: string;
+      expires_in?: number;
       error?: { message?: string };
       error_description?: string;
     };
 
-    console.log("[GOOGLE_TOKEN_DEBUG] status", tokenRes.status);
-    console.log("[GOOGLE_TOKEN_DEBUG] tokenJson", tokenJson);
-    console.log("[GOOGLE_TOKEN_DEBUG] error", tokenJson.error);
-    console.log("[GOOGLE_TOKEN_DEBUG] error_description", tokenJson.error_description);
-    console.log("[GOOGLE_TOKEN_DEBUG] redirect_uri", config.redirectUri);
-    console.log("[GOOGLE_TOKEN_DEBUG] client_id_present", Boolean(config.clientId));
-    console.log("[GOOGLE_TOKEN_DEBUG] client_secret_present", Boolean(config.clientSecret));
-
     if (!tokenRes.ok || !tokenJson.access_token) {
-      throw new Error(tokenJson.error?.message ?? tokenJson.error_description ?? "Failed to exchange Google code");
+      throw new Error(
+        tokenJson.error?.message ?? tokenJson.error_description ?? "Failed to exchange Google code"
+      );
     }
 
-    console.log("[GOOGLE_PROFILE_DEBUG] access_token_present", Boolean(tokenJson.access_token));
-    console.log("[GOOGLE_PROFILE_DEBUG] access_token_length", tokenJson.access_token?.length ?? 0);
-    console.log("[GOOGLE_PROFILE_DEBUG] refresh_token_present", Boolean(tokenJson.refresh_token));
-    console.log("[GOOGLE_PROFILE_DEBUG] profile_endpoint", "https://www.googleapis.com/oauth2/v2/userinfo");
-    console.log("[GOOGLE_PROFILE_DEBUG] auth_header", tokenJson.access_token ? `Bearer ${tokenJson.access_token}` : "MISSING");
-
     const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-      headers: {
-        Authorization: `Bearer ${tokenJson.access_token}`,
-      },
+      headers: { Authorization: `Bearer ${tokenJson.access_token}` },
     });
-
-    console.log("[GOOGLE_PROFILE_DEBUG] profile_status", profileRes.status);
-    console.log("[GOOGLE_PROFILE_DEBUG] profile_status_text", profileRes.statusText);
 
     const profile = (await profileRes.json()) as {
       email?: string;
@@ -98,25 +80,51 @@ export async function GET(request: Request) {
       error_description?: string;
     };
 
-    console.log("[GOOGLE_PROFILE_DEBUG] profile_json", profile);
-    console.log("[GOOGLE_PROFILE_DEBUG] profile_email_present", Boolean(profile.email));
-    console.log("[GOOGLE_PROFILE_DEBUG] profile_id_present", Boolean(profile.id));
-
     if (!profileRes.ok) {
-      throw new Error(profile.error?.message ?? profile.error_description ?? "Failed to load Google profile");
+      throw new Error(
+        profile.error?.message ?? profile.error_description ?? "Failed to load Google profile"
+      );
     }
 
+    const tokenExpiresAt = new Date(
+      Date.now() + (tokenJson.expires_in ?? 3600) * 1000
+    ).toISOString();
+
     const admin = createAdminClient();
+    const externalAccountId = profile.email ?? profile.id ?? "";
 
     const { data: existingConnector } = await admin
       .from("connectors")
-      .select("id")
+      .select("id, config")
       .eq("workspace_id", workspaceId)
       .eq("provider", "google_sheets")
-      .eq("external_account_id", profile.email ?? profile.id ?? "")
+      .eq("external_account_id", externalAccountId)
       .maybeSingle();
 
-    if (!existingConnector) {
+    if (existingConnector) {
+      // Reconnect: merge new tokens into existing config, preserving spreadsheet selection
+      const existingConfig = (existingConnector.config ?? {}) as Record<string, unknown>;
+      const { error } = await admin
+        .from("connectors")
+        .update({
+          status: "active",
+          config: {
+            ...existingConfig,
+            access_token: tokenJson.access_token,
+            // Preserve old refresh_token if Google didn't return a new one
+            refresh_token: tokenJson.refresh_token ?? existingConfig.refresh_token ?? null,
+            token_expires_at: tokenExpiresAt,
+            google_email: profile.email ?? null,
+            google_name: profile.name ?? null,
+            connected_by: user.id,
+          },
+          external_account_name: profile.name ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingConnector.id);
+
+      if (error) throw new Error(error.message);
+    } else {
       const { error } = await admin.from("connectors").insert({
         workspace_id: workspaceId,
         name: "Google Sheets",
@@ -125,25 +133,28 @@ export async function GET(request: Request) {
         config: {
           access_token: tokenJson.access_token,
           refresh_token: tokenJson.refresh_token ?? null,
+          token_expires_at: tokenExpiresAt,
           google_email: profile.email ?? null,
           google_name: profile.name ?? null,
           connected_by: user.id,
         },
-        external_account_id: profile.email ?? profile.id ?? null,
+        external_account_id: externalAccountId,
         external_account_name: profile.name ?? null,
         connected_by: user.id,
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
     }
 
     await clearGoogleOAuthCookies();
-    return NextResponse.redirect(new URL("/dashboard/connectors/google?google=success", request.url));
+    return NextResponse.redirect(
+      new URL("/dashboard/connectors/google?google=success", request.url)
+    );
   } catch (error) {
     console.error("Google OAuth callback error:", error);
     await clearGoogleOAuthCookies();
-    return NextResponse.redirect(new URL("/dashboard/connectors?error=token_exchange", request.url));
+    return NextResponse.redirect(
+      new URL("/dashboard/connectors?error=token_exchange", request.url)
+    );
   }
 }

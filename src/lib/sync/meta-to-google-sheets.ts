@@ -29,7 +29,9 @@ type MetaInsightRow = {
 type GoogleConnectorConfig = {
   access_token?: string;
   refresh_token?: string;
+  token_expires_at?: string;
   spreadsheet_id?: string;
+  spreadsheet_name?: string;
 };
 
 export type WorkspaceSyncExecutionResult =
@@ -50,20 +52,60 @@ function normalizeMetaAccountId(accountId: string): string {
   return accountId.startsWith("act_") ? accountId.slice(4) : accountId;
 }
 
-function getGoogleSheetsClient(tokens: {
-  accessToken?: string;
-  refreshToken?: string;
-}) {
-  const config = requireGoogleOAuthConfig();
+/**
+ * Creates a Google Sheets API client that:
+ * - Sets token expiry so googleapis can auto-refresh when access_token expires
+ * - Persists the refreshed access_token back to the DB via the `tokens` event
+ */
+function createSheetsClient(
+  config: GoogleConnectorConfig,
+  connectorId: string,
+  admin: ReturnType<typeof createAdminClient>
+) {
+  const oauthConfig = requireGoogleOAuthConfig();
   const oauth2Client = new google.auth.OAuth2(
-    config.clientId,
-    config.clientSecret,
-    config.redirectUri
+    oauthConfig.clientId,
+    oauthConfig.clientSecret,
+    oauthConfig.redirectUri
   );
-  oauth2Client.setCredentials({
-    access_token: tokens.accessToken,
-    refresh_token: tokens.refreshToken,
+
+  const credentials: {
+    access_token?: string;
+    refresh_token?: string;
+    expiry_date?: number;
+  } = {
+    access_token: config.access_token,
+    refresh_token: config.refresh_token,
+  };
+
+  if (config.token_expires_at) {
+    credentials.expiry_date = new Date(config.token_expires_at).getTime();
+  }
+
+  oauth2Client.setCredentials(credentials);
+
+  // When googleapis auto-refreshes the access_token, persist the new token to DB
+  oauth2Client.on("tokens", (newTokens) => {
+    if (newTokens.access_token) {
+      const newExpiresAt = newTokens.expiry_date
+        ? new Date(newTokens.expiry_date).toISOString()
+        : new Date(Date.now() + 3600_000).toISOString();
+
+      void admin
+        .from("connectors")
+        .update({
+          config: {
+            ...config,
+            access_token: newTokens.access_token,
+            token_expires_at: newExpiresAt,
+            ...(newTokens.refresh_token ? { refresh_token: newTokens.refresh_token } : {}),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", connectorId);
+    }
   });
+
   return google.sheets({ version: "v4", auth: oauth2Client });
 }
 
@@ -74,8 +116,7 @@ async function fetchMetaInsightsLast30Days(
   const normalizedAccountId = normalizeMetaAccountId(accountId);
 
   const params = new URLSearchParams({
-    fields:
-      "date_start,campaign_name,spend,impressions,clicks,action_values",
+    fields: "date_start,campaign_name,spend,impressions,clicks,action_values",
     level: "campaign",
     time_increment: "1",
     date_preset: "last_30d",
@@ -98,18 +139,17 @@ async function fetchMetaInsightsLast30Days(
 function generateSampleData(): (string | number)[][] {
   return [
     ["2024-06-01", "Brand Awareness", 150, 320, 12000, 450, 3.0],
-    ["2024-06-01", "Retargeting",      200, 410, 15500, 640, 3.2],
-    ["2024-06-02", "Brand Awareness",  165, 355, 13200, 495, 3.0],
-    ["2024-06-02", "Prospecting",      300, 580, 22000, 810, 2.7],
-    ["2024-06-03", "Retargeting",      220, 445, 16800, 704, 3.2],
+    ["2024-06-01", "Retargeting",     200, 410, 15500, 640, 3.2],
+    ["2024-06-02", "Brand Awareness", 165, 355, 13200, 495, 3.0],
+    ["2024-06-02", "Prospecting",     300, 580, 22000, 810, 2.7],
+    ["2024-06-03", "Retargeting",     220, 445, 16800, 704, 3.2],
   ];
 }
 
 async function ensureSheetTab(
   spreadsheetId: string,
-  tokens: { accessToken?: string; refreshToken?: string }
+  sheets: ReturnType<typeof google.sheets>
 ): Promise<void> {
-  const sheets = getGoogleSheetsClient(tokens);
   const { data } = await sheets.spreadsheets.get({ spreadsheetId });
   const exists = (data.sheets ?? []).some(
     (s) => s.properties?.title === SHEET_TAB_NAME
@@ -118,13 +158,7 @@ async function ensureSheetTab(
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {
-        requests: [
-          {
-            addSheet: {
-              properties: { title: SHEET_TAB_NAME },
-            },
-          },
-        ],
+        requests: [{ addSheet: { properties: { title: SHEET_TAB_NAME } } }],
       },
     });
   }
@@ -132,10 +166,8 @@ async function ensureSheetTab(
 
 async function ensureSheetHeaders(
   spreadsheetId: string,
-  tokens: { accessToken?: string; refreshToken?: string }
+  sheets: ReturnType<typeof google.sheets>
 ): Promise<void> {
-  const sheets = getGoogleSheetsClient(tokens);
-
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: HEADER_RANGE,
@@ -151,25 +183,16 @@ async function ensureSheetHeaders(
       spreadsheetId,
       range: HEADER_RANGE,
       valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [Array.from(SHEET_HEADERS)],
-      },
+      requestBody: { values: [Array.from(SHEET_HEADERS)] },
     });
   }
 }
 
 async function writeInsightRows(
   spreadsheetId: string,
-  tokens: { accessToken?: string; refreshToken?: string },
+  sheets: ReturnType<typeof google.sheets>,
   insights: MetaInsightRow[]
 ): Promise<{ rowsWritten: number; isSample: boolean }> {
-  const sheets = getGoogleSheetsClient(tokens);
-
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId,
-    range: DATA_RANGE,
-  });
-
   let rows: (string | number)[][];
   let isSample = false;
 
@@ -201,12 +224,24 @@ async function writeInsightRows(
   }
 
   if (rows.length > 0) {
+    // Write new data FIRST — if this fails, existing data is preserved
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: DATA_RANGE,
+      range: `${SHEET_TAB_NAME}!A2:G${rows.length + 1}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: rows },
     });
+    // Clear any stale rows below the new data (best-effort, non-critical)
+    try {
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId,
+        range: `${SHEET_TAB_NAME}!A${rows.length + 2}:G`,
+      });
+    } catch {
+      // Non-critical: extra rows may remain but new data is written correctly
+    }
+  } else {
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: DATA_RANGE });
   }
 
   return { rowsWritten: rows.length, isSample };
@@ -217,29 +252,15 @@ export async function runMetaToGoogleSheetsSyncForWorkspace(
 ): Promise<WorkspaceSyncExecutionResult> {
   const admin = createAdminClient();
 
-  const [
-    { data: googleConnector, error: googleConnectorError },
-    { data: metaConnectors },
-  ] = await Promise.all([
-    admin
-      .from("connectors")
-      .select("id, config")
-      .eq("workspace_id", workspaceId)
-      .eq("provider", "google_sheets")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .maybeSingle(),
-    admin
-      .from("connectors")
-      .select("id, external_account_id")
-      .eq("workspace_id", workspaceId)
-      .eq("provider", "meta_ads")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1),
-  ]);
+  const { data: googleConnector, error: googleConnectorError } = await admin
+    .from("connectors")
+    .select("id, config")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "google_sheets")
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .maybeSingle();
 
-  const metaConnector = metaConnectors?.[0] ?? null;
   const startedAt = new Date().toISOString();
 
   if (googleConnectorError) {
@@ -309,16 +330,14 @@ export async function runMetaToGoogleSheetsSyncForWorkspace(
     );
   }
 
-  const tokens = {
-    accessToken: googleConfig.access_token,
-    refreshToken: googleConfig.refresh_token,
-  };
-
-  // Fetch Meta insights using the persisted connector token (not a pending session).
+  // Resolve Meta Ads data — fail loudly for expired/missing tokens so the user knows
   let insights: MetaInsightRow[] = [];
+  let metaConnectorId: string | null = null;
+
   const metaToken = await getActiveMetaToken(workspaceId);
 
   if (metaToken.status === "ok") {
+    metaConnectorId = metaToken.connectorId;
     try {
       insights = await fetchMetaInsightsLast30Days(
         metaToken.accessToken,
@@ -327,21 +346,33 @@ export async function runMetaToGoogleSheetsSyncForWorkspace(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn("[Sync] Meta insights fetch failed:", message);
-      // Token rejected by Meta API — mark connector so health panel shows warning.
       if (message.includes('"code":190') || message.includes("Invalid OAuth")) {
         await markMetaConnectorTokenError(metaToken.connectorId);
       }
+      return failSyncJob(`Meta Ads API error: ${message}`, 500);
     }
-  } else if (metaToken.status === "expired" || metaToken.status === "missing") {
-    console.warn("[Sync] Meta token unavailable (status:", metaToken.status, ") — using sample data");
+  } else if (metaToken.status === "expired") {
+    return failSyncJob(
+      "Meta Ads token has expired. Reconnect Meta Ads to sync real data.",
+      400
+    );
+  } else if (metaToken.status === "missing") {
+    return failSyncJob(
+      "Meta Ads access token is missing. Reconnect Meta Ads.",
+      400
+    );
   }
+  // status === "not_connected": fall through with empty insights → sample data written
+
+  // Create the sheets client once; it will auto-refresh the token and persist it if needed
+  const sheets = createSheetsClient(googleConfig, googleConnector.id, admin);
 
   try {
-    await ensureSheetTab(spreadsheetId, tokens);
-    await ensureSheetHeaders(spreadsheetId, tokens);
+    await ensureSheetTab(spreadsheetId, sheets);
+    await ensureSheetHeaders(spreadsheetId, sheets);
     const { rowsWritten, isSample } = await writeInsightRows(
       spreadsheetId,
-      tokens,
+      sheets,
       insights
     );
 
@@ -362,18 +393,17 @@ export async function runMetaToGoogleSheetsSyncForWorkspace(
       })
       .eq("id", syncJobId);
 
-    if (metaConnector) {
+    if (metaConnectorId) {
       await admin
         .from("connectors")
         .update({ last_synced_at: syncedAt, updated_at: syncedAt })
-        .eq("id", metaConnector.id);
+        .eq("id", metaConnectorId);
     }
 
     return { ok: true, status: 200, rowsWritten, spreadsheetId, isSample };
   } catch (error) {
     console.error("[Sync] Meta to Google Sheets sync failed:", error);
-    const message =
-      error instanceof Error ? error.message : "Sync failed";
+    const message = error instanceof Error ? error.message : "Sync failed";
     return failSyncJob(message, 500);
   }
 }

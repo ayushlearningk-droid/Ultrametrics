@@ -77,7 +77,7 @@ export function GoogleSpreadsheetSelection() {
           throw new Error(payload.error ?? response.statusText);
         }
 
-        router.push("/dashboard/connectors");
+        router.push("/dashboard/connectors/google");
       } catch (err) {
         setError(
           err instanceof Error
