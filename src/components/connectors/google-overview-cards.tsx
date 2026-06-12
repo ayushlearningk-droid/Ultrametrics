@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/format/currency";
 
 interface CampaignRow {
   campaignId: string;
@@ -213,13 +214,7 @@ export function GoogleOverviewCards({
     campaigns !== null ? buildAIAnalysis(campaigns, totalCost, totalConv) : null;
   const s = analysis ? ANALYSIS_STYLE[analysis.type] : null;
 
-  const fmtCur = (v: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(v);
+  const fmtCur = (v: number) => formatCurrency(v, currency);
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

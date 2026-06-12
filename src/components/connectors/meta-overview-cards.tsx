@@ -14,6 +14,7 @@ import {
 
 import { Sparkline } from "@/components/home/sparkline";
 import { cn } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/format/currency";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -250,10 +251,10 @@ const OPPORTUNITIES = [
 /* ─── Campaign Health ────────────────────────────────────────────── */
 
 const CAMPAIGNS = [
-  { id: 1, name: "Retargeting — Site Visitors", spend: 847, ctr: 2.34, impressions: 46800, trendPct: 8.2 },
-  { id: 2, name: "Summer Sale — Prospecting", spend: 1124, ctr: 1.91, impressions: 87200, trendPct: 12.4 },
-  { id: 3, name: "Lookalike — 1% US", spend: 2174, ctr: 1.68, impressions: 225100, trendPct: 5.6 },
-  { id: 4, name: "Brand Awareness — Video", spend: 690, ctr: 1.42, impressions: 95100, trendPct: -3.1 },
+  { id: 1, name: "Retargeting — Site Visitors", spend: 71148,  ctr: 2.34, impressions: 46800,  trendPct: 8.2  },
+  { id: 2, name: "Summer Sale — Prospecting",   spend: 94416,  ctr: 1.91, impressions: 87200,  trendPct: 12.4 },
+  { id: 3, name: "Lookalike — 1% IN",           spend: 182616, ctr: 1.68, impressions: 225100, trendPct: 5.6  },
+  { id: 4, name: "Brand Awareness — Video",     spend: 57960,  ctr: 1.42, impressions: 95100,  trendPct: -3.1 },
 ];
 
 function healthScore(ctr: number, trendPct: number): number {
@@ -475,11 +476,7 @@ export function MetaOverviewCards({
               height={84}
             />
             <p className={cn("mt-2.5 font-mono text-[11px] font-medium", s.iconColor)}>
-              $
-              {analysis.sparkData[analysis.sparkData.length - 1].toLocaleString(
-                "en-US",
-                { maximumFractionDigits: 0 }
-              )}{" "}
+              {formatCurrency(analysis.sparkData[analysis.sparkData.length - 1], currency)}{" "}
               last day
             </p>
           </div>
@@ -500,12 +497,7 @@ export function MetaOverviewCards({
               value:
                 loading || totalSpend === null
                   ? null
-                  : new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency,
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(totalSpend),
+                  : formatCurrency(totalSpend, currency),
             },
             {
               label: "Avg. CTR",
@@ -513,16 +505,14 @@ export function MetaOverviewCards({
             },
             {
               label: "Avg. CPC",
-              value: loading || avgCpc === null ? null : `$${avgCpc.toFixed(2)}`,
+              value: loading || avgCpc === null ? null : formatCurrency(avgCpc, currency, { decimals: 2 }),
             },
             {
               label: "Impressions",
               value:
                 loading || totalImp === null
                   ? null
-                  : new Intl.NumberFormat("en-US", {
-                      notation: "compact",
-                    }).format(totalImp),
+                  : formatNumber(totalImp, currency, { compact: true }),
             },
           ].map((m) => (
             <div key={m.label}>
@@ -689,7 +679,7 @@ export function MetaOverviewCards({
                       Spend
                     </p>
                     <p className="mt-1.5 font-mono text-[18px] font-bold tabular-nums leading-none text-foreground/75">
-                      ${c.spend.toLocaleString()}
+                      {formatCurrency(c.spend, currency)}
                     </p>
                   </div>
                 </div>

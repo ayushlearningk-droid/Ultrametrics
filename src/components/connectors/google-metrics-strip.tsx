@@ -5,6 +5,7 @@ import {
   ConnectorMetricsStrip,
   type MetricItem,
 } from "@/components/connectors/connector-metrics-strip";
+import { formatCurrency, formatNumber } from "@/lib/format/currency";
 
 interface CampaignRow {
   campaignId: string;
@@ -24,19 +25,11 @@ function fmt(
 ): string {
   switch (type) {
     case "currency":
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(val);
+      return formatCurrency(val, currency);
     case "integer":
-      return new Intl.NumberFormat("en-US").format(Math.round(val));
+      return formatNumber(Math.round(val), currency);
     case "compact":
-      return new Intl.NumberFormat("en-US", {
-        notation: "compact",
-        maximumFractionDigits: 1,
-      }).format(val);
+      return formatNumber(val, currency, { compact: true });
     case "decimal":
       return val.toFixed(2);
   }
