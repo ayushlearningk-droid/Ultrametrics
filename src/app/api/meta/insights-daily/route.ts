@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 import { getAccountInsightsByDay } from "@/lib/meta/insights";
 import { getActiveMetaToken, markMetaConnectorTokenError } from "@/lib/meta/token";
+import { DEMO_META_DAILY } from "@/lib/dev/demo-data";
 
 export async function GET() {
+  const cookieStore = await cookies();
+  if (cookieStore.get("__dev_screenshot")?.value === "1") {
+    return NextResponse.json(DEMO_META_DAILY);
+  }
   try {
     const workspaces = await getUserWorkspaces();
     const workspaceId = await getCurrentWorkspaceId(workspaces);

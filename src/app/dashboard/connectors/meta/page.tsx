@@ -1,15 +1,30 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ConnectorBackLink } from "@/components/connectors/connector-back-link";
 import { MetaConnectButton } from "@/components/connectors/meta-connect-button";
 import { MetaOAuthAlerts } from "@/components/connectors/meta-oauth-alerts";
+import { MetaMetricsStrip } from "@/components/connectors/meta-metrics-strip";
+import { MetaOverviewCards } from "@/components/connectors/meta-overview-cards";
 import { MetaAIInsights } from "@/components/connectors/meta-ai-insights";
 import { MetaIcon } from "@/components/ui/brand-icons";
 import { getConnectorsByWorkspace } from "@/lib/data/dashboard";
 import { getMetaOAuthConfig } from "@/lib/meta/config";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
+import { DEMO_CONNECTORS } from "@/lib/dev/demo-data";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Meta Ads" };
+
+function relativeTime(d: string | null) {
+  if (!d) return "Never";
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 export default async function MetaAdsPage({
   searchParams,
@@ -17,11 +32,16 @@ export default async function MetaAdsPage({
   searchParams: Promise<{ oauth?: string; error?: string; reason?: string; tab?: string }>;
 }) {
   const params = await searchParams;
+  const cookieStore = await cookies();
+  const isDemo = cookieStore.get("__dev_screenshot")?.value === "1";
+
   const workspaces = await getUserWorkspaces();
   const wsId = await getCurrentWorkspaceId(workspaces);
   const metaConfig = getMetaOAuthConfig();
 
-  const allConnectors = wsId ? await getConnectorsByWorkspace(wsId) : [];
+  const allConnectors = isDemo
+    ? DEMO_CONNECTORS
+    : wsId ? await getConnectorsByWorkspace(wsId) : [];
   const connector = allConnectors.find((c) => c.provider === "meta_ads") ?? null;
 
   const activeTab = params.tab ?? (connector ? "overview" : "connect");
@@ -36,70 +56,114 @@ export default async function MetaAdsPage({
     : [{ id: "connect", label: "Connect" }];
 
   return (
-    <div className="min-h-full px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+    <div className="min-h-full">
 
-      {/* Header */}
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <MetaIcon className="h-10 w-10" />
-          <div>
-            <div className="flex items-center gap-2">
-              <ConnectorBackLink href="/dashboard/connectors" />
-            </div>
-            <h1 className="text-xl font-semibold tracking-tight">Meta Ads</h1>
-            {connector && (
-              <p className="mt-0.5 text-sm text-white/35">
-                {connector.external_account_name ?? connector.name}
-                {connector.external_account_id && (
-                  <span className="ml-2 font-mono text-[11px] text-white/20">
-                    #{connector.external_account_id}
-                  </span>
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="px-6 pt-6 pb-0 sm:px-8 lg:px-12 xl:px-16">
+        <ConnectorBackLink href="/dashboard/connectors" />
+
+        <div className="mt-4 flex items-start justify-between gap-4">
+          {/* Left: identity */}
+          <div className="flex items-center gap-3.5">
+            <MetaIcon className="h-8 w-8" />
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-[15px] font-semibold leading-none tracking-tight text-foreground/92">
+                  Meta Ads
+                </h1>
+                {connector && (
+                  <>
+                    <span className="text-white/15">·</span>
+                    <span className="text-[13px] leading-none text-white/45">
+                      {connector.external_account_name ?? connector.name}
+                    </span>
+                  </>
                 )}
-              </p>
+              </div>
+              {connector?.external_account_id && (
+                <p className="mt-1.5 font-mono text-[10px] text-white/20">
+                  act_{connector.external_account_id}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Right: monitoring status */}
+          <div className="flex items-center gap-3.5">
+            {connector && (
+              <div className="flex flex-col items-end gap-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-[6px] w-[6px]">
+                    <span
+                      className={cn(
+                        "absolute inline-flex h-full w-full animate-ping rounded-full opacity-60",
+                        connector.status === "active" ? "bg-emerald-400" : "bg-amber-400"
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "relative inline-flex h-[6px] w-[6px] rounded-full",
+                        connector.status === "active" ? "bg-emerald-400" : "bg-amber-400"
+                      )}
+                    />
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold uppercase tracking-[0.22em]",
+                      connector.status === "active"
+                        ? "text-emerald-400/80"
+                        : "text-amber-400/80"
+                    )}
+                  >
+                    {connector.status === "active" ? "AI Monitoring" : "Paused"}
+                  </span>
+                </div>
+                {connector.last_synced_at && (
+                  <p className="text-[10px] text-white/25">
+                    Synced {relativeTime(connector.last_synced_at)}
+                  </p>
+                )}
+              </div>
+            )}
+            {connector && wsId && metaConfig && (
+              <a
+                href={`/api/connectors/meta/oauth/start?workspaceId=${encodeURIComponent(wsId)}`}
+                className="rounded-lg border border-white/[0.07] px-3 py-1.5 text-[11px] text-white/32 transition-all hover:border-white/[0.15] hover:text-white/60"
+              >
+                Reconnect
+              </a>
             )}
           </div>
         </div>
-
-        {connector && wsId && metaConfig && (
-          <a
-            href={`/api/connectors/meta/oauth/start?workspaceId=${encodeURIComponent(wsId)}`}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.025] px-4 py-2 text-sm text-white/50 transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/90"
-          >
-            Reconnect
-          </a>
-        )}
       </div>
 
-      {/* Status bar */}
+      {/* ── Account Health Bar (only when connected) ─────────────── */}
       {connector && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-3">
-          <div className={cn(
-            "h-2 w-2 rounded-full",
-            connector.status === "active" ? "bg-emerald-400 shadow-emerald-400/40 shadow-[0_0_6px]" : "bg-amber-400"
-          )} />
-          <p className="text-sm font-medium capitalize text-foreground/80">{connector.status}</p>
-          {connector.last_synced_at && (
-            <p className="ml-auto text-xs text-white/30">
-              Last synced {new Date(connector.last_synced_at).toLocaleString()}
-            </p>
-          )}
+        <div className="mt-5 border-t border-white/[0.05]">
+          <MetaMetricsStrip />
         </div>
       )}
 
-      {/* OAuth alerts */}
-      <MetaOAuthAlerts oauth={params.oauth} error={params.error} reason={params.reason} />
+      {/* ── OAuth alerts ────────────────────────────────────────── */}
+      <div className="px-6 sm:px-8 lg:px-12 xl:px-16">
+        <MetaOAuthAlerts
+          oauth={params.oauth}
+          error={params.error}
+          reason={params.reason}
+        />
+      </div>
 
-      {/* Tabs */}
-      <div className="mb-8 flex gap-1 border-b border-white/[0.06]">
+      {/* ── Tabs (secondary nav) ────────────────────────────────── */}
+      <div className="flex gap-0 border-b border-white/[0.04] px-6 sm:px-8 lg:px-12 xl:px-16">
         {tabs.map((tab) => (
           <Link
             key={tab.id}
             href={`/dashboard/connectors/meta?tab=${tab.id}`}
             className={cn(
-              "px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px",
+              "-mb-px border-b px-3.5 py-2.5 text-[11px] font-medium transition-colors",
               activeTab === tab.id
-                ? "border-brand text-foreground"
-                : "border-transparent text-white/35 hover:text-white/60"
+                ? "border-white/25 text-foreground/70"
+                : "border-transparent text-white/28 hover:text-white/52"
             )}
           >
             {tab.label}
@@ -107,31 +171,46 @@ export default async function MetaAdsPage({
         ))}
       </div>
 
-      {/* Tab content */}
-      {activeTab === "connect" && (
-        <ConnectTab wsId={wsId} metaConfig={metaConfig} />
-      )}
+      {/* ── Tab content ─────────────────────────────────────────── */}
+      <div className="px-6 py-8 sm:px-8 lg:px-12 xl:px-16">
+        {activeTab === "connect" && (
+          <ConnectTab wsId={wsId} metaConfig={metaConfig} />
+        )}
 
-      {activeTab === "overview" && connector && (
-        <OverviewTab connector={connector} wsId={wsId} metaConfig={metaConfig} />
-      )}
+        {activeTab === "overview" && connector && (
+          <MetaOverviewCards
+            connector={{
+              name: connector.name,
+              status: connector.status,
+              last_synced_at: connector.last_synced_at,
+              external_account_id: connector.external_account_id,
+            }}
+            wsId={wsId}
+            metaConfig={metaConfig}
+          />
+        )}
 
-      {activeTab === "insights" && connector && (
-        <MetaAIInsights />
-      )}
+        {activeTab === "insights" && connector && <MetaAIInsights />}
 
-      {activeTab === "budget" && connector && (
-        <BudgetTab />
-      )}
+        {activeTab === "budget" && connector && <BudgetTab />}
 
-      {activeTab === "settings" && connector && (
-        <SettingsTab connector={connector} wsId={wsId} metaConfig={metaConfig} />
-      )}
+        {activeTab === "settings" && connector && (
+          <SettingsTab wsId={wsId} metaConfig={metaConfig} />
+        )}
+      </div>
     </div>
   );
 }
 
-function ConnectTab({ wsId, metaConfig }: { wsId: string | null; metaConfig: unknown }) {
+/* ─── Sub-tabs ────────────────────────────────────────────────────── */
+
+function ConnectTab({
+  wsId,
+  metaConfig,
+}: {
+  wsId: string | null;
+  metaConfig: unknown;
+}) {
   const STEPS = [
     "Sign in with your Facebook account",
     "Grant Ultrametrics access to your ad accounts",
@@ -140,9 +219,11 @@ function ConnectTab({ wsId, metaConfig }: { wsId: string | null; metaConfig: unk
   return (
     <div className="max-w-md space-y-6">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">Setup</p>
-        <p className="mt-3 text-sm text-white/50">
-          Connect a Meta ad account to import campaign performance data into Ultrametrics.
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
+          Setup
+        </p>
+        <p className="mt-3 text-[13px] text-white/50">
+          Connect a Meta ad account to import campaign performance data and unlock AI-powered insights.
         </p>
       </div>
       <ol className="space-y-3">
@@ -151,14 +232,17 @@ function ConnectTab({ wsId, metaConfig }: { wsId: string | null; metaConfig: unk
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.04] font-mono text-[10px] text-white/40">
               {i + 1}
             </span>
-            <span className="text-sm text-white/55">{step}</span>
+            <span className="text-[13px] text-white/55">{step}</span>
           </li>
         ))}
       </ol>
       {wsId ? (
         <MetaConnectButton workspaceId={wsId} configured={metaConfig !== null} />
       ) : (
-        <button disabled className="rounded-lg bg-brand/50 px-4 py-2 text-sm text-white/50">
+        <button
+          disabled
+          className="rounded-lg bg-brand/50 px-4 py-2 text-[13px] text-white/50"
+        >
           Connect with Facebook
         </button>
       )}
@@ -166,48 +250,26 @@ function ConnectTab({ wsId, metaConfig }: { wsId: string | null; metaConfig: unk
   );
 }
 
-function OverviewTab({
-  connector,
-}: {
-  connector: { name: string; status: string; last_synced_at: string | null; external_account_id?: string | null };
-  wsId?: string | null;
-  metaConfig?: unknown;
-}) {
-  return (
-    <div className="space-y-6 max-w-lg">
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] divide-y divide-white/[0.05]">
-        {[
-          { label: "Connector name", value: connector.name },
-          { label: "Account ID", value: connector.external_account_id ?? "—" },
-          { label: "Status", value: connector.status, capitalize: true },
-          { label: "Last sync", value: connector.last_synced_at ? new Date(connector.last_synced_at).toLocaleString() : "Never" },
-        ].map((row) => (
-          <div key={row.label} className="flex items-center justify-between px-5 py-3.5">
-            <p className="text-xs text-white/35">{row.label}</p>
-            <p className={cn("text-sm font-medium text-foreground/80", row.capitalize && "capitalize")}>{row.value}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function BudgetTab() {
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="max-w-lg space-y-4">
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">Budget analysis</p>
-        <p className="mt-4 text-sm text-white/50">
-          Budget recommendations will appear here once your account has sufficient historical data (minimum 7 days of spend).
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
+          Budget Analysis
         </p>
-        <p className="mt-3 text-sm text-white/35">
-          Connect more data sources and let Ultrametrics build a baseline of your spending patterns to unlock personalized budget optimization recommendations.
+        <p className="mt-4 text-[13px] text-white/50">
+          Budget recommendations appear once your account has 7+ days of spend history.
+        </p>
+        <p className="mt-2 text-[12px] text-white/30">
+          Ultrametrics will identify budget-constrained campaigns with strong ROAS and recommend reallocation opportunities.
         </p>
       </div>
       <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-400/70">Tip</p>
-        <p className="mt-2 text-sm text-white/50">
-          Campaigns with ROAS above 3.0 are typically good candidates for budget increases. Monitor your CTR trends to identify when creative fatigue sets in.
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400/70">
+          Tip
+        </p>
+        <p className="mt-2 text-[12px] text-white/45">
+          Campaigns with ROAS above 3× are typically good candidates for budget increases. Monitor your CTR trends to identify when creative fatigue sets in.
         </p>
       </div>
     </div>
@@ -218,26 +280,29 @@ function SettingsTab({
   wsId,
   metaConfig,
 }: {
-  connector?: { name: string };
   wsId: string | null;
   metaConfig: unknown;
 }) {
   return (
-    <div className="max-w-md space-y-6">
+    <div className="max-w-md space-y-4">
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-        <p className="text-sm font-medium text-foreground/80">Reconnect account</p>
-        <p className="mt-1 text-sm text-white/35">
+        <p className="text-[13px] font-medium text-foreground/80">
+          Reconnect account
+        </p>
+        <p className="mt-1 text-[12px] text-white/35">
           Refresh your Meta OAuth token if syncs are failing or the token has expired.
         </p>
         {wsId && metaConfig ? (
           <a
             href={`/api/connectors/meta/oauth/start?workspaceId=${encodeURIComponent(wsId)}`}
-            className="mt-4 inline-block rounded-lg border border-white/[0.1] bg-white/[0.04] px-4 py-2 text-sm text-foreground/70 transition-colors hover:bg-white/[0.07]"
+            className="mt-4 inline-block rounded-lg border border-white/[0.1] bg-white/[0.04] px-4 py-2 text-[12px] text-foreground/65 transition-colors hover:bg-white/[0.07]"
           >
             Reconnect with Facebook
           </a>
         ) : (
-          <p className="mt-2 text-xs text-red-400/70">Meta OAuth is not configured in this environment.</p>
+          <p className="mt-2 text-[11px] text-red-400/70">
+            Meta OAuth is not configured in this environment.
+          </p>
         )}
       </div>
     </div>

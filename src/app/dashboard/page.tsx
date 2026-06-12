@@ -1,16 +1,18 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import {
   getConnectorsByWorkspace,
   getSyncJobsByWorkspace,
 } from "@/lib/data/dashboard";
 import { getDashboardContext } from "@/lib/data/workspaces";
 import { CONNECTOR_PROVIDERS } from "@/lib/connectors/providers";
-import { AIDigest } from "@/components/home/ai-digest";
+import { AIHero } from "@/components/home/ai-hero";
 import { CampaignHealthStrip } from "@/components/home/campaign-health-strip";
 import type { HealthConnector } from "@/components/home/campaign-health-strip";
 import { BRAND_ICON_MAP, GenericPlatformIcon } from "@/components/ui/brand-icons";
 import type { SyncJobStatus, ConnectorStatus } from "@/types/database";
 import type { MetaConnectorConfig } from "@/lib/meta/token";
+import { DEMO_CONNECTORS, DEMO_SYNC_JOBS } from "@/lib/dev/demo-data";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Home" };
@@ -62,17 +64,22 @@ const JOB_DOT: Record<SyncJobStatus, string> = {
 };
 
 export default async function DashboardPage() {
+  const cookieStore = await cookies();
+  const isDemo = cookieStore.get("__dev_screenshot")?.value === "1";
+
   const ctx = await getDashboardContext();
   const profile = ctx?.profile ?? null;
   const workspaces = ctx?.workspaces ?? [];
   const wsId = ctx?.currentWorkspaceId ?? null;
   const wsName =
-    workspaces.find((w) => w.id === wsId)?.name ?? "Workspace";
+    workspaces.find((w) => w.id === wsId)?.name ?? (isDemo ? "Acme Corp" : "Workspace");
 
-  const [allJobs, connectors] = await Promise.all([
-    wsId ? getSyncJobsByWorkspace(wsId, 8) : Promise.resolve([]),
-    wsId ? getConnectorsByWorkspace(wsId) : Promise.resolve([]),
-  ]);
+  const [allJobs, connectors] = isDemo
+    ? [DEMO_SYNC_JOBS, DEMO_CONNECTORS]
+    : await Promise.all([
+        wsId ? getSyncJobsByWorkspace(wsId, 8) : Promise.resolve([]),
+        wsId ? getConnectorsByWorkspace(wsId) : Promise.resolve([]),
+      ]);
 
   const activeConnectors = connectors.filter((c) => c.status === "active");
   const lastSync =
@@ -166,9 +173,13 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* ── AI Digest — first visible ────────────────────────────── */}
+        {/* ── AI Hero — first visible, dominates screen ───────────── */}
         <section className="mb-10">
-          <AIDigest connectors={digestConnectors} />
+          <AIHero
+            connectors={digestConnectors}
+            activeCount={activeConnectors.length}
+            lastSync={lastSync ? `synced ${relativeTime(lastSync)}` : null}
+          />
         </section>
 
         {/* ── Campaign Health Strip ────────────────────────────────── */}

@@ -22,7 +22,6 @@ async function main() {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     colorScheme: "dark",
-    // Send bypass header on every request in this context
     extraHTTPHeaders: {
       "x-dev-screenshot": "ultrametrics_dev_screenshot",
     },
@@ -32,9 +31,14 @@ async function main() {
 
   for (const { name, url } of PAGES) {
     console.log(`Capturing ${name} …`);
-    await page.goto(url, { waitUntil: "networkidle" });
-    // Let Framer Motion animations settle
-    await page.waitForTimeout(1800);
+    try {
+      await page.goto(url, { waitUntil: "networkidle", timeout: 15000 });
+    } catch {
+      // networkidle can time out on pages with long-polling; capture anyway
+      console.log(`  (networkidle timed out, capturing anyway)`);
+    }
+    // Let animations settle and client components hydrate
+    await page.waitForTimeout(2500);
     const file = join(OUT, `${name}.png`);
     await page.screenshot({ path: file, fullPage: true });
     console.log(`  ✓  saved → ${file}`);

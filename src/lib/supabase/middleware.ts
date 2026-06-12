@@ -23,6 +23,14 @@ function withCookies(from: NextResponse, to: NextResponse) {
 }
 
 export async function updateSession(request: NextRequest) {
+  // Dev-only: bypass auth for screenshot tool
+  if (
+    process.env.NODE_ENV === "development" &&
+    request.headers.get("x-dev-screenshot") === "ultrametrics_dev_screenshot"
+  ) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

@@ -1,15 +1,30 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ConnectorBackLink } from "@/components/connectors/connector-back-link";
 import { GoogleAdsConnectButton } from "@/components/connectors/google-ads-connect-button";
 import { GoogleAdsOAuthAlerts } from "@/components/connectors/google-ads-oauth-alerts";
 import { GoogleSyncNowButton } from "@/components/connectors/google-sync-now-button";
+import { GoogleMetricsStrip } from "@/components/connectors/google-metrics-strip";
+import { GoogleOverviewCards } from "@/components/connectors/google-overview-cards";
 import { GoogleAdsIcon } from "@/components/ui/brand-icons";
 import { getConnectorsByWorkspace } from "@/lib/data/dashboard";
 import { getGoogleAdsConfig } from "@/lib/google-ads/config";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
+import { DEMO_CONNECTORS } from "@/lib/dev/demo-data";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Google Ads" };
+
+function relativeTime(d: string | null) {
+  if (!d) return "Never";
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 export default async function GoogleAdsPage({
   searchParams,
@@ -17,11 +32,16 @@ export default async function GoogleAdsPage({
   searchParams: Promise<{ oauth?: string; error?: string; reason?: string; tab?: string }>;
 }) {
   const params = await searchParams;
+  const cookieStore = await cookies();
+  const isDemo = cookieStore.get("__dev_screenshot")?.value === "1";
+
   const workspaces = await getUserWorkspaces();
   const wsId = await getCurrentWorkspaceId(workspaces);
   const googleAdsConfig = getGoogleAdsConfig();
 
-  const allConnectors = wsId ? await getConnectorsByWorkspace(wsId) : [];
+  const allConnectors = isDemo
+    ? DEMO_CONNECTORS
+    : wsId ? await getConnectorsByWorkspace(wsId) : [];
   const connector = allConnectors.find((c) => c.provider === "google_ads") ?? null;
 
   const activeTab = params.tab ?? (connector ? "overview" : "connect");
@@ -36,22 +56,20 @@ export default async function GoogleAdsPage({
     : [{ id: "connect", label: "Connect" }];
 
   return (
-    <div className="min-h-full px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+    <div className="min-h-full">
 
-      {/* Header */}
-      <div className="mb-8 flex items-start justify-between gap-4">
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 px-6 pt-8 pb-6 sm:px-8 lg:px-12 xl:px-16">
         <div className="flex items-center gap-4">
-          <GoogleAdsIcon className="h-10 w-10" />
+          <GoogleAdsIcon className="h-9 w-9" />
           <div>
-            <div className="flex items-center gap-2">
-              <ConnectorBackLink href="/dashboard/connectors" />
-            </div>
+            <ConnectorBackLink href="/dashboard/connectors" />
             <h1 className="text-xl font-semibold tracking-tight">Google Ads</h1>
             {connector && (
-              <p className="mt-0.5 text-sm text-white/35">
+              <p className="mt-0.5 text-[12px] text-white/35">
                 {connector.external_account_name ?? connector.name}
                 {connector.external_account_id && (
-                  <span className="ml-2 font-mono text-[11px] text-white/20">
+                  <span className="ml-2 font-mono text-[10px] text-white/20">
                     #{connector.external_account_id}
                   </span>
                 )}
@@ -62,43 +80,62 @@ export default async function GoogleAdsPage({
 
         {connector && (
           <div className="flex items-center gap-2">
-            <a
-              href="/dashboard/connectors/google-ads/create-campaign"
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            >
-              + New campaign
-            </a>
+            <GoogleSyncNowButton
+              endpoint="/api/sync/google-ads-to-google-sheets"
+              source="Google Ads"
+            />
           </div>
         )}
       </div>
 
-      {/* Status bar */}
+      {/* ── Status + Metrics strip ───────────────────────────────── */}
       {connector && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-3">
-          <div className={cn(
-            "h-2 w-2 rounded-full",
-            connector.status === "active" ? "bg-emerald-400 shadow-emerald-400/40 shadow-[0_0_6px]" : "bg-amber-400"
-          )} />
-          <p className="text-sm font-medium capitalize text-foreground/80">{connector.status}</p>
-          {connector.last_synced_at && (
-            <p className="ml-auto text-xs text-white/30">
-              Last synced {new Date(connector.last_synced_at).toLocaleString()}
+        <div className="border-y border-white/[0.06] bg-white/[0.01]">
+          {/* Status row */}
+          <div className="flex items-center gap-3 border-b border-white/[0.05] px-6 py-3 sm:px-8 lg:px-12 xl:px-16">
+            <div
+              className={cn(
+                "h-[6px] w-[6px] rounded-full",
+                connector.status === "active"
+                  ? "animate-pulse bg-emerald-400 shadow-[0_0_6px] shadow-emerald-400/40"
+                  : "bg-amber-400"
+              )}
+            />
+            <p className="text-[12px] font-medium capitalize text-foreground/70">
+              {connector.status}
             </p>
-          )}
+            {connector.last_synced_at && (
+              <p className="ml-auto text-[11px] text-white/28">
+                Last synced{" "}
+                {relativeTime(connector.last_synced_at)}
+              </p>
+            )}
+          </div>
+
+          {/* Big metrics */}
+          <div className="px-2 sm:px-4 lg:px-8 xl:px-12">
+            <GoogleMetricsStrip />
+          </div>
         </div>
       )}
 
-      {/* OAuth alerts */}
-      <GoogleAdsOAuthAlerts oauth={params.oauth} error={params.error} reason={params.reason} />
+      {/* ── OAuth alerts ────────────────────────────────────────── */}
+      <div className="px-6 sm:px-8 lg:px-12 xl:px-16">
+        <GoogleAdsOAuthAlerts
+          oauth={params.oauth}
+          error={params.error}
+          reason={params.reason}
+        />
+      </div>
 
-      {/* Tabs */}
-      <div className="mb-8 flex gap-1 border-b border-white/[0.06]">
+      {/* ── Tabs ────────────────────────────────────────────────── */}
+      <div className="flex gap-0 border-b border-white/[0.06] px-6 sm:px-8 lg:px-12 xl:px-16">
         {tabs.map((tab) => (
           <Link
             key={tab.id}
             href={`/dashboard/connectors/google-ads?tab=${tab.id}`}
             className={cn(
-              "px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px",
+              "border-b-2 px-4 py-3 text-[13px] font-medium transition-colors -mb-px",
               activeTab === tab.id
                 ? "border-brand text-foreground"
                 : "border-transparent text-white/35 hover:text-white/60"
@@ -109,41 +146,60 @@ export default async function GoogleAdsPage({
         ))}
       </div>
 
-      {/* Tab content */}
-      {activeTab === "connect" && (
-        <ConnectTab wsId={wsId} googleAdsConfig={googleAdsConfig} />
-      )}
+      {/* ── Tab content ─────────────────────────────────────────── */}
+      <div className="px-6 py-8 sm:px-8 lg:px-12 xl:px-16">
+        {activeTab === "connect" && (
+          <ConnectTab wsId={wsId} googleAdsConfig={googleAdsConfig} />
+        )}
 
-      {activeTab === "overview" && connector && (
-        <OverviewTab connector={connector} wsId={wsId} googleAdsConfig={googleAdsConfig} />
-      )}
+        {activeTab === "overview" && connector && (
+          <GoogleOverviewCards
+            connector={{
+              name: connector.name,
+              status: connector.status,
+              last_synced_at: connector.last_synced_at,
+              external_account_id: connector.external_account_id,
+            }}
+            wsId={wsId}
+            googleAdsConfig={googleAdsConfig}
+          />
+        )}
 
-      {activeTab === "campaigns" && connector && (
-        <CampaignsTab />
-      )}
+        {activeTab === "campaigns" && connector && <CampaignsTab />}
 
-      {activeTab === "recommendations" && connector && (
-        <RecommendationsTab />
-      )}
+        {activeTab === "recommendations" && connector && (
+          <RecommendationsTab />
+        )}
 
-      {activeTab === "settings" && connector && (
-        <SettingsTab wsId={wsId} googleAdsConfig={googleAdsConfig} />
-      )}
+        {activeTab === "settings" && connector && (
+          <SettingsTab wsId={wsId} googleAdsConfig={googleAdsConfig} />
+        )}
+      </div>
     </div>
   );
 }
 
-function ConnectTab({ wsId, googleAdsConfig }: { wsId: string | null; googleAdsConfig: unknown }) {
+/* ─── Sub-tabs ────────────────────────────────────────────────────── */
+
+function ConnectTab({
+  wsId,
+  googleAdsConfig,
+}: {
+  wsId: string | null;
+  googleAdsConfig: unknown;
+}) {
   const STEPS = [
     "Sign in with your Google account",
-    "Grant Ultrametrics access to your Google Ads",
-    "Select the ad account to connect",
+    "Grant Ultrametrics access to your Google Ads data",
+    "Select the ad account to connect to this workspace",
   ];
   return (
     <div className="max-w-md space-y-6">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">Setup</p>
-        <p className="mt-3 text-sm text-white/50">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
+          Setup
+        </p>
+        <p className="mt-3 text-[13px] text-white/50">
           Connect Google Ads to import campaign performance and unlock AI-powered optimization recommendations.
         </p>
       </div>
@@ -153,14 +209,20 @@ function ConnectTab({ wsId, googleAdsConfig }: { wsId: string | null; googleAdsC
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.04] font-mono text-[10px] text-white/40">
               {i + 1}
             </span>
-            <span className="text-sm text-white/55">{step}</span>
+            <span className="text-[13px] text-white/55">{step}</span>
           </li>
         ))}
       </ol>
       {wsId ? (
-        <GoogleAdsConnectButton workspaceId={wsId} configured={googleAdsConfig !== null} />
+        <GoogleAdsConnectButton
+          workspaceId={wsId}
+          configured={googleAdsConfig !== null}
+        />
       ) : (
-        <button disabled className="rounded-lg bg-brand/50 px-4 py-2 text-sm text-white/50">
+        <button
+          disabled
+          className="rounded-lg bg-brand/50 px-4 py-2 text-[13px] text-white/50"
+        >
           Connect Google Ads
         </button>
       )}
@@ -168,59 +230,13 @@ function ConnectTab({ wsId, googleAdsConfig }: { wsId: string | null; googleAdsC
   );
 }
 
-function OverviewTab({
-  connector,
-  wsId,
-  googleAdsConfig,
-}: {
-  connector: { name: string; status: string; last_synced_at: string | null; external_account_id?: string | null };
-  wsId: string | null;
-  googleAdsConfig: unknown;
-}) {
-  return (
-    <div className="space-y-6 max-w-lg">
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] divide-y divide-white/[0.05]">
-        {[
-          { label: "Connector name", value: connector.name },
-          { label: "Account ID", value: connector.external_account_id ?? "—" },
-          { label: "Status", value: connector.status, capitalize: true },
-          { label: "Last sync", value: connector.last_synced_at ? new Date(connector.last_synced_at).toLocaleString() : "Never" },
-        ].map((row) => (
-          <div key={row.label} className="flex items-center justify-between px-5 py-3.5">
-            <p className="text-xs text-white/35">{row.label}</p>
-            <p className={cn("text-sm font-medium text-foreground/80", row.capitalize && "capitalize")}>{row.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <GoogleSyncNowButton endpoint="/api/sync/google-ads-to-google-sheets" source="Google Ads" />
-        {wsId && !!googleAdsConfig && (
-          <a
-            href={`/api/connectors/google-ads/oauth/start?workspaceId=${encodeURIComponent(wsId)}`}
-            className="rounded-lg border border-white/[0.08] px-4 py-2 text-sm text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/70"
-          >
-            Reconnect
-          </a>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function CampaignsTab() {
   return (
-    <div className="max-w-2xl">
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02]">
-          <span className="text-xl">📊</span>
-        </div>
-        <p className="font-medium text-foreground/70">Campaign-level data</p>
-        <p className="mt-2 text-sm text-white/35">
-          Campaign-level breakdown is coming soon. Currently Ultrametrics syncs account-level performance data.
-        </p>
-        <p className="mt-3 text-xs text-white/25">
-          Your data is being synced to Google Sheets. Open your connected spreadsheet to see the full breakdown.
+    <div className="max-w-lg">
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 text-center">
+        <p className="font-medium text-foreground/65">Campaign-level breakdown</p>
+        <p className="mt-2 text-[12px] text-white/35">
+          Campaign-level reporting is coming soon. Your data is currently synced to Google Sheets — open your connected spreadsheet for the full breakdown.
         </p>
       </div>
     </div>
@@ -242,7 +258,12 @@ function RecommendationsTab() {
     {
       type: "opportunity" as const,
       title: "Experiment with responsive search ads",
-      body: "RSAs with ad strength 'Excellent' consistently outperform standard expanded text ads. Consider upgrading your top campaigns.",
+      body: "RSAs with 'Excellent' ad strength consistently outperform standard expanded text ads. Consider upgrading your top campaigns.",
+    },
+    {
+      type: "info" as const,
+      title: "Enable conversion tracking on all campaigns",
+      body: "Without conversion data, Smart Bidding cannot optimize effectively. Verify that all campaigns have at least one conversion action configured.",
     },
   ];
 
@@ -261,12 +282,18 @@ function RecommendationsTab() {
               : "border-brand/20 bg-brand/[0.04]"
           )}
         >
-          <div className={cn(
-            "absolute left-0 top-5 bottom-5 w-[3px] rounded-r",
-            r.type === "opportunity" ? "bg-emerald-400" : "bg-brand"
-          )} />
-          <p className="text-[13px] font-semibold text-foreground/85">{r.title}</p>
-          <p className="mt-1.5 text-[12px] leading-relaxed text-white/45">{r.body}</p>
+          <div
+            className={cn(
+              "absolute left-0 top-4 bottom-4 w-[3px] rounded-r",
+              r.type === "opportunity" ? "bg-emerald-400" : "bg-brand"
+            )}
+          />
+          <p className="text-[13px] font-semibold text-foreground/85">
+            {r.title}
+          </p>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-white/40">
+            {r.body}
+          </p>
         </div>
       ))}
       <p className="pt-2 text-[11px] text-white/20">
@@ -276,23 +303,33 @@ function RecommendationsTab() {
   );
 }
 
-function SettingsTab({ wsId, googleAdsConfig }: { wsId: string | null; googleAdsConfig: unknown }) {
+function SettingsTab({
+  wsId,
+  googleAdsConfig,
+}: {
+  wsId: string | null;
+  googleAdsConfig: unknown;
+}) {
   return (
-    <div className="max-w-md space-y-6">
+    <div className="max-w-md space-y-4">
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-        <p className="text-sm font-medium text-foreground/80">Reconnect account</p>
-        <p className="mt-1 text-sm text-white/35">
+        <p className="text-[13px] font-medium text-foreground/80">
+          Reconnect account
+        </p>
+        <p className="mt-1 text-[12px] text-white/35">
           Refresh your Google OAuth token if syncs are failing or the token has expired.
         </p>
         {wsId && googleAdsConfig ? (
           <a
             href={`/api/connectors/google-ads/oauth/start?workspaceId=${encodeURIComponent(wsId)}`}
-            className="mt-4 inline-block rounded-lg border border-white/[0.1] bg-white/[0.04] px-4 py-2 text-sm text-foreground/70 transition-colors hover:bg-white/[0.07]"
+            className="mt-4 inline-block rounded-lg border border-white/[0.1] bg-white/[0.04] px-4 py-2 text-[12px] text-foreground/65 transition-colors hover:bg-white/[0.07]"
           >
             Reconnect with Google
           </a>
         ) : (
-          <p className="mt-2 text-xs text-red-400/70">Google Ads OAuth is not configured in this environment.</p>
+          <p className="mt-2 text-[11px] text-red-400/70">
+            Google Ads OAuth is not configured in this environment.
+          </p>
         )}
       </div>
     </div>

@@ -23,10 +23,22 @@ interface MetaMetrics {
   sparkData: number[];
 }
 
+interface GoogleMetrics {
+  cost: string;
+  conversions: string;
+  roas: string | null;
+}
+
 interface DailyRow {
   date_start: string;
   spend: string;
   ctr: string;
+}
+
+interface CampaignRow {
+  costCurrency: number;
+  conversions: number;
+  conversionsValue: number;
 }
 
 function relativeTime(d: string | null) {
@@ -54,6 +66,8 @@ export function CampaignHealthStrip({
 }) {
   const [metaMetrics, setMetaMetrics] = useState<MetaMetrics | null>(null);
   const [metaLoading, setMetaLoading] = useState(false);
+  const [googleMetrics, setGoogleMetrics] = useState<GoogleMetrics | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     const hasMeta = connectors.some(
@@ -117,6 +131,48 @@ export function CampaignHealthStrip({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const hasGoogle = connectors.some(
+      (c) => c.provider === "google_ads" && c.status === "active"
+    );
+    if (!hasGoogle) return;
+
+    setGoogleLoading(true);
+    fetch("/api/google-ads/test-insights")
+      .then((r) => r.json())
+      .catch(() => null)
+      .then((data) => {
+        if (!data?.ok || !data.insights?.length) {
+          setGoogleLoading(false);
+          return;
+        }
+        const rows: CampaignRow[] = data.insights;
+        const totalCost = rows.reduce((s, r) => s + r.costCurrency, 0);
+        const totalConv = rows.reduce((s, r) => s + r.conversions, 0);
+        const totalConvValue = rows.reduce((s, r) => s + r.conversionsValue, 0);
+        const roas =
+          totalCost > 0 && totalConvValue > 0
+            ? (totalConvValue / totalCost).toFixed(1) + "×"
+            : null;
+
+        const currency = data.currency || "USD";
+        const fmtCost = new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }).format(totalCost);
+
+        setGoogleMetrics({
+          cost: fmtCost,
+          conversions: totalConv > 0 ? totalConv.toFixed(0) : "0",
+          roas,
+        });
+        setGoogleLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (connectors.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-white/[0.07] px-6 py-10 text-center">
@@ -143,7 +199,9 @@ export function CampaignHealthStrip({
       {connectors.map((c) => {
         const BrandIcon = BRAND_ICON_MAP[c.provider];
         const isMeta = c.provider === "meta_ads";
-        const showMetrics = isMeta && c.status === "active";
+        const isGoogle = c.provider === "google_ads";
+        const showMetaMetrics = isMeta && c.status === "active";
+        const showGoogleMetrics = isGoogle && c.status === "active";
 
         return (
           <Link
@@ -174,8 +232,8 @@ export function CampaignHealthStrip({
               </span>
             </div>
 
-            {/* Metrics */}
-            {showMetrics ? (
+            {/* Meta metrics */}
+            {showMetaMetrics ? (
               metaLoading ? (
                 <div className="space-y-2">
                   <div className="h-8 w-24 animate-pulse rounded bg-white/[0.06]" />
@@ -217,6 +275,32 @@ export function CampaignHealthStrip({
                         width={72}
                         height={28}
                       />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[13px] text-white/25">No data yet</p>
+              )
+            ) : showGoogleMetrics ? (
+              /* Google Ads metrics */
+              googleLoading ? (
+                <div className="space-y-2">
+                  <div className="h-8 w-24 animate-pulse rounded bg-white/[0.06]" />
+                  <div className="h-3 w-16 animate-pulse rounded bg-white/[0.04]" />
+                </div>
+              ) : googleMetrics ? (
+                <div>
+                  <p className="font-mono text-[26px] font-semibold tabular-nums leading-none tracking-tight text-foreground/90">
+                    {googleMetrics.cost}
+                  </p>
+                  <div className="mt-2 space-y-0.5">
+                    <p className="font-mono text-[11px] text-emerald-400/80">
+                      {googleMetrics.conversions} conversions
+                    </p>
+                    {googleMetrics.roas && (
+                      <p className="text-[11px] text-white/30">
+                        {googleMetrics.roas} ROAS
+                      </p>
                     )}
                   </div>
                 </div>

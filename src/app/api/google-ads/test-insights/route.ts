@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/api/require-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
@@ -6,8 +7,14 @@ import {
   getCampaignInsights,
   refreshGoogleAdsAccessToken,
 } from "@/lib/google-ads/insights";
+import { DEMO_GOOGLE_INSIGHTS } from "@/lib/dev/demo-data";
 
 export async function GET() {
+  const cookieStore = await cookies();
+  if (cookieStore.get("__dev_screenshot")?.value === "1") {
+    return NextResponse.json(DEMO_GOOGLE_INSIGHTS);
+  }
+
   try {
     const user = await requireUser();
     if (!user) {
