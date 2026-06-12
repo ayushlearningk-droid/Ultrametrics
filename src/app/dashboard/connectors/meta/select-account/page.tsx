@@ -37,44 +37,39 @@ export default async function MetaAdsSelectAccountPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-2xl px-6 py-8 sm:px-8">
       <ConnectorBackLink
         href={META_ADS_CONNECT_PATH}
         label="Back to Meta connection"
       />
 
-      <div>
-        <h1 className="text-4xl font-bold text-green-500">
-          REAL META ACCOUNTS
-        </h1>
-
-        <p className="mt-2 text-muted-foreground">
-          Loaded directly from Meta Graph API
+      <div className="mt-6">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">
+          Select Ad Account
         </p>
-
-        <p className="mt-4 text-lg font-semibold text-green-500">
-          Accounts Loaded: {accounts.length}
+        <p className="mt-2 text-[13px] text-white/50">
+          Choose the Meta ad account to connect to this workspace.
         </p>
       </div>
 
-      <div className="space-y-4">
-        {accounts.map((account) => (
-          <div
-            key={account.id}
-            className="rounded-lg border p-4"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">
+      <div className="mt-6 space-y-2">
+        {accounts.length === 0 ? (
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-8 text-center">
+            <p className="text-[13px] text-white/40">No ad accounts found on this Meta account.</p>
+          </div>
+        ) : (
+          accounts.map((account) => (
+            <div
+              key={account.id}
+              className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 transition-colors hover:border-white/[0.1] hover:bg-white/[0.03]"
+            >
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-foreground/80">
                   {account.name}
                 </p>
-
-                <p className="text-sm text-muted-foreground">
-                  {account.account_id || account.id}
-                </p>
-
-                <p className="text-xs text-muted-foreground">
-                  {account.currency || "USD"}
+                <p className="mt-0.5 font-mono text-[10px] text-white/28">
+                  #{account.account_id || account.id}
+                  {account.currency ? ` · ${account.currency}` : ""}
                 </p>
               </div>
 
@@ -82,16 +77,14 @@ export default async function MetaAdsSelectAccountPage() {
                 account={{
                   id: account.id,
                   name: account.name,
-                  account_id:
-                    account.account_id || account.id,
-                  currency:
-                    account.currency || "USD",
+                  account_id: account.account_id || account.id,
+                  currency: account.currency || "USD",
                   status: "active",
                 }}
               />
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

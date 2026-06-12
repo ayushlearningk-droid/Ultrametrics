@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getLatestMetaPendingSession } from "@/lib/meta/pending";
 import { metaTokenExpiresAt, type MetaConnectorConfig } from "@/lib/meta/token";
+import { ensureWorkspaceSyncSchedule } from "@/lib/sync/ensure-workspace-schedule";
 
 export async function POST(request: Request) {
   try {
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
         })
         .eq("id", existingConnector.id);
 
+      await ensureWorkspaceSyncSchedule(workspaceId).catch(() => {});
       return NextResponse.json({ ok: true, duplicate: true });
     }
 
@@ -115,6 +117,7 @@ export async function POST(request: Request) {
       );
     }
 
+    await ensureWorkspaceSyncSchedule(workspaceId).catch(() => {});
     return NextResponse.json({ ok: true, connector: data });
   } catch (err) {
     console.error("CONNECT API CRASH:", err);

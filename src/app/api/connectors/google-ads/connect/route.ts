@@ -8,6 +8,7 @@ import {
 } from "@/lib/data/workspaces";
 import { deleteOAuthPendingForUserWorkspace } from "@/lib/data/oauth-pending";
 import { GOOGLE_ADS_REFRESH_TOKEN_COOKIE } from "@/lib/google-ads/constants";
+import { ensureWorkspaceSyncSchedule } from "@/lib/sync/ensure-workspace-schedule";
 
 type ConnectBody = {
   customerId?: string;
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
 
     const { data: existingConnector, error: existingError } = await admin
       .from("connectors")
-      .select("id")
+      .select("id, config")
       .eq("workspace_id", workspaceId)
       .eq("provider", "google_ads")
       .eq("external_account_id", body.customerId)
@@ -64,17 +65,35 @@ export async function POST(request: Request) {
       );
     }
 
-    if (existingConnector) {
-      return NextResponse.json({ ok: true, duplicate: true });
-    }
-
-    // Read the refresh_token stored by the OAuth callback.
-    // May be absent if Google did not issue one (e.g. token already granted
-    // to this app previously without prompt=consent). The sync engine will
-    // handle this case when Phase 2 is built.
+    // Read the refresh_token stored by the OAuth callback regardless of
+    // whether the connector is new or existing — reconnect must update it.
     const cookieStore = await cookies();
     const refreshToken =
       cookieStore.get(GOOGLE_ADS_REFRESH_TOKEN_COOKIE)?.value ?? null;
+
+    if (existingConnector) {
+      const prevConfig = (existingConnector.config ?? {}) as Record<string, unknown>;
+      await admin
+        .from("connectors")
+        .update({
+          config: {
+            ...prevConfig,
+            ...(body.currencyCode ? { currency: body.currencyCode } : {}),
+            ...(refreshToken ? { refresh_token: refreshToken } : {}),
+          },
+          name: body.customerName,
+          external_account_name: body.customerName,
+          status: "active",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingConnector.id);
+
+      cookieStore.delete(GOOGLE_ADS_REFRESH_TOKEN_COOKIE);
+      await deleteOAuthPendingForUserWorkspace(user.id, workspaceId, "google_ads");
+      await ensureWorkspaceSyncSchedule(workspaceId).catch(() => {});
+
+      return NextResponse.json({ ok: true, reconnected: true });
+    }
 
     const { error: insertError } = await admin.from("connectors").insert({
       workspace_id: workspaceId,
@@ -100,6 +119,7 @@ export async function POST(request: Request) {
     // Clean up the pending session; the access_token it held is no longer
     // needed for account selection and the refresh_token is now in config.
     await deleteOAuthPendingForUserWorkspace(user.id, workspaceId, "google_ads");
+    await ensureWorkspaceSyncSchedule(workspaceId).catch(() => {});
 
     return NextResponse.json({ ok: true });
   } catch (err) {
