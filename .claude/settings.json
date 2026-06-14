@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -I -H \"x-dev-screenshot: ultrametrics_dev_screenshot\" \"http://localhost:3000/dashboard\")",
+      "Bash(npx next *)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

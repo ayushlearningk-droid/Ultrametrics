@@ -1,0 +1,343 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ════════════════════════════════════════════════════════════════
+   ULTRAMETRICS — SPATIAL DESIGN SYSTEM
+   Phase 0: tokens · environment · ambient light · glass · elevation · motion
+   Depth model: L0 environment → L1 canvas → L2 panels → L3 hero/cmd → L4 overlays
+   ════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    /* Light mode kept minimal — product runs dark by default */
+    --background: 0 0% 100%;
+    --sidebar: 220 14% 96%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+    --radius: 0.625rem;
+    --brand: 158 64% 52%;
+    --brand-foreground: 158 80% 6%;
+    --brand-muted: 158 40% 92%;
+  }
+
+  .dark {
+    /* ── Surfaces (near-black, slightly cool) ──────────────────── */
+    --surface-0: 240 18% 4%;       /* app canvas base of the gradient */
+    --surface-1: 240 14% 7%;       /* L2 panels */
+    --surface-2: 240 12% 11%;      /* hover / raised */
+
+    --background: 240 18% 4%;
+    --foreground: 240 12% 93%;     /* --ink */
+    --foreground-muted: 240 8% 56%;/* --ink-muted */
+
+    --card: 240 14% 7%;
+    --card-foreground: 240 12% 93%;
+    --popover: 240 14% 8%;
+    --popover-foreground: 240 12% 93%;
+    --primary: 240 12% 93%;
+    --primary-foreground: 240 18% 5%;
+    --secondary: 240 12% 11%;
+    --secondary-foreground: 240 12% 93%;
+    --muted: 240 12% 11%;
+    --muted-foreground: 240 8% 56%;
+    --accent: 240 12% 11%;
+    --accent-foreground: 240 12% 93%;
+
+    /* ── The single interface accent — EMERALD ─────────────────── */
+    --brand: 158 70% 52%;
+    --brand-foreground: 158 80% 6%;
+    --brand-muted: 158 50% 14%;
+
+    /* ── Functional status colors ──────────────────────────────── */
+    --success: 158 64% 45%;
+    --warn: 38 92% 58%;
+    --danger: 0 78% 70%;
+    --destructive: 0 78% 64%;
+    --destructive-foreground: 240 12% 93%;
+
+    /* ── Environmental light (L0 ONLY — never on text/controls) ── */
+    --amb-blue: 224 90% 60%;
+    --amb-violet: 256 90% 68%;
+
+    --border: 240 10% 14%;
+    --input: 240 10% 14%;
+    --ring: 158 70% 52%;
+    --sidebar: 240 20% 3%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01" 1, "cv01" 1, "tnum" 0;
+  }
+
+  /* ── Type scale: exactly 3 sizes, 2 weights ──────────────────── */
+  .type-display {
+    font-size: 28px;
+    line-height: 34px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .type-body {
+    font-size: 14px;
+    line-height: 21px;
+    font-weight: 400;
+  }
+  .type-caption {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+  }
+  .type-eyebrow {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  ::selection {
+    background: hsl(var(--brand) / 0.25);
+    color: hsl(var(--foreground));
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.35); }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   L0 — ENVIRONMENT LAYER
+   cinematic gradient + blue (top-left) + violet (bottom-right) glow
+   + vignette + slow 60s drift. Fixed, non-interactive, GPU-cheap.
+   ════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .env-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 120% at 50% 0%, hsl(240 20% 6%) 0%, hsl(240 18% 4%) 45%, hsl(240 22% 2.5%) 100%);
+  }
+
+  /* ambient light pools — real elements so cursor parallax can transform them */
+  .env-pool {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+  }
+  .env-pool-blue {
+    top: -22%;
+    left: -16%;
+    width: 64%;
+    height: 70%;
+    background: radial-gradient(circle, hsl(var(--amb-blue) / 0.20) 0%, transparent 62%);
+    filter: blur(34px);
+    animation: drift-blue 60s ease-in-out infinite;
+  }
+  .env-pool-violet {
+    bottom: -26%;
+    right: -18%;
+    width: 66%;
+    height: 74%;
+    background: radial-gradient(circle, hsl(var(--amb-violet) / 0.16) 0%, transparent 64%);
+    filter: blur(40px);
+    animation: drift-violet 72s ease-in-out infinite;
+  }
+
+  /* vignette sits above the glows */
+  .env-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(130% 100% at 50% 40%, transparent 55%, hsl(240 24% 1.5% / 0.55) 100%);
+  }
+
+  /* ── L2 panel — translucent pseudo-glass, NO backdrop blur ───── */
+  .panel {
+    position: relative;
+    background:
+      linear-gradient(180deg, hsl(var(--surface-1) / 0.72) 0%, hsl(var(--surface-1) / 0.55) 100%);
+    border: 1px solid hsl(240 12% 22% / 0.30);
+    border-radius: 14px;
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.04) inset,
+      0 8px 24px hsl(240 30% 1% / 0.5);
+    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 180ms ease,
+                border-color 180ms ease;
+  }
+  /* directional edge light — the signature element */
+  .panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, hsl(0 0% 100% / 0.18) 0%, hsl(0 0% 100% / 0.04) 36%, transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .panel-hover:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.06) inset,
+      0 12px 32px hsl(240 30% 1% / 0.55);
+    border-color: hsl(240 12% 30% / 0.4);
+  }
+
+  /* ── L3 elevated AI surface — real glass blur (bounded ≤2) ───── */
+  .surface-elevated {
+    position: relative;
+    background:
+      linear-gradient(165deg, hsl(var(--surface-1) / 0.82) 0%, hsl(var(--surface-0) / 0.78) 100%);
+    border: 1px solid hsl(240 12% 26% / 0.4);
+    border-radius: 20px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.06) inset,
+      0 16px 48px hsl(240 30% 1% / 0.6);
+  }
+  .surface-elevated::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, hsl(0 0% 100% / 0.22) 0%, hsl(var(--brand) / 0.08) 30%, transparent 65%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* command-bar focus bloom — Cursor/Runway-style elevated active state */
+  .cmd-bloom {
+    box-shadow:
+      0 0 0 1px hsl(var(--brand) / 0.45),
+      0 0 0 4px hsl(var(--brand) / 0.10),
+      0 0 28px 2px hsl(var(--brand) / 0.20),
+      0 18px 52px hsl(240 30% 1% / 0.65);
+    border-color: hsl(var(--brand) / 0.5) !important;
+    transform: translateY(-1px);
+  }
+  /* ambient glow rail under the command bar */
+  .cmd-rail {
+    position: absolute;
+    inset-inline: 14%;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--brand) / 0.5), transparent);
+    opacity: 0;
+    transition: opacity 220ms ease;
+    pointer-events: none;
+  }
+  .cmd-rail-on { opacity: 1; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MOTION — 6 named animations, all reduced-motion safe
+   pulse · flow · settle · elevate(hover) · bloom(focus) · drift
+   ════════════════════════════════════════════════════════════════ */
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* monitoring pulse */
+  .anim-pulse { animation: um-pulse 2.4s ease-in-out infinite; }
+
+  /* syncing flow shimmer (1px line) */
+  .anim-flow {
+    background: linear-gradient(90deg, transparent, hsl(var(--brand) / 0.7), transparent);
+    background-size: 200% 100%;
+    animation: um-flow 1.8s linear infinite;
+  }
+
+  /* vertical flow — travels down a timeline guide */
+  .anim-flow-y {
+    background: linear-gradient(180deg, transparent, hsl(var(--brand) / 0.55), transparent);
+    animation: um-flow-y 3.2s linear infinite;
+  }
+
+  /* intelligence arriving */
+  .anim-settle { animation: um-settle 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
+
+@keyframes um-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.88); }
+}
+@keyframes um-flow {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes um-flow-y {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(1000%); }
+}
+@keyframes um-settle {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes drift-blue {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; }
+}
+@keyframes drift-violet {
+  0%, 100% { opacity: 0.82; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .env-pool { animation: none !important; transform: none !important; }
+  .anim-pulse,
+  .anim-flow,
+  .anim-flow-y,
+  .anim-settle { animation: none !important; }
+  .panel,
+  .panel-hover:hover { transition: border-color 180ms ease; transform: none; }
+  * { scroll-behavior: auto !important; }
+}
