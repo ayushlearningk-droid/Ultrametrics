@@ -114,45 +114,49 @@ export function MetaAIInsights() {
 
   if (loading) {
     return (
-      <div className="max-w-xl space-y-3">
-        <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">AI Insights</p>
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-white/[0.03]" />
-        ))}
+      <div className="max-w-3xl">
+        <p className="mb-5 type-eyebrow text-foreground-muted/80">AI Insights</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="anim-flow h-28 rounded-xl bg-white/[0.04]" />
+          ))}
+        </div>
       </div>
     );
   }
 
   const STYLE = {
-    opportunity: { border: "border-emerald-500/20", bg: "bg-emerald-500/[0.04]", bar: "bg-emerald-400", icon: "text-emerald-400" },
-    alert: { border: "border-amber-500/20", bg: "bg-amber-500/[0.04]", bar: "bg-amber-400", icon: "text-amber-400" },
+    opportunity: { border: "border-brand/20", bg: "bg-brand/[0.04]", bar: "bg-brand", icon: "text-brand" },
+    alert: { border: "border-warn/20", bg: "bg-warn/[0.04]", bar: "bg-warn", icon: "text-warn" },
     info: { border: "border-brand/20", bg: "bg-brand/[0.04]", bar: "bg-brand", icon: "text-brand" },
   };
 
   return (
-    <div className="max-w-xl space-y-3">
-      <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/25">AI Insights</p>
-      {(recs ?? []).map((r, i) => {
-        const s = STYLE[r.type];
-        const Icon = r.icon;
-        return (
-          <div key={i} className={cn("relative rounded-xl border p-5 pl-6", s.border, s.bg)}>
-            <div className={cn("absolute left-0 top-4 bottom-4 w-[3px] rounded-r", s.bar)} />
-            <div className="flex items-start gap-2.5">
-              <Icon className={cn("mt-0.5 h-[14px] w-[14px] shrink-0", s.icon)} />
-              <div>
-                <p className="text-[13px] font-semibold text-foreground/90">{r.title}</p>
-                {r.metric && (
-                  <span className={cn("inline-block mt-1 rounded-full border px-2 py-0.5 font-mono text-[10px]", s.border, s.icon)}>
-                    {r.metric}
-                  </span>
-                )}
+    <div className="max-w-3xl anim-settle">
+      <p className="mb-5 type-eyebrow text-foreground-muted/80">AI Insights</p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {(recs ?? []).map((r, i) => {
+          const s = STYLE[r.type];
+          const Icon = r.icon;
+          return (
+            <div key={i} className={cn("relative rounded-xl border p-5 pl-6", s.border, s.bg)}>
+              <div className={cn("absolute left-0 top-4 bottom-4 w-[3px] rounded-r", s.bar)} />
+              <div className="flex items-start gap-2.5">
+                <Icon className={cn("mt-0.5 h-[14px] w-[14px] shrink-0", s.icon)} />
+                <div className="min-w-0">
+                  <p className="type-body font-semibold text-foreground/90">{r.title}</p>
+                  {r.metric && (
+                    <span className={cn("mt-1 inline-block rounded-full border px-2 py-0.5 font-mono type-caption", s.border, s.icon)}>
+                      {r.metric}
+                    </span>
+                  )}
+                </div>
               </div>
+              <p className="mt-2.5 type-caption leading-relaxed text-foreground-muted">{r.body}</p>
             </div>
-            <p className="mt-2.5 text-[12px] leading-relaxed text-white/45">{r.body}</p>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

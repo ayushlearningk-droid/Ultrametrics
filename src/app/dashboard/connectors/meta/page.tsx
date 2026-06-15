@@ -87,39 +87,53 @@ export default async function MetaAdsPage({
             </div>
           </div>
 
-          {/* Right: monitoring status */}
+          {/* Right: connection status + token health + last sync */}
           <div className="flex items-center gap-3.5">
             {connector && (
               <div className="flex flex-col items-end gap-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-[6px] w-[6px]">
-                    <span
-                      className={cn(
-                        "absolute inline-flex h-full w-full animate-ping rounded-full opacity-60",
-                        connector.status === "active" ? "bg-brand" : "bg-warn"
-                      )}
-                    />
-                    <span
-                      className={cn(
-                        "relative inline-flex h-[6px] w-[6px] rounded-full",
-                        connector.status === "active" ? "bg-brand" : "bg-warn"
-                      )}
-                    />
-                  </span>
+                <div className="flex items-center gap-2.5">
+                  {/* Token health pill */}
                   <span
                     className={cn(
-                      "type-eyebrow",
+                      "rounded-full border px-2 py-0.5 type-caption",
                       connector.status === "active"
-                        ? "text-brand/80"
-                        : "text-warn/80"
+                        ? "border-brand/25 bg-brand/[0.06] text-brand/80"
+                        : "border-warn/25 bg-warn/[0.06] text-warn/80"
                     )}
                   >
-                    {connector.status === "active" ? "AI Monitoring" : "Paused"}
+                    {connector.status === "active" ? "Token healthy" : "Action needed"}
+                  </span>
+                  {/* Connection status */}
+                  <span className="flex items-center gap-2">
+                    <span className="relative flex h-[6px] w-[6px]">
+                      <span
+                        className={cn(
+                          "absolute inline-flex h-full w-full animate-ping rounded-full opacity-60",
+                          connector.status === "active" ? "bg-brand" : "bg-warn"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "relative inline-flex h-[6px] w-[6px] rounded-full",
+                          connector.status === "active" ? "bg-brand" : "bg-warn"
+                        )}
+                      />
+                    </span>
+                    <span
+                      className={cn(
+                        "type-eyebrow",
+                        connector.status === "active"
+                          ? "text-brand/80"
+                          : "text-warn/80"
+                      )}
+                    >
+                      {connector.status === "active" ? "Connected" : "Paused"}
+                    </span>
                   </span>
                 </div>
                 {connector.last_synced_at && (
                   <p className="type-caption text-foreground-muted/60">
-                    Synced {relativeTime(connector.last_synced_at)}
+                    Last sync {relativeTime(connector.last_synced_at)}
                   </p>
                 )}
               </div>
@@ -145,22 +159,27 @@ export default async function MetaAdsPage({
         />
       </div>
 
-      {/* ── Tabs (secondary nav) ────────────────────────────────── */}
-      <div className="flex gap-0 border-b border-white/[0.04] px-6 sm:px-8 lg:px-12 xl:px-16">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.id}
-            href={`/dashboard/connectors/meta?tab=${tab.id}`}
-            className={cn(
-              "-mb-px border-b px-3.5 py-2.5 type-caption font-medium transition-colors",
-              activeTab === tab.id
-                ? "border-brand/60 text-foreground/85"
-                : "border-transparent text-foreground-muted hover:text-foreground/70"
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
+      {/* ── Tabs (Linear-inspired secondary nav) ────────────────── */}
+      <div className="border-b border-white/[0.04] px-6 sm:px-8 lg:px-12 xl:px-16">
+        <div className="flex gap-1">
+          {tabs.map((tab) => (
+            <Link
+              key={tab.id}
+              href={`/dashboard/connectors/meta?tab=${tab.id}`}
+              className={cn(
+                "relative rounded-t-md px-3 py-2.5 type-caption font-medium transition-colors",
+                activeTab === tab.id
+                  ? "text-foreground/90"
+                  : "text-foreground-muted hover:bg-white/[0.03] hover:text-foreground/70"
+              )}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-brand/70" />
+              )}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* ── Tab content ─────────────────────────────────────────── */}
@@ -243,26 +262,43 @@ function ConnectTab({
 }
 
 function BudgetTab() {
+  const SIGNALS = [
+    {
+      title: "Budget-constrained scaling",
+      body: "Ad sets hitting their daily cap while CTR holds steady are the first candidates for a budget increase — demand exists beyond current spend.",
+    },
+    {
+      title: "Efficiency thresholds",
+      body: "Campaigns with CTR above the 1.5% benchmark are typically good candidates for reallocation; sub-benchmark spend is trimmed first.",
+    },
+    {
+      title: "Fatigue protection",
+      body: "When spend rises faster than click-through, budget is held back and a creative refresh is recommended before scaling resumes.",
+    },
+  ];
   return (
-    <div className="max-w-lg space-y-4">
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
-        <p className="type-eyebrow text-foreground-muted/80">
-          Budget Analysis
-        </p>
-        <p className="mt-4 type-body text-foreground-muted">
-          Budget recommendations appear once your account has 7+ days of spend history.
-        </p>
-        <p className="mt-2 type-caption text-foreground-muted/70">
-          Ultrametrics will identify budget-constrained campaigns with strong ROAS and recommend reallocation opportunities.
+    <div className="space-y-6">
+      <div className="surface-elevated relative overflow-hidden p-7">
+        <p className="type-eyebrow text-foreground-muted/80">Budget analysis</p>
+        <h2 className="mt-4 type-display max-w-xl text-balance">
+          Recommendations activate after 7+ days of spend history
+        </h2>
+        <p className="mt-3 max-w-2xl type-body leading-relaxed text-foreground-muted">
+          Ultrametrics watches your real campaign data for budget-constrained
+          ad sets with strong engagement and surfaces reallocation
+          opportunities here — no fabricated numbers, only signals from your
+          account.
         </p>
       </div>
-      <div className="rounded-xl border border-brand/15 bg-brand/[0.04] p-5">
-        <p className="type-eyebrow text-brand/70">
-          Tip
-        </p>
-        <p className="mt-2 type-caption text-foreground-muted">
-          Campaigns with ROAS above 3× are typically good candidates for budget increases. Monitor your CTR trends to identify when creative fatigue sets in.
-        </p>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {SIGNALS.map((s) => (
+          <div key={s.title} className="panel panel-hover p-5">
+            <p className="type-body font-semibold text-foreground/90">{s.title}</p>
+            <p className="mt-2 type-caption leading-relaxed text-foreground-muted">
+              {s.body}
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -276,12 +312,12 @@ function SettingsTab({
   metaConfig: unknown;
 }) {
   return (
-    <div className="max-w-md space-y-4">
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-        <p className="type-body font-medium text-foreground/85">
+    <div className="grid max-w-3xl grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="panel p-5">
+        <p className="type-body font-semibold text-foreground/90">
           Reconnect account
         </p>
-        <p className="mt-1 type-caption text-foreground-muted/70">
+        <p className="mt-1 type-caption leading-relaxed text-foreground-muted">
           Refresh your Meta OAuth token if syncs are failing or the token has expired.
         </p>
         {wsId && metaConfig ? (
@@ -296,6 +332,16 @@ function SettingsTab({
             Meta OAuth is not configured in this environment.
           </p>
         )}
+      </div>
+      <div className="panel p-5">
+        <p className="type-body font-semibold text-foreground/90">
+          How syncing works
+        </p>
+        <p className="mt-1 type-caption leading-relaxed text-foreground-muted">
+          Campaign performance is pulled from the Meta Ads API and written to
+          your connected Google Sheet on an automated schedule. Token health and
+          last-sync status are shown on the Overview tab.
+        </p>
       </div>
     </div>
   );
