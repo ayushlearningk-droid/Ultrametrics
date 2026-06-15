@@ -20,10 +20,19 @@ export async function getAccountInsights(
     `&date_preset=last_30d` +
     `&access_token=${accessToken}`;
 
+  // TEMP LOG: remove after debugging empty-insights issue
+  console.log(
+    "[Meta][TEMP][totals] URL:",
+    url.replace(/access_token=[^&]+/, "access_token=***REDACTED***")
+  );
+  console.log("[Meta][TEMP][totals] accountId param:", accountId);
+
   const res = await fetch(url);
 
   if (!res.ok) {
     const errorText = await res.text();
+    // TEMP LOG: exact error body from Meta (status + payload)
+    console.error("[Meta][TEMP][totals] HTTP", res.status, "error body:", errorText);
     throw new Error(errorText);
   }
 
@@ -60,13 +69,27 @@ export async function getAccountInsightsByDay(
   });
 
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/act_${accountId}/insights?${params}`;
+
+  // TEMP LOG: remove after debugging empty-insights issue
+  console.log(
+    "[Meta][TEMP][daily] URL:",
+    url.replace(/access_token=[^&]+/, "access_token=***REDACTED***")
+  );
+  console.log("[Meta][TEMP][daily] accountId param:", accountId, "days:", days);
+
   const res = await fetch(url);
 
   if (!res.ok) {
     const errorText = await res.text();
+    // TEMP LOG: exact error body from Meta (status + payload)
+    console.error("[Meta][TEMP][daily] HTTP", res.status, "error body:", errorText);
     throw new Error(errorText);
   }
 
   const json = await res.json();
+  // TEMP LOG: exact response body + row count from Meta
+  console.log("[Meta][TEMP][daily] row count:", (json.data ?? []).length);
+  console.log("[Meta][TEMP][daily] RAW:", JSON.stringify(json, null, 2));
+
   return (json.data ?? []) as DailyInsightRow[];
 }
