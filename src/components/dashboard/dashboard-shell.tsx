@@ -6,6 +6,7 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { BottomCommandBar } from "@/components/os/bottom-command-bar";
+import { EnvironmentLayer } from "@/components/dashboard/environment-layer";
 import type { User, Workspace } from "@/types/database";
 
 interface DashboardShellProps {
@@ -39,7 +40,11 @@ export function DashboardShell({
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen overflow-hidden bg-surface-0">
+      {/* ── L0 — Environment layer (ambient light + cursor parallax) ── */}
+      <EnvironmentLayer />
+
+      {/* ── L2 — Sidebar (sits in front of environment) ─────────── */}
       <DashboardSidebar
         workspaceName={workspaceName}
         workspaces={workspaces}
@@ -51,33 +56,35 @@ export function DashboardShell({
         onNotifToggle={() => setNotifOpen((v) => !v)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile-only top strip */}
-        <div className="flex h-11 shrink-0 items-center gap-3 border-b border-white/[0.05] px-4 md:hidden">
+        <div className="flex h-12 shrink-0 items-center gap-3 border-b border-white/[0.05] px-4 md:hidden">
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="text-white/40 hover:text-white/70"
+            className="text-foreground-muted hover:text-foreground"
             aria-label="Open menu"
           >
             <Menu className="h-4 w-4" />
           </button>
-          <span className="text-sm font-semibold tracking-tight">
+          <span className="type-body font-semibold tracking-tight">
             Ultra<span className="text-brand">metrics</span>
           </span>
           <div className="flex-1" />
           <button
             onClick={() => setCmdOpen(true)}
-            className="text-white/40 hover:text-white/70"
+            className="text-foreground-muted hover:text-foreground"
             aria-label="Search"
           >
             <Search className="h-4 w-4" />
           </button>
         </div>
 
+        {/* ── L1 — Canvas (transparent, scrolls over environment) ── */}
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
 
+        {/* ── L3 — Command bar ────────────────────────────────────── */}
         <BottomCommandBar />
       </div>
 

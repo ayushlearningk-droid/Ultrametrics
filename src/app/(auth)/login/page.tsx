@@ -1,4 +1,4 @@
-import { AuthCard } from "@/components/auth/auth-card";
+import { AuthSplit } from "@/components/auth/auth-split";
 import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata = {
@@ -17,11 +17,12 @@ export default async function LoginPage({
       : "/dashboard";
 
   return (
-    <AuthCard
-      title="Welcome back"
-      description="Sign in to your Ultrametrics account"
+    <AuthSplit
+      eyebrow="Welcome back"
+      title="Sign in to Mission Control."
+      subtitle="Your AI is still watching your marketing. Pick up where you left off."
     >
       <LoginForm redirectTo={safeRedirect} />
-    </AuthCard>
+    </AuthSplit>
   );
 }

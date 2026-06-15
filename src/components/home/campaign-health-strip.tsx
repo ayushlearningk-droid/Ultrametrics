@@ -207,7 +207,7 @@ export function CampaignHealthStrip({
           <Link
             key={c.id}
             href={c.href}
-            className="group relative flex flex-col rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 transition-all duration-150 hover:border-white/[0.12] hover:bg-white/[0.035]"
+            className="panel panel-hover group relative flex flex-col p-5"
           >
             {/* Status dot */}
             <div

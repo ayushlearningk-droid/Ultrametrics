@@ -60,31 +60,36 @@ export function SignupForm() {
 
   if (success) {
     return (
-      <div className="rounded-md border border-brand/30 bg-brand/5 px-4 py-3 text-center text-sm">
-        Account created! Redirecting to your dashboard...
+      <div className="rounded-lg border border-brand/30 bg-brand/[0.07] px-4 py-3.5 text-center type-body text-brand">
+        Account created — taking you to your dashboard…
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div className="rounded-lg border border-danger/30 bg-danger/[0.08] px-3.5 py-2.5 type-caption text-danger">
           {error}
         </div>
       )}
       <div className="space-y-2">
-        <Label htmlFor="fullName">Full name</Label>
+        <Label htmlFor="fullName" className="type-caption text-foreground-muted">
+          Full name
+        </Label>
         <Input
           id="fullName"
           name="fullName"
           placeholder="Jane Smith"
           required
           autoComplete="name"
+          className="h-11 bg-white/[0.02]"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="email">Work email</Label>
+        <Label htmlFor="email" className="type-caption text-foreground-muted">
+          Work email
+        </Label>
         <Input
           id="email"
           name="email"
@@ -92,41 +97,53 @@ export function SignupForm() {
           placeholder="you@company.com"
           required
           autoComplete="email"
+          className="h-11 bg-white/[0.02]"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password" className="type-caption text-foreground-muted">
+          Password
+        </Label>
         <Input
           id="password"
           name="password"
           type="password"
           required
           autoComplete="new-password"
+          className="h-11 bg-white/[0.02]"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm password</Label>
+        <Label htmlFor="confirmPassword" className="type-caption text-foreground-muted">
+          Confirm password
+        </Label>
         <Input
           id="confirmPassword"
           name="confirmPassword"
           type="password"
           required
           autoComplete="new-password"
+          className="h-11 bg-white/[0.02]"
         />
       </div>
-      <Button type="submit" variant="brand" className="w-full" disabled={loading}>
+      <Button
+        type="submit"
+        variant="brand"
+        className="h-11 w-full"
+        disabled={loading}
+      >
         {loading ? (
           <>
             <Loader2 className="animate-spin" />
-            Creating account...
+            Creating account…
           </>
         ) : (
           "Create account"
         )}
       </Button>
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="text-center type-caption text-foreground-muted">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-brand hover:underline">
+        <Link href="/login" className="font-medium text-brand transition-colors hover:text-brand/80">
           Sign in
         </Link>
       </p>
