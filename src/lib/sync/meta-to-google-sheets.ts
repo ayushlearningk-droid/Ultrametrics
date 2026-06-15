@@ -125,6 +125,15 @@ async function fetchMetaInsightsLast30Days(
   });
 
   const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${normalizedAccountId}/insights?${params.toString()}`;
+
+  // TEMP LOG: remove after debugging account-id resolution
+  console.log("[Sync][TEMP] raw accountId param:", accountId);
+  console.log("[Sync][TEMP] normalized accountId:", normalizedAccountId);
+  console.log(
+    "[Sync][TEMP] Meta Insights URL:",
+    url.replace(/access_token=[^&]+/, "access_token=***REDACTED***")
+  );
+
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -328,6 +337,11 @@ export async function runMetaToGoogleSheetsSyncForWorkspace(
 
   if (metaToken.status === "ok") {
     metaConnectorId = metaToken.connectorId;
+    // TEMP LOG: connector external_account_id (source of the insights account id)
+    console.log(
+      "[Sync][TEMP] connector external_account_id:",
+      metaToken.accountId
+    );
     try {
       insights = await fetchMetaInsightsLast30Days(
         metaToken.accessToken,
