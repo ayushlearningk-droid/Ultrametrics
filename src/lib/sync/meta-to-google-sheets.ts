@@ -136,16 +136,6 @@ async function fetchMetaInsightsLast30Days(
   return payload.data ?? [];
 }
 
-function generateSampleData(): (string | number)[][] {
-  return [
-    ["2024-06-01", "Brand Awareness", 150, 320, 12000, 450, 3.0],
-    ["2024-06-01", "Retargeting",     200, 410, 15500, 640, 3.2],
-    ["2024-06-02", "Brand Awareness", 165, 355, 13200, 495, 3.0],
-    ["2024-06-02", "Prospecting",     300, 580, 22000, 810, 2.7],
-    ["2024-06-03", "Retargeting",     220, 445, 16800, 704, 3.2],
-  ];
-}
-
 async function ensureSheetTab(
   spreadsheetId: string,
   sheets: ReturnType<typeof google.sheets>
@@ -192,13 +182,12 @@ async function writeInsightRows(
   spreadsheetId: string,
   sheets: ReturnType<typeof google.sheets>,
   insights: MetaInsightRow[]
-): Promise<{ rowsWritten: number; isSample: boolean }> {
+): Promise<{ rowsWritten: number; isSample: false }> {
+  // Never fabricate data. Empty insights → write no rows (real data only).
   let rows: (string | number)[][];
-  let isSample = false;
 
   if (insights.length === 0) {
-    rows = generateSampleData();
-    isSample = true;
+    rows = [];
   } else {
     rows = insights.map((row) => {
       const spend = parseFloat(row.spend ?? "0");
@@ -244,7 +233,8 @@ async function writeInsightRows(
     await sheets.spreadsheets.values.clear({ spreadsheetId, range: DATA_RANGE });
   }
 
-  return { rowsWritten: rows.length, isSample };
+  // isSample retained in shape for response/UI compatibility, always false.
+  return { rowsWritten: rows.length, isSample: false };
 }
 
 export async function runMetaToGoogleSheetsSyncForWorkspace(
@@ -362,7 +352,7 @@ export async function runMetaToGoogleSheetsSyncForWorkspace(
       400
     );
   }
-  // status === "not_connected": fall through with empty insights → sample data written
+  // status === "not_connected": fall through with empty insights → nothing written
 
   // Create the sheets client once; it will auto-refresh the token and persist it if needed
   const sheets = createSheetsClient(googleConfig, googleConnector.id, admin);
