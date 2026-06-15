@@ -53,14 +53,16 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div className="rounded-lg border border-danger/30 bg-danger/[0.08] px-3.5 py-2.5 type-caption text-danger">
           {error}
         </div>
       )}
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email" className="type-caption text-foreground-muted">
+          Email
+        </Label>
         <Input
           id="email"
           name="email"
@@ -68,14 +70,17 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
           placeholder="you@company.com"
           required
           autoComplete="email"
+          className="h-11 bg-white/[0.02]"
         />
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password" className="type-caption text-foreground-muted">
+            Password
+          </Label>
           <Link
             href="/forgot-password"
-            className="text-sm text-brand hover:underline"
+            className="type-caption text-brand/80 transition-colors hover:text-brand"
           >
             Forgot password?
           </Link>
@@ -86,21 +91,27 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
           type="password"
           required
           autoComplete="current-password"
+          className="h-11 bg-white/[0.02]"
         />
       </div>
-      <Button type="submit" variant="brand" className="w-full" disabled={loading}>
+      <Button
+        type="submit"
+        variant="brand"
+        className="h-11 w-full"
+        disabled={loading}
+      >
         {loading ? (
           <>
             <Loader2 className="animate-spin" />
-            Signing in...
+            Signing in…
           </>
         ) : (
           "Sign in"
         )}
       </Button>
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="text-center type-caption text-foreground-muted">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="font-medium text-brand hover:underline">
+        <Link href="/signup" className="font-medium text-brand transition-colors hover:text-brand/80">
           Sign up
         </Link>
       </p>

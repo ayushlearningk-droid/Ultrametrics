@@ -7,7 +7,6 @@ import {
   ArrowRight,
   CheckCircle2,
   RefreshCw,
-  Sparkles,
   TrendingDown,
   TrendingUp,
   Zap,
@@ -45,31 +44,31 @@ interface DailyRow {
 const SEV = {
   critical: {
     label: "RISK",
-    bar: "bg-red-400",
-    dot: "bg-red-400 shadow-[0_0_10px_3px] shadow-red-400/50",
-    heading: "text-red-300",
-    tag: "border-red-400/30 text-red-300/90 bg-red-400/[0.07]",
-    btn: "border-red-400/30 text-red-300/80 hover:border-red-400/60 hover:bg-red-400/[0.07] hover:text-red-200",
-    statColor: "text-red-400",
-    rowHover: "hover:bg-red-400/[0.025]",
+    bar: "bg-danger",
+    dot: "bg-danger shadow-[0_0_10px_3px] shadow-danger/50",
+    heading: "text-danger",
+    tag: "border-danger/30 text-danger bg-danger/[0.07]",
+    btn: "border-danger/30 text-danger hover:border-danger/60 hover:bg-danger/[0.07]",
+    statColor: "text-danger",
+    rowHover: "hover:bg-danger/[0.025]",
   },
   opportunity: {
     label: "OPPORTUNITY",
-    bar: "bg-emerald-400",
-    dot: "bg-emerald-400 shadow-[0_0_10px_3px] shadow-emerald-400/50",
-    heading: "text-emerald-300",
-    tag: "border-emerald-400/30 text-emerald-300/90 bg-emerald-400/[0.07]",
-    btn: "border-emerald-400/30 text-emerald-300/80 hover:border-emerald-400/60 hover:bg-emerald-400/[0.07] hover:text-emerald-200",
-    statColor: "text-emerald-400",
-    rowHover: "hover:bg-emerald-400/[0.025]",
+    bar: "bg-brand",
+    dot: "bg-brand shadow-[0_0_10px_3px] shadow-brand/50",
+    heading: "text-brand",
+    tag: "border-brand/30 text-brand bg-brand/[0.07]",
+    btn: "border-brand/30 text-brand hover:border-brand/60 hover:bg-brand/[0.07]",
+    statColor: "text-brand",
+    rowHover: "hover:bg-brand/[0.025]",
   },
   info: {
     label: "INFO",
     bar: "bg-brand",
     dot: "bg-brand/80",
     heading: "text-brand",
-    tag: "border-brand/30 text-brand/90 bg-brand/[0.07]",
-    btn: "border-brand/30 text-brand/70 hover:border-brand/60 hover:bg-brand/[0.07] hover:text-brand",
+    tag: "border-brand/30 text-brand bg-brand/[0.07]",
+    btn: "border-brand/30 text-brand hover:border-brand/60 hover:bg-brand/[0.07]",
     statColor: "text-brand",
     rowHover: "hover:bg-brand/[0.025]",
   },
@@ -188,7 +187,7 @@ function buildHeadlineParts(
 
   if (opportunity > 0) {
     parts.push(
-      <span key="opp" className="text-emerald-400">
+      <span key="opp" className="text-brand">
         {opportunity} {opportunity === 1 ? "opportunity" : "opportunities"}
       </span>
     );
@@ -198,7 +197,7 @@ function buildHeadlineParts(
   }
   if (critical > 0) {
     parts.push(
-      <span key="risk" className="text-red-400">
+      <span key="risk" className="text-danger">
         {critical} {critical === 1 ? "risk" : "risks"}
       </span>
     );
@@ -265,33 +264,34 @@ export function AIHero({
   /* ── No sources ── */
   if (hasNoSources) {
     return (
-      <div className="relative w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.03] to-transparent"
-           style={{ boxShadow: "0 1px 0 0 rgba(255,255,255,0.04) inset, 0 0 0 1px rgba(74,108,247,0.08)" }}>
+      <div className="surface-elevated relative w-full overflow-hidden anim-settle shadow-[0_28px_80px_-12px_hsl(240_40%_1%/0.7)]">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent" />
-        <div className="px-8 py-14">
+        <div className="px-8 py-14 sm:px-10">
           <div className="mb-6 flex items-center gap-2.5">
-            <Sparkles className="h-5 w-5 text-brand/60" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/30">
-              Ultrametrics
+            <span className="relative flex h-3 w-3 items-center justify-center">
+              <span className="anim-pulse absolute inline-flex h-3 w-3 rounded-full bg-brand/40" />
+              <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-brand shadow-[0_0_8px_2px] shadow-brand/50" />
             </span>
+            <span className="type-eyebrow text-foreground-muted">Ultrametrics</span>
           </div>
-          <h2 className="text-[38px] font-bold leading-[1.1] tracking-tight text-foreground/80">
-            Connect your first ad account<br />
-            <span className="text-brand/70">to activate AI monitoring.</span>
+          <h2 className="type-display max-w-2xl text-balance">
+            Connect your first ad account{" "}
+            <span className="text-brand">to activate AI monitoring.</span>
           </h2>
-          <p className="mt-4 text-[14px] text-white/35 max-w-lg">
-            Ultrametrics watches your Meta Ads and Google Ads 24/7 — detecting opportunities, catching issues, and telling you exactly what to do.
+          <p className="mt-4 max-w-lg type-body text-foreground-muted">
+            Ultrametrics watches your Meta Ads and Google Ads around the clock —
+            detecting opportunities, catching issues, and telling you exactly what to do.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               href="/dashboard/connectors/meta"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.04] px-5 py-2.5 text-[13px] font-medium text-white/70 transition-all hover:border-white/[0.22] hover:bg-white/[0.07] hover:text-white/95"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 type-body font-medium text-brand-foreground shadow-[0_0_16px_0] shadow-brand/30 transition-all hover:bg-brand/90"
             >
               Connect Meta Ads <ArrowRight className="h-3.5 w-3.5" />
             </Link>
             <Link
               href="/dashboard/connectors/google-ads"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.04] px-5 py-2.5 text-[13px] font-medium text-white/70 transition-all hover:border-white/[0.22] hover:bg-white/[0.07] hover:text-white/95"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.03] px-5 py-2.5 type-body font-medium text-foreground/80 transition-all hover:border-white/[0.22] hover:bg-white/[0.06]"
             >
               Connect Google Ads <ArrowRight className="h-3.5 w-3.5" />
             </Link>
@@ -302,32 +302,37 @@ export function AIHero({
   }
 
   return (
-    <div
-      className="relative w-full overflow-hidden rounded-2xl border border-white/[0.09]"
-      style={{
-        background: "linear-gradient(160deg, hsl(228 16% 5%) 0%, hsl(228 14% 4%) 100%)",
-        boxShadow: "0 1px 0 0 rgba(255,255,255,0.05) inset, 0 0 0 1px rgba(74,108,247,0.06), 0 24px 48px -12px rgba(0,0,0,0.6)",
-      }}
-    >
+    <div className="surface-elevated relative w-full overflow-hidden anim-settle shadow-[0_28px_80px_-12px_hsl(240_40%_1%/0.7)]">
+      {/* Internal ambient glow — cinematic depth inside the elevated surface */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 80% at 12% -10%, hsl(var(--brand) / 0.07) 0%, transparent 55%), radial-gradient(90% 70% at 100% 0%, hsl(256 90% 68% / 0.05) 0%, transparent 50%)",
+        }}
+      />
       {/* Top accent */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent" />
 
       {/* ── Status bar ───────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] px-8 py-4">
+      <div className="relative z-[1] flex items-center justify-between gap-4 border-b border-white/[0.06] px-8 py-4">
         <div className="flex items-center gap-3">
-          <span
-            className={cn(
-              "block h-[7px] w-[7px] rounded-full",
-              activeCount > 0
-                ? "animate-pulse bg-brand shadow-[0_0_8px_2px] shadow-brand/40"
-                : "bg-amber-400"
+          <span className="relative flex h-3 w-3 items-center justify-center">
+            {activeCount > 0 ? (
+              <>
+                <span className="anim-pulse absolute inline-flex h-3 w-3 rounded-full bg-brand/40" />
+                <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-brand shadow-[0_0_8px_2px] shadow-brand/50" />
+              </>
+            ) : (
+              <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-warn" />
             )}
-          />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/35">
+          </span>
+          <span className="type-eyebrow text-foreground-muted">
             {activeCount > 0 ? "Ultrametrics is monitoring" : "Monitoring paused"}
           </span>
-          <span className="hidden text-white/15 sm:block">·</span>
-          <span className="hidden text-[12px] text-white/25 sm:block">
+          <span className="hidden text-foreground-muted/40 sm:block">·</span>
+          <span className="hidden type-caption text-foreground-muted sm:block">
             {activeCount} source{activeCount !== 1 ? "s" : ""}
             {lastSync && <> · {lastSync}</>}
           </span>
@@ -337,7 +342,7 @@ export function AIHero({
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-1.5 text-[11px] font-medium text-white/35 transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/65 disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 type-caption font-medium text-foreground-muted transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-foreground disabled:opacity-40"
           >
             <RefreshCw className={cn("h-3 w-3", syncing && "animate-spin")} />
             {syncing ? "Syncing…" : "Sync all"}
@@ -346,27 +351,26 @@ export function AIHero({
       </div>
 
       {/* ── Headline ─────────────────────────────────────────────── */}
-      <div className="px-8 py-10">
+      <div className="relative z-[1] px-8 pb-7 pt-7">
         {loading ? (
           <div className="space-y-3">
-            <div className="h-4 w-40 animate-pulse rounded bg-white/[0.05]" />
-            <div className="h-12 w-[520px] max-w-full animate-pulse rounded-lg bg-white/[0.07]" />
-            <div className="h-4 w-52 animate-pulse rounded bg-white/[0.04]" />
+            <div className="h-3 w-40 anim-flow rounded bg-white/[0.05]" />
+            <div className="h-8 w-[520px] max-w-full anim-flow rounded-lg bg-white/[0.07]" />
+            <div className="h-3 w-52 anim-flow rounded bg-white/[0.04]" />
           </div>
         ) : (
           <>
-            <p className="mb-2 text-[12px] font-medium uppercase tracking-[0.22em] text-white/30">
-              Ultrametrics detected
+            <p className="mb-2.5 type-eyebrow text-foreground-muted">
+              Ultrametrics detected {headlineParts}
             </p>
-            <h2 className="text-[44px] font-bold leading-[1.08] tracking-tight sm:text-[48px]">
-              {headlineParts}
-            </h2>
-            {findings && findings.length > 0 && (
-              <p className="mt-3 text-[13px] text-white/30">
-                across {activeCount} active source{activeCount !== 1 ? "s" : ""}
-                {" · "}
-                <span className="text-white/20">review below</span>
-              </p>
+            {findings && findings.length > 0 ? (
+              <h2 className="type-display max-w-3xl text-balance">
+                {findings[0].title}.
+              </h2>
+            ) : (
+              <h2 className="type-display max-w-3xl text-balance text-foreground/80">
+                No issues detected.
+              </h2>
             )}
           </>
         )}
@@ -374,14 +378,14 @@ export function AIHero({
 
       {/* ── All healthy ──────────────────────────────────────────── */}
       {!loading && findings && findings.length === 0 && (
-        <div className="border-t border-white/[0.06] px-8 py-7">
+        <div className="relative z-[1] border-t border-white/[0.06] px-8 py-7">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-400/70" />
+            <CheckCircle2 className="h-5 w-5 text-brand/70" />
             <div>
-              <p className="text-[14px] font-medium text-foreground/75">
+              <p className="type-body font-medium text-foreground/85">
                 No issues detected across {activeCount} source{activeCount !== 1 ? "s" : ""}
               </p>
-              <p className="mt-0.5 text-[12px] text-white/30">
+              <p className="mt-0.5 type-caption text-foreground-muted">
                 All campaigns are within normal parameters. Ultrametrics will alert you when it detects anything.
               </p>
             </div>
@@ -389,9 +393,17 @@ export function AIHero({
         </div>
       )}
 
-      {/* ── Findings ─────────────────────────────────────────────── */}
+      {/* ── Findings → Recommended actions ───────────────────────── */}
       {!loading && findings && findings.length > 0 && (
-        <div className="border-t border-white/[0.07]">
+        <div className="relative z-[1] border-t border-white/[0.07]">
+          <div className="flex items-center gap-2.5 px-8 pb-1 pt-5">
+            <span className="type-eyebrow text-foreground-muted/80">
+              Recommended actions
+            </span>
+            <span className="font-mono type-caption tabular-nums text-foreground-muted/45">
+              {findings.length}
+            </span>
+          </div>
           {findings.map((f, i) => {
             const s = SEV[f.severity];
             const Icon = f.icon;
@@ -415,20 +427,20 @@ export function AIHero({
                 {/* Content */}
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className={cn("text-[10px] font-bold uppercase tracking-[0.22em]", s.heading)}>
+                    <span className={cn("type-eyebrow", s.heading)}>
                       {s.label}
                     </span>
                     {f.metric && (
-                      <span className={cn("rounded-full border px-2.5 py-0.5 font-mono text-[10px]", s.tag)}>
+                      <span className={cn("rounded-full border px-2.5 py-0.5 font-mono type-caption", s.tag)}>
                         {f.metric}
                       </span>
                     )}
                     <Icon className={cn("h-3.5 w-3.5 opacity-60", s.heading)} />
                   </div>
-                  <p className="text-[16px] font-semibold leading-snug text-foreground/90">
+                  <p className="type-body font-semibold text-foreground/90">
                     {f.title}
                   </p>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-white/42 max-w-2xl">
+                  <p className="mt-1.5 max-w-2xl type-body leading-relaxed text-foreground-muted">
                     {f.body}
                   </p>
                 </div>
@@ -438,7 +450,7 @@ export function AIHero({
                   <Link
                     href={f.href}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-[12px] font-medium transition-all",
+                      "inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 type-caption font-medium transition-all",
                       s.btn
                     )}
                   >

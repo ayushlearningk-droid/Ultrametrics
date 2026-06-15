@@ -1,4 +1,4 @@
-import { AuthCard } from "@/components/auth/auth-card";
+import { AuthSplit } from "@/components/auth/auth-split";
 import { SignupForm } from "@/components/auth/signup-form";
 
 export const metadata = {
@@ -7,11 +7,12 @@ export const metadata = {
 
 export default function SignupPage() {
   return (
-    <AuthCard
-      title="Create your account"
-      description="Start your 14-day free trial — no credit card required"
+    <AuthSplit
+      eyebrow="Start free"
+      title="Put an AI on your marketing."
+      subtitle="14-day trial, no credit card. Connect a source and your Mission Control goes live in minutes."
     >
       <SignupForm />
-    </AuthCard>
+    </AuthSplit>
   );
 }
