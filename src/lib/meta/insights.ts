@@ -17,7 +17,7 @@ export async function getAccountInsights(
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/act_${accountId}/insights` +
     `?fields=${fields}` +
-    `&date_preset=last_30d` +
+    `&date_preset=maximum` +
     `&access_token=${accessToken}`;
 
   // TEMP LOG: remove after debugging empty-insights issue
@@ -63,7 +63,7 @@ export async function getAccountInsightsByDay(
   const fields = ["impressions", "clicks", "spend", "ctr"].join(",");
   const params = new URLSearchParams({
     fields,
-    date_preset: `last_${days}d`,
+    date_preset: "maximum",
     time_increment: "1",
     access_token: accessToken,
   });
