@@ -11,24 +11,21 @@ import { storeConnectorToken } from "@/lib/data/connector-credentials";
 import { ensureWorkspaceSyncSchedule } from "@/lib/sync/ensure-workspace-schedule";
 
 /**
- * C2 dual-write: store the encrypted access-token envelope alongside the
- * existing connectors.config write. Best-effort — a vault failure must never
- * break the connect flow. connectors.config stays authoritative until PR 4.
+ * C2 fail-closed dual-write: store the encrypted access-token envelope alongside
+ * the connectors.config write. If storeConnectorToken throws it propagates to
+ * the route's outer try/catch, failing the connect — a connector is never
+ * created/updated without its token also landing in the vault.
  */
 async function dualWriteMetaToken(
   connectorId: string | null,
   accessToken: string | null
 ): Promise<void> {
   if (!connectorId || !accessToken) return;
-  try {
-    await storeConnectorToken({
-      connectorId,
-      accessToken,
-      tokenExpiresAt: metaTokenExpiresAt(),
-    });
-  } catch (err) {
-    console.error("[C2] meta connect dual-write failed:", err);
-  }
+  await storeConnectorToken({
+    connectorId,
+    accessToken,
+    tokenExpiresAt: metaTokenExpiresAt(),
+  });
 }
 
 export async function POST(request: Request) {

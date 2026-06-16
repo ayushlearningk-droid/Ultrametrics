@@ -8,9 +8,10 @@ import { clearGoogleOAuthCookies, readGoogleOAuthCookies } from "@/lib/google/oa
 import { storeConnectorToken } from "@/lib/data/connector-credentials";
 
 /**
- * C2 dual-write: store the encrypted token envelope alongside the existing
- * connectors.config write. Best-effort — a vault failure must never break the
- * OAuth flow. connectors.config stays authoritative until PR 4.
+ * C2 fail-closed dual-write: store the encrypted token envelope alongside the
+ * connectors.config write. If storeConnectorToken throws it propagates to the
+ * route's outer try/catch, which redirects with an error — a connector is never
+ * created/updated without its token also landing in the vault.
  */
 async function dualWriteGoogleToken(
   connectorId: string | null,
@@ -19,11 +20,7 @@ async function dualWriteGoogleToken(
   tokenExpiresAt: string | null
 ): Promise<void> {
   if (!connectorId || !accessToken) return;
-  try {
-    await storeConnectorToken({ connectorId, accessToken, refreshToken, tokenExpiresAt });
-  } catch (err) {
-    console.error("[C2] google oauth dual-write failed:", err);
-  }
+  await storeConnectorToken({ connectorId, accessToken, refreshToken, tokenExpiresAt });
 }
 
 export async function GET(request: Request) {

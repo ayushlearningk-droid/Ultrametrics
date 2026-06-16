@@ -12,22 +12,20 @@ import { ensureWorkspaceSyncSchedule } from "@/lib/sync/ensure-workspace-schedul
 import { storeConnectorToken } from "@/lib/data/connector-credentials";
 
 /**
- * C2 dual-write: Google Ads connectors store only a refresh token (the access
- * token is fetched on demand during sync). The vault's access_token envelope is
- * required (NOT NULL), so it is written as an empty-string placeholder while the
- * real secret — the refresh token — is encrypted. Best-effort: a vault failure
- * must never break connect. connectors.config stays authoritative until PR 4.
+ * C2 fail-closed dual-write: Google Ads connectors store only a refresh token
+ * (the access token is fetched on demand during sync). The vault's access_token
+ * envelope is required (NOT NULL), so it is written as an empty-string
+ * placeholder while the real secret — the refresh token — is encrypted. If
+ * storeConnectorToken throws it propagates to the route's outer try/catch,
+ * failing the connect — a connector is never created/updated without its token
+ * also landing in the vault.
  */
 async function dualWriteGoogleAdsToken(
   connectorId: string | null,
   refreshToken: string | null
 ): Promise<void> {
   if (!connectorId || !refreshToken) return;
-  try {
-    await storeConnectorToken({ connectorId, accessToken: "", refreshToken });
-  } catch (err) {
-    console.error("[C2] google-ads connect dual-write failed:", err);
-  }
+  await storeConnectorToken({ connectorId, accessToken: "", refreshToken });
 }
 
 type ConnectBody = {

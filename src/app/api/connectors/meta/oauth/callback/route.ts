@@ -114,18 +114,14 @@ console.log("=========================================");
         })
         .eq("id", existingConnector.id);
 
-      // C2 dual-write: also store the encrypted envelope. Best-effort — a vault
-      // failure must not break OAuth. connectors.config remains authoritative
-      // until the PR-4 read cutover.
-      try {
-        await storeConnectorToken({
-          connectorId: existingConnector.id,
-          accessToken,
-          tokenExpiresAt,
-        });
-      } catch (vaultErr) {
-        console.error("[C2] meta oauth dual-write failed:", vaultErr);
-      }
+      // C2 fail-closed dual-write: store the encrypted envelope. If this throws
+      // it propagates to the outer catch, which redirects with an error — the
+      // reconnect is reported as failed rather than leaving the vault un-updated.
+      await storeConnectorToken({
+        connectorId: existingConnector.id,
+        accessToken,
+        tokenExpiresAt,
+      });
     }
 
     await clearMetaOAuthCookies();
