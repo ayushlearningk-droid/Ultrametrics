@@ -125,12 +125,10 @@ export async function GET(request: Request) {
         .from("connectors")
         .update({
           status: "active",
+          // C2 Phase 1: tokens are no longer written to connectors.config — they
+          // live only in the vault (dual-write below). Non-token config is kept.
           config: {
             ...existingConfig,
-            access_token: tokenJson.access_token,
-            // Preserve old refresh_token if Google didn't return a new one
-            refresh_token: tokenJson.refresh_token ?? existingConfig.refresh_token ?? null,
-            token_expires_at: tokenExpiresAt,
             google_email: profile.email ?? null,
             google_name: profile.name ?? null,
             connected_by: user.id,
@@ -156,10 +154,9 @@ export async function GET(request: Request) {
           name: "Google Sheets",
           provider: "google_sheets",
           status: "active",
+          // C2 Phase 1: tokens are no longer written to connectors.config — they
+          // live only in the vault (dual-write below). Non-token config is kept.
           config: {
-            access_token: tokenJson.access_token,
-            refresh_token: tokenJson.refresh_token ?? null,
-            token_expires_at: tokenExpiresAt,
             google_email: profile.email ?? null,
             google_name: profile.name ?? null,
             connected_by: user.id,

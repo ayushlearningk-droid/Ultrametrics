@@ -71,15 +71,13 @@ export async function POST(request: Request) {
 
     const admin = createAdminClient();
 
-    // Read the pending session token so we can persist it into the connector.
+    // Read the pending session token so we can persist it into the vault.
     const pendingSession = await getLatestMetaPendingSession(workspaceId);
     const accessToken = pendingSession?.access_token ?? null;
+    // C2 Phase 1: tokens are no longer written to connectors.config — only the
+    // non-secret config is stored here; the token goes to the vault (dual-write).
     const tokenConfig: MetaConnectorConfig = {
       currency: body.currency ?? "INR",
-      ...(accessToken && {
-        access_token: accessToken,
-        token_expires_at: metaTokenExpiresAt(),
-      }),
     };
 
     const { data: existingConnector, error: existingError } =

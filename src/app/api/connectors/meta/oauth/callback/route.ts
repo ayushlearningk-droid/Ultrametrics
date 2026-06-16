@@ -101,13 +101,13 @@ console.log("=========================================");
 
     if (existingConnector) {
       const tokenExpiresAt = metaTokenExpiresAt();
+      // C2 Phase 1: tokens are no longer written to connectors.config — they
+      // live only in the vault (dual-write below). Non-token config is preserved.
       await admin
         .from("connectors")
         .update({
           config: {
             ...((existingConnector.config ?? {}) as MetaConnectorConfig),
-            access_token: accessToken,
-            token_expires_at: tokenExpiresAt,
           },
           status: "active",
           updated_at: new Date().toISOString(),

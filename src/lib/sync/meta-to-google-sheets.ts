@@ -85,28 +85,16 @@ function createSheetsClient(
 
   oauth2Client.setCredentials(credentials);
 
-  // When googleapis auto-refreshes the access_token, persist the new token to DB
+  // When googleapis auto-refreshes the access_token, persist the new token.
   oauth2Client.on("tokens", (newTokens) => {
     if (newTokens.access_token) {
       const newExpiresAt = newTokens.expiry_date
         ? new Date(newTokens.expiry_date).toISOString()
         : new Date(Date.now() + 3600_000).toISOString();
 
-      void admin
-        .from("connectors")
-        .update({
-          config: {
-            ...config,
-            access_token: newTokens.access_token,
-            token_expires_at: newExpiresAt,
-            ...(newTokens.refresh_token ? { refresh_token: newTokens.refresh_token } : {}),
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", connectorId);
-
-      // C2 dual-write: keep the encrypted envelope in sync after auto-refresh.
-      // Best-effort — config (above) stays authoritative until PR 4.
+      // C2 Phase 1: the refreshed token is persisted only to the vault (no
+      // connectors.config token write). Best-effort — if it fails, the token is
+      // simply re-derived from the refresh token on the next sync.
       void storeConnectorToken({
         connectorId,
         accessToken: newTokens.access_token,

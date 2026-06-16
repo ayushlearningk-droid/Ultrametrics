@@ -94,10 +94,11 @@ export async function POST(request: Request) {
       await admin
         .from("connectors")
         .update({
+          // C2 Phase 1: refresh token no longer written to connectors.config —
+          // it lives only in the vault (dual-write below). Non-token config kept.
           config: {
             ...prevConfig,
             ...(body.currencyCode ? { currency: body.currencyCode } : {}),
-            ...(refreshToken ? { refresh_token: refreshToken } : {}),
           },
           name: body.customerName,
           external_account_name: body.customerName,
@@ -121,9 +122,10 @@ export async function POST(request: Request) {
         provider: "google_ads",
         name: body.customerName,
         status: "active",
+        // C2 Phase 1: refresh token no longer written to connectors.config — it
+        // lives only in the vault (dual-write below). Non-token config kept.
         config: {
           currency: body.currencyCode ?? "",
-          refresh_token: refreshToken,
         },
         external_account_id: body.customerId,
         external_account_name: body.customerName,
