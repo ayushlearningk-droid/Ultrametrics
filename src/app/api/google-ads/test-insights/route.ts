@@ -8,6 +8,7 @@ import {
   refreshGoogleAdsAccessToken,
 } from "@/lib/google-ads/insights";
 import { DEMO_GOOGLE_INSIGHTS } from "@/lib/dev/demo-data";
+import { getConnectorToken } from "@/lib/data/connector-credentials";
 
 export async function GET() {
   const cookieStore = await cookies();
@@ -56,7 +57,16 @@ export async function GET() {
       currency?: string;
     };
 
-    if (!config.refresh_token) {
+    // C2 vault-first read with config fallback.
+    let refreshToken = config.refresh_token;
+    try {
+      const vault = await getConnectorToken(connector.id);
+      if (vault?.refreshToken) refreshToken = vault.refreshToken;
+    } catch (err) {
+      console.error("[C2] google-ads vault read failed, using config fallback:", err);
+    }
+
+    if (!refreshToken) {
       return NextResponse.json(
         {
           error:
@@ -87,7 +97,7 @@ export async function GET() {
     }
 
     // Exchange refresh_token for a fresh access_token.
-    const accessToken = await refreshGoogleAdsAccessToken(config.refresh_token);
+    const accessToken = await refreshGoogleAdsAccessToken(refreshToken);
     console.log("[GoogleAds][test-insights] access token refreshed successfully, length:", accessToken.length);
 
     const customerId = String(connector.external_account_id);

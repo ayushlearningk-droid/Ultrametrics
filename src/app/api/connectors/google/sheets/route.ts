@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/api/require-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 import { listSpreadsheets } from "@/lib/google/sheets";
+import { getConnectorToken } from "@/lib/data/connector-credentials";
 
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -45,9 +46,20 @@ export async function GET(request: Request) {
     refresh_token?: string;
   };
 
+  // C2 vault-first read with config fallback.
+  let accessToken = config.access_token;
+  let refreshToken = config.refresh_token;
+  try {
+    const vault = await getConnectorToken(connector.id);
+    if (vault?.accessToken) accessToken = vault.accessToken;
+    if (vault?.refreshToken) refreshToken = vault.refreshToken;
+  } catch (err) {
+    console.error("[C2] google vault read failed, using config fallback:", err);
+  }
+
   const spreadsheets = await listSpreadsheets({
-    accessToken: config.access_token,
-    refreshToken: config.refresh_token,
+    accessToken,
+    refreshToken,
   });
 
   return NextResponse.json({ spreadsheets });

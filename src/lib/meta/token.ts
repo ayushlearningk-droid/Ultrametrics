@@ -8,6 +8,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getConnectorToken } from "@/lib/data/connector-credentials";
 
 export type MetaConnectorConfig = {
   currency?: string;
@@ -58,13 +59,27 @@ export async function getActiveMetaToken(
   if (!connector) return { status: "not_connected" };
 
   const config = (connector.config ?? {}) as MetaConnectorConfig;
-  const token = config.access_token;
   const accountId = String(connector.external_account_id ?? "");
+
+  // C2 vault-first read with config fallback. A vault failure (missing key /
+  // no row / decrypt error) falls back to the plaintext config — config is
+  // still authoritative until the plaintext purge (a later PR).
+  let token = config.access_token;
+  let tokenExpiresAt = config.token_expires_at ?? null;
+  try {
+    const vault = await getConnectorToken(connector.id);
+    if (vault?.accessToken) {
+      token = vault.accessToken;
+      tokenExpiresAt = vault.tokenExpiresAt ?? tokenExpiresAt;
+    }
+  } catch (err) {
+    console.error("[C2] meta vault read failed, using config fallback:", err);
+  }
 
   if (!token) return { status: "missing", connectorId: connector.id };
 
-  if (config.token_expires_at) {
-    const expiresAt = new Date(config.token_expires_at).getTime();
+  if (tokenExpiresAt) {
+    const expiresAt = new Date(tokenExpiresAt).getTime();
     if (Date.now() >= expiresAt) {
       return { status: "expired", connectorId: connector.id, accountId };
     }
@@ -76,7 +91,7 @@ export async function getActiveMetaToken(
     connectorId: connector.id,
     accountId,
     currency: config.currency ?? "USD",
-    tokenExpiresAt: config.token_expires_at ?? null,
+    tokenExpiresAt,
   };
 }
 
