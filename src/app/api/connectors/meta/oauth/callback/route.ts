@@ -17,6 +17,7 @@ import {
 } from "@/lib/meta/oauth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { storeConnectorToken } from "@/lib/data/connector-credentials";
 import { metaTokenExpiresAt, type MetaConnectorConfig } from "@/lib/meta/token";
 
 export async function GET(request: Request) {
@@ -99,19 +100,32 @@ console.log("=========================================");
       .maybeSingle();
 
     if (existingConnector) {
-      const prevConfig = (existingConnector.config ?? {}) as MetaConnectorConfig;
+      const tokenExpiresAt = metaTokenExpiresAt();
       await admin
         .from("connectors")
         .update({
           config: {
-            ...prevConfig,
+            ...((existingConnector.config ?? {}) as MetaConnectorConfig),
             access_token: accessToken,
-            token_expires_at: metaTokenExpiresAt(),
+            token_expires_at: tokenExpiresAt,
           },
           status: "active",
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingConnector.id);
+
+      // C2 dual-write: also store the encrypted envelope. Best-effort — a vault
+      // failure must not break OAuth. connectors.config remains authoritative
+      // until the PR-4 read cutover.
+      try {
+        await storeConnectorToken({
+          connectorId: existingConnector.id,
+          accessToken,
+          tokenExpiresAt,
+        });
+      } catch (vaultErr) {
+        console.error("[C2] meta oauth dual-write failed:", vaultErr);
+      }
     }
 
     await clearMetaOAuthCookies();

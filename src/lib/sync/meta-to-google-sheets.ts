@@ -2,6 +2,7 @@ import { google } from "googleapis";
 import { requireGoogleOAuthConfig } from "@/lib/google/config";
 import { getActiveMetaToken, markMetaConnectorTokenError } from "@/lib/meta/token";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { storeConnectorToken } from "@/lib/data/connector-credentials";
 
 const META_GRAPH_VERSION = "v23.0";
 const SHEET_TAB_NAME = "Ultrametrics";
@@ -103,6 +104,15 @@ function createSheetsClient(
           updated_at: new Date().toISOString(),
         })
         .eq("id", connectorId);
+
+      // C2 dual-write: keep the encrypted envelope in sync after auto-refresh.
+      // Best-effort — config (above) stays authoritative until PR 4.
+      void storeConnectorToken({
+        connectorId,
+        accessToken: newTokens.access_token,
+        refreshToken: newTokens.refresh_token ?? config.refresh_token ?? null,
+        tokenExpiresAt: newExpiresAt,
+      }).catch((err) => console.error("[C2] google refresh dual-write failed:", err));
     }
   });
 

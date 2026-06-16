@@ -5,6 +5,26 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireGoogleOAuthConfig } from "@/lib/google/config";
 import { clearGoogleOAuthCookies, readGoogleOAuthCookies } from "@/lib/google/oauth-cookies";
+import { storeConnectorToken } from "@/lib/data/connector-credentials";
+
+/**
+ * C2 dual-write: store the encrypted token envelope alongside the existing
+ * connectors.config write. Best-effort — a vault failure must never break the
+ * OAuth flow. connectors.config stays authoritative until PR 4.
+ */
+async function dualWriteGoogleToken(
+  connectorId: string | null,
+  accessToken: string | undefined,
+  refreshToken: string | null,
+  tokenExpiresAt: string | null
+): Promise<void> {
+  if (!connectorId || !accessToken) return;
+  try {
+    await storeConnectorToken({ connectorId, accessToken, refreshToken, tokenExpiresAt });
+  } catch (err) {
+    console.error("[C2] google oauth dual-write failed:", err);
+  }
+}
 
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -124,26 +144,44 @@ export async function GET(request: Request) {
         .eq("id", existingConnector.id);
 
       if (error) throw new Error(error.message);
+
+      await dualWriteGoogleToken(
+        existingConnector.id,
+        tokenJson.access_token,
+        tokenJson.refresh_token ?? (existingConfig.refresh_token as string | null) ?? null,
+        tokenExpiresAt
+      );
     } else {
-      const { error } = await admin.from("connectors").insert({
-        workspace_id: workspaceId,
-        name: "Google Sheets",
-        provider: "google_sheets",
-        status: "active",
-        config: {
-          access_token: tokenJson.access_token,
-          refresh_token: tokenJson.refresh_token ?? null,
-          token_expires_at: tokenExpiresAt,
-          google_email: profile.email ?? null,
-          google_name: profile.name ?? null,
+      const { data: inserted, error } = await admin
+        .from("connectors")
+        .insert({
+          workspace_id: workspaceId,
+          name: "Google Sheets",
+          provider: "google_sheets",
+          status: "active",
+          config: {
+            access_token: tokenJson.access_token,
+            refresh_token: tokenJson.refresh_token ?? null,
+            token_expires_at: tokenExpiresAt,
+            google_email: profile.email ?? null,
+            google_name: profile.name ?? null,
+            connected_by: user.id,
+          },
+          external_account_id: externalAccountId,
+          external_account_name: profile.name ?? null,
           connected_by: user.id,
-        },
-        external_account_id: externalAccountId,
-        external_account_name: profile.name ?? null,
-        connected_by: user.id,
-      });
+        })
+        .select("id")
+        .single();
 
       if (error) throw new Error(error.message);
+
+      await dualWriteGoogleToken(
+        inserted?.id ?? null,
+        tokenJson.access_token,
+        tokenJson.refresh_token ?? null,
+        tokenExpiresAt
+      );
     }
 
     await clearGoogleOAuthCookies();

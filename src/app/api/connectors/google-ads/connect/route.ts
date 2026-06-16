@@ -9,6 +9,26 @@ import {
 import { deleteOAuthPendingForUserWorkspace } from "@/lib/data/oauth-pending";
 import { GOOGLE_ADS_REFRESH_TOKEN_COOKIE } from "@/lib/google-ads/constants";
 import { ensureWorkspaceSyncSchedule } from "@/lib/sync/ensure-workspace-schedule";
+import { storeConnectorToken } from "@/lib/data/connector-credentials";
+
+/**
+ * C2 dual-write: Google Ads connectors store only a refresh token (the access
+ * token is fetched on demand during sync). The vault's access_token envelope is
+ * required (NOT NULL), so it is written as an empty-string placeholder while the
+ * real secret — the refresh token — is encrypted. Best-effort: a vault failure
+ * must never break connect. connectors.config stays authoritative until PR 4.
+ */
+async function dualWriteGoogleAdsToken(
+  connectorId: string | null,
+  refreshToken: string | null
+): Promise<void> {
+  if (!connectorId || !refreshToken) return;
+  try {
+    await storeConnectorToken({ connectorId, accessToken: "", refreshToken });
+  } catch (err) {
+    console.error("[C2] google-ads connect dual-write failed:", err);
+  }
+}
 
 type ConnectBody = {
   customerId?: string;
@@ -88,6 +108,7 @@ export async function POST(request: Request) {
         })
         .eq("id", existingConnector.id);
 
+      await dualWriteGoogleAdsToken(existingConnector.id, refreshToken);
       cookieStore.delete(GOOGLE_ADS_REFRESH_TOKEN_COOKIE);
       await deleteOAuthPendingForUserWorkspace(user.id, workspaceId, "google_ads");
       await ensureWorkspaceSyncSchedule(workspaceId).catch(() => {});
@@ -95,23 +116,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, reconnected: true });
     }
 
-    const { error: insertError } = await admin.from("connectors").insert({
-      workspace_id: workspaceId,
-      provider: "google_ads",
-      name: body.customerName,
-      status: "active",
-      config: {
-        currency: body.currencyCode ?? "",
-        refresh_token: refreshToken,
-      },
-      external_account_id: body.customerId,
-      external_account_name: body.customerName,
-      connected_by: user.id,
-    });
+    const { data: inserted, error: insertError } = await admin
+      .from("connectors")
+      .insert({
+        workspace_id: workspaceId,
+        provider: "google_ads",
+        name: body.customerName,
+        status: "active",
+        config: {
+          currency: body.currencyCode ?? "",
+          refresh_token: refreshToken,
+        },
+        external_account_id: body.customerId,
+        external_account_name: body.customerName,
+        connected_by: user.id,
+      })
+      .select("id")
+      .single();
 
     if (insertError) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
+
+    await dualWriteGoogleAdsToken(inserted?.id ?? null, refreshToken);
 
     // Consume the refresh_token cookie — it is now persisted to connectors.config.
     cookieStore.delete(GOOGLE_ADS_REFRESH_TOKEN_COOKIE);

@@ -7,7 +7,29 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getLatestMetaPendingSession } from "@/lib/meta/pending";
 import { metaTokenExpiresAt, type MetaConnectorConfig } from "@/lib/meta/token";
+import { storeConnectorToken } from "@/lib/data/connector-credentials";
 import { ensureWorkspaceSyncSchedule } from "@/lib/sync/ensure-workspace-schedule";
+
+/**
+ * C2 dual-write: store the encrypted access-token envelope alongside the
+ * existing connectors.config write. Best-effort — a vault failure must never
+ * break the connect flow. connectors.config stays authoritative until PR 4.
+ */
+async function dualWriteMetaToken(
+  connectorId: string | null,
+  accessToken: string | null
+): Promise<void> {
+  if (!connectorId || !accessToken) return;
+  try {
+    await storeConnectorToken({
+      connectorId,
+      accessToken,
+      tokenExpiresAt: metaTokenExpiresAt(),
+    });
+  } catch (err) {
+    console.error("[C2] meta connect dual-write failed:", err);
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -92,6 +114,7 @@ export async function POST(request: Request) {
         })
         .eq("id", existingConnector.id);
 
+      await dualWriteMetaToken(existingConnector.id, accessToken);
       await ensureWorkspaceSyncSchedule(workspaceId).catch(() => {});
       return NextResponse.json({ ok: true, duplicate: true });
     }
@@ -117,6 +140,7 @@ export async function POST(request: Request) {
       );
     }
 
+    await dualWriteMetaToken(data?.[0]?.id ?? null, accessToken);
     await ensureWorkspaceSyncSchedule(workspaceId).catch(() => {});
     return NextResponse.json({ ok: true, connector: data });
   } catch (err) {
