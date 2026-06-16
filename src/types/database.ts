@@ -160,6 +160,9 @@ export type Database = {
           access_token_ciphertext: string;
           access_token_iv: string;
           access_token_tag: string;
+          refresh_token_ciphertext: string | null;
+          refresh_token_iv: string | null;
+          refresh_token_tag: string | null;
           token_expires_at: string | null;
           key_version: number;
           created_at: string;
@@ -170,6 +173,9 @@ export type Database = {
           access_token_ciphertext: string;
           access_token_iv: string;
           access_token_tag: string;
+          refresh_token_ciphertext?: string | null;
+          refresh_token_iv?: string | null;
+          refresh_token_tag?: string | null;
           token_expires_at?: string | null;
           key_version?: number;
           created_at?: string;
@@ -180,6 +186,9 @@ export type Database = {
           access_token_ciphertext?: string;
           access_token_iv?: string;
           access_token_tag?: string;
+          refresh_token_ciphertext?: string | null;
+          refresh_token_iv?: string | null;
+          refresh_token_tag?: string | null;
           token_expires_at?: string | null;
           key_version?: number;
           created_at?: string;
