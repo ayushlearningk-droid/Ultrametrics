@@ -2,7 +2,7 @@ import { google } from "googleapis";
 import { requireGoogleOAuthConfig } from "@/lib/google/config";
 import { getActiveMetaToken, markMetaConnectorTokenError } from "@/lib/meta/token";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { storeConnectorToken } from "@/lib/data/connector-credentials";
+import { storeConnectorToken, getConnectorToken } from "@/lib/data/connector-credentials";
 
 const META_GRAPH_VERSION = "v23.0";
 const SHEET_TAB_NAME = "Ultrametrics";
@@ -314,6 +314,19 @@ export async function runMetaToGoogleSheetsSyncForWorkspace(
   }
 
   const googleConfig = (googleConnector.config ?? {}) as GoogleConnectorConfig;
+
+  // C2 vault-first read with config fallback. Override the plaintext config
+  // tokens with the encrypted envelope when present; on any vault failure the
+  // config values remain (config is authoritative until the plaintext purge).
+  try {
+    const vault = await getConnectorToken(googleConnector.id);
+    if (vault?.accessToken) googleConfig.access_token = vault.accessToken;
+    if (vault?.refreshToken) googleConfig.refresh_token = vault.refreshToken;
+    if (vault?.tokenExpiresAt) googleConfig.token_expires_at = vault.tokenExpiresAt;
+  } catch (err) {
+    console.error("[C2] google vault read failed (meta sync), using config fallback:", err);
+  }
+
   const spreadsheetId = googleConfig.spreadsheet_id;
 
   if (!spreadsheetId) {

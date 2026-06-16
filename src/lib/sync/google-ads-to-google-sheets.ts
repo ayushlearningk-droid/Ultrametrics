@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { requireGoogleOAuthConfig } from "@/lib/google/config";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getConnectorToken } from "@/lib/data/connector-credentials";
 import {
   getCampaignInsights,
   refreshGoogleAdsAccessToken,
@@ -232,6 +233,16 @@ export async function runGoogleAdsToGoogleSheetsSyncForWorkspace(
   }
 
   const sheetsConfig = (sheetsConnector.config ?? {}) as GoogleSheetsConnectorConfig;
+
+  // C2 vault-first read with config fallback for the Google Sheets connector.
+  try {
+    const vault = await getConnectorToken(sheetsConnector.id);
+    if (vault?.accessToken) sheetsConfig.access_token = vault.accessToken;
+    if (vault?.refreshToken) sheetsConfig.refresh_token = vault.refreshToken;
+  } catch (err) {
+    console.error("[C2] google sheets vault read failed (ads sync), using config fallback:", err);
+  }
+
   const spreadsheetId = sheetsConfig.spreadsheet_id;
 
   if (!spreadsheetId) {
@@ -254,13 +265,24 @@ export async function runGoogleAdsToGoogleSheetsSyncForWorkspace(
   let insights: GoogleAdsCampaignRow[] = [];
   const adsConfig = (adsConnector?.config ?? {}) as GoogleAdsConnectorConfig;
 
-  if (adsConnector?.external_account_id && adsConfig.refresh_token) {
+  // C2 vault-first read with config fallback for the Google Ads refresh token.
+  let adsRefreshToken = adsConfig.refresh_token ?? null;
+  if (adsConnector?.id) {
+    try {
+      const vault = await getConnectorToken(adsConnector.id);
+      if (vault?.refreshToken) adsRefreshToken = vault.refreshToken;
+    } catch (err) {
+      console.error("[C2] google ads vault read failed, using config fallback:", err);
+    }
+  }
+
+  if (adsConnector?.external_account_id && adsRefreshToken) {
     const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim();
     const mccCustomerId = process.env.GOOGLE_ADS_MCC_CUSTOMER_ID?.trim();
 
     if (developerToken && mccCustomerId) {
       try {
-        const accessToken = await refreshGoogleAdsAccessToken(adsConfig.refresh_token);
+        const accessToken = await refreshGoogleAdsAccessToken(adsRefreshToken);
         insights = await getCampaignInsights(
           accessToken,
           developerToken,
