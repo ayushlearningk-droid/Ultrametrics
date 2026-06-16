@@ -134,10 +134,6 @@ export async function listAccessibleCustomers(
   const requestUrl = `${GOOGLE_ADS_API_BASE}/customers:listAccessibleCustomers`;
 
   // --- DIAGNOSTIC: inputs ---
-  console.log("[GoogleAds][diag] access_token length:", accessToken.length);
-  console.log("[GoogleAds][diag] access_token prefix (first 20):", accessToken.slice(0, 20));
-  console.log("[GoogleAds][diag] developer-token length:", developerToken.length);
-  console.log("[GoogleAds][diag] developer-token prefix (first 5):", developerToken.slice(0, 5));
   console.log("[GoogleAds][diag] mccCustomerId received:", mccCustomerId ? `"${mccCustomerId}" (len=${mccCustomerId.length})` : "(empty or undefined)");
 
   // --- DIAGNOSTIC: headers being built ---

@@ -119,10 +119,6 @@ export async function getCampaignInsights(
   console.log("[GoogleAds][insights] customerId has dashes:", customerId.includes("-"));
   console.log("[GoogleAds][insights] mccCustomerId (login-customer-id header):", mccCustomerId || "(empty — header NOT sent)");
   console.log("[GoogleAds][insights] mccCustomerId has dashes:", mccCustomerId?.includes("-") ?? false);
-  console.log("[GoogleAds][insights] developerToken length:", developerToken.length);
-  console.log("[GoogleAds][insights] developerToken prefix (first 5):", developerToken.slice(0, 5));
-  console.log("[GoogleAds][insights] accessToken length:", accessToken.length);
-  console.log("[GoogleAds][insights] accessToken prefix (first 20):", accessToken.slice(0, 20));
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
