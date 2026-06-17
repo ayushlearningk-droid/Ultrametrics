@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/require-user";
-import { isWorkspaceMember } from "@/lib/api/workspace-access";
+import { requireWorkspaceRoleOrRedirect } from "@/lib/api/require-workspace-role";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { requireGoogleOAuthConfig } from "@/lib/google/config";
 import { clearGoogleOAuthCookies, readGoogleOAuthCookies } from "@/lib/google/oauth-cookies";
 import { storeConnectorToken } from "@/lib/data/connector-credentials";
@@ -49,11 +48,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/dashboard/connectors?error=invalid_state", request.url));
   }
 
-  const supabase = await createClient();
-  const allowed = await isWorkspaceMember(supabase, workspaceId, user.id);
-  if (!allowed) {
+  // RBAC: completing a connector OAuth flow is an owner/admin action.
+  const access = await requireWorkspaceRoleOrRedirect(
+    workspaceId,
+    ["owner", "admin"],
+    () => new URL("/dashboard/connectors?error=forbidden", request.url)
+  );
+  if (!access.ok) {
     await clearGoogleOAuthCookies();
-    return NextResponse.redirect(new URL("/dashboard/connectors?error=forbidden", request.url));
+    return NextResponse.redirect(access.redirect!);
   }
 
   try {
