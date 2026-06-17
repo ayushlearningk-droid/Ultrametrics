@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getLatestMetaPendingSession } from "@/lib/meta/pending";
 import { metaTokenExpiresAt, type MetaConnectorConfig } from "@/lib/meta/token";
 import { storeConnectorToken } from "@/lib/data/connector-credentials";
+import { requireWorkspaceWrite } from "@/lib/api/require-workspace-role";
 import { ensureWorkspaceSyncSchedule } from "@/lib/sync/ensure-workspace-schedule";
 
 /**
@@ -67,6 +68,12 @@ export async function POST(request: Request) {
         { error: "No active workspace found" },
         { status: 400 }
       );
+    }
+
+    // RBAC: connecting a connector is an owner/admin action.
+    const access = await requireWorkspaceWrite(workspaceId);
+    if (!access.ok) {
+      return NextResponse.json({ error: "Forbidden" }, { status: access.status });
     }
 
     const admin = createAdminClient();

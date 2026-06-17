@@ -1,8 +1,7 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/require-user";
-import { isWorkspaceMember } from "@/lib/api/workspace-access";
-import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceRoleOrRedirect } from "@/lib/api/require-workspace-role";
 import { getGoogleAdsConfig } from "@/lib/google-ads/config";
 import { setGoogleAdsOAuthCookies } from "@/lib/google-ads/oauth-cookies";
 import { googleAdsConnectUrl } from "@/lib/google-ads/oauth-redirect";
@@ -32,10 +31,14 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = await createClient();
-  const allowed = await isWorkspaceMember(supabase, workspaceId, user.id);
-  if (!allowed) {
-    return NextResponse.redirect(googleAdsConnectUrl({ error: "forbidden" }));
+  // RBAC: starting a connector OAuth flow is an owner/admin action.
+  const access = await requireWorkspaceRoleOrRedirect(
+    workspaceId,
+    ["owner", "admin"],
+    () => googleAdsConnectUrl({ error: "forbidden" })
+  );
+  if (!access.ok) {
+    return NextResponse.redirect(access.redirect!);
   }
 
   const state = randomBytes(32).toString("hex");

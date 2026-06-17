@@ -1,12 +1,11 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/require-user";
-import { isWorkspaceMember } from "@/lib/api/workspace-access";
+import { requireWorkspaceRoleOrRedirect } from "@/lib/api/require-workspace-role";
 import { getMetaOAuthConfig } from "@/lib/meta/config";
 import { setMetaOAuthCookies } from "@/lib/meta/oauth-cookies";
 import { metaConnectUrl } from "@/lib/meta/oauth-redirect";
 import { buildMetaAuthorizeUrl } from "@/lib/meta/oauth";
-import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -30,10 +29,14 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = await createClient();
-  const allowed = await isWorkspaceMember(supabase, workspaceId, user.id);
-  if (!allowed) {
-    return NextResponse.redirect(metaConnectUrl({ error: "forbidden" }));
+  // RBAC: starting a connector OAuth flow is an owner/admin action.
+  const access = await requireWorkspaceRoleOrRedirect(
+    workspaceId,
+    ["owner", "admin"],
+    () => metaConnectUrl({ error: "forbidden" })
+  );
+  if (!access.ok) {
+    return NextResponse.redirect(access.redirect!);
   }
 
   const state = randomBytes(32).toString("hex");

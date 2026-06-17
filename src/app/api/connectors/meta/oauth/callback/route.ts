@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/require-user";
-import { isWorkspaceMember } from "@/lib/api/workspace-access";
+import { requireWorkspaceRoleOrRedirect } from "@/lib/api/require-workspace-role";
 import {
   createOAuthPendingSession,
   deleteOAuthPendingForUserWorkspace,
@@ -15,7 +15,6 @@ import {
   exchangeCodeForAccessToken,
   exchangeForLongLivedToken,
 } from "@/lib/meta/oauth";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { storeConnectorToken } from "@/lib/data/connector-credentials";
 import { metaTokenExpiresAt, type MetaConnectorConfig } from "@/lib/meta/token";
@@ -60,11 +59,15 @@ console.log("=========================================");
     return NextResponse.redirect(metaConnectUrl({ error: "invalid_state" }));
   }
 
-  const supabase = await createClient();
-  const allowed = await isWorkspaceMember(supabase, workspaceId, user.id);
-  if (!allowed) {
+  // RBAC: completing a connector OAuth flow is an owner/admin action.
+  const access = await requireWorkspaceRoleOrRedirect(
+    workspaceId,
+    ["owner", "admin"],
+    () => metaConnectUrl({ error: "forbidden" })
+  );
+  if (!access.ok) {
     await clearMetaOAuthCookies();
-    return NextResponse.redirect(metaConnectUrl({ error: "forbidden" }));
+    return NextResponse.redirect(access.redirect!);
   }
 
   try {

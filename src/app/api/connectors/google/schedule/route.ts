@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/require-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
+import { requireWorkspaceWrite } from "@/lib/api/require-workspace-role";
 
 type ScheduleFrequency = "hourly" | "daily" | "weekly";
 
@@ -86,6 +87,12 @@ export async function POST(request: Request) {
       { error: "No active workspace found" },
       { status: 400 }
     );
+  }
+
+  // RBAC: changing the sync schedule is an owner/admin action.
+  const access = await requireWorkspaceWrite(workspaceId);
+  if (!access.ok) {
+    return NextResponse.json({ error: "Forbidden" }, { status: access.status });
   }
 
   const admin = createAdminClient();

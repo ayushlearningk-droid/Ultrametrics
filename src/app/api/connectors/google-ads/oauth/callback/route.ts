@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/api/require-user";
-import { isWorkspaceMember } from "@/lib/api/workspace-access";
+import { requireWorkspaceRoleOrRedirect } from "@/lib/api/require-workspace-role";
 import {
   createOAuthPendingSession,
   deleteOAuthPendingForUserWorkspace,
@@ -19,7 +19,6 @@ import {
   GOOGLE_ADS_OAUTH_PENDING_TTL_SECONDS,
   GOOGLE_ADS_REFRESH_TOKEN_COOKIE,
 } from "@/lib/google-ads/constants";
-import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -64,11 +63,15 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = await createClient();
-  const allowed = await isWorkspaceMember(supabase, workspaceId, user.id);
-  if (!allowed) {
+  // RBAC: completing a connector OAuth flow is an owner/admin action.
+  const access = await requireWorkspaceRoleOrRedirect(
+    workspaceId,
+    ["owner", "admin"],
+    () => googleAdsConnectUrl({ error: "forbidden" })
+  );
+  if (!access.ok) {
     await clearGoogleAdsOAuthCookies();
-    return NextResponse.redirect(googleAdsConnectUrl({ error: "forbidden" }));
+    return NextResponse.redirect(access.redirect!);
   }
 
   try {

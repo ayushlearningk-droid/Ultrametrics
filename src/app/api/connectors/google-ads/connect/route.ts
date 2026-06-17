@@ -10,6 +10,7 @@ import { deleteOAuthPendingForUserWorkspace } from "@/lib/data/oauth-pending";
 import { GOOGLE_ADS_REFRESH_TOKEN_COOKIE } from "@/lib/google-ads/constants";
 import { ensureWorkspaceSyncSchedule } from "@/lib/sync/ensure-workspace-schedule";
 import { storeConnectorToken } from "@/lib/data/connector-credentials";
+import { requireWorkspaceWrite } from "@/lib/api/require-workspace-role";
 
 /**
  * C2 fail-closed dual-write: Google Ads connectors store only a refresh token
@@ -64,6 +65,12 @@ export async function POST(request: Request) {
         { error: "No active workspace found" },
         { status: 400 }
       );
+    }
+
+    // RBAC: connecting a connector is an owner/admin action.
+    const access = await requireWorkspaceWrite(workspaceId);
+    if (!access.ok) {
+      return NextResponse.json({ error: "Forbidden" }, { status: access.status });
     }
 
     const admin = createAdminClient();
