@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/require-user";
+import { requireWorkspaceWrite } from "@/lib/api/require-workspace-role";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 import { runMetaToGoogleSheetsSyncForWorkspace } from "@/lib/sync/meta-to-google-sheets";
 
@@ -14,6 +15,12 @@ export async function POST(request: Request) {
 
   if (!workspaceId) {
     return NextResponse.json({ error: "No active workspace found" }, { status: 400 });
+  }
+
+  // RBAC: running a sync is an owner/admin action (members are read-only).
+  const access = await requireWorkspaceWrite(workspaceId);
+  if (!access.ok) {
+    return NextResponse.json({ error: "Forbidden" }, { status: access.status });
   }
 
   const result = await runMetaToGoogleSheetsSyncForWorkspace(workspaceId);
