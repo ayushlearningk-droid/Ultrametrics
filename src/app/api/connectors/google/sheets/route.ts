@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
 import { listSpreadsheets } from "@/lib/google/sheets";
 import { getConnectorToken } from "@/lib/data/connector-credentials";
+import { requireWorkspaceWrite } from "@/lib/api/require-workspace-role";
 
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -20,6 +21,12 @@ export async function GET(request: Request) {
       { error: "No active workspace found" },
       { status: 400 }
     );
+  }
+
+  // RBAC: listing spreadsheets is a privileged setup action (owner/admin only).
+  const access = await requireWorkspaceWrite(workspaceId);
+  if (!access.ok) {
+    return NextResponse.json({ error: "Forbidden" }, { status: access.status });
   }
 
   const admin = createAdminClient();
