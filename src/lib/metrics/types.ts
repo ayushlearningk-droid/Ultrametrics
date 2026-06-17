@@ -20,7 +20,57 @@ export type MetricsProvider =
   | "google_ads"
   | "ga4"
   | "shopify"
-  | "tiktok";
+  | "tiktok"
+  | "amazon_ads"
+  | "linkedin_ads";
+
+/**
+ * Canonical raw-metric catalog (Phase 4). The superset of additive raw metrics
+ * any provider can report. Provider capability descriptors declare which subset
+ * they populate (see ProviderCapabilities.rawMetrics in capabilities.ts).
+ *
+ * Additive by contract: new providers APPEND keys, never repurpose existing
+ * ones. RawMetricSet keeps its named ad-centric fields for now (Steps 1–2); the
+ * generalization of RawMetricSet to a catalog-keyed shape is a later, separate
+ * step — this union exists so capability descriptors can reference it today.
+ */
+export type MetricKey =
+  // Ads (Meta / Google / TikTok / Amazon / LinkedIn)
+  | "spend"
+  | "impressions"
+  | "clicks"
+  | "conversions"
+  | "reach"
+  | "revenue"
+  | "video_views"
+  | "leads"
+  // Analytics (GA4)
+  | "sessions"
+  | "users"
+  | "engaged_sessions"
+  // Commerce (Shopify)
+  | "orders"
+  | "refunds";
+
+/**
+ * Canonical derived-metric catalog (Phase 4). Ratios computed centrally in
+ * derive.ts from raw totals. A provider only exposes a derived key when its
+ * inputs are supported raw metrics (declared in ProviderCapabilities).
+ *  - ctr/cpc/cpm/roas: classic ad ratios (already produced by Steps 1–3)
+ *  - acos: spend / revenue (Amazon Ads; inverse of roas)
+ *  - aov: revenue / orders (commerce)
+ *  - conversion_rate: conversions / clicks
+ *  - engagement_rate: engaged_sessions / sessions (analytics)
+ */
+export type DerivedKey =
+  | "ctr"
+  | "cpc"
+  | "cpm"
+  | "roas"
+  | "acos"
+  | "aov"
+  | "conversion_rate"
+  | "engagement_rate";
 
 /** Time granularity of a metric result. */
 export type MetricsGranularity = "total" | "daily";

@@ -28,6 +28,7 @@ import type {
 import { toTotals } from "@/lib/metrics/derive";
 import { getAdapter } from "@/lib/metrics/registry";
 import { getConnectorsByWorkspace } from "@/lib/data/dashboard";
+import { getCached, setCached } from "@/lib/metrics/cache";
 
 /** Outcome of fetching metrics for a single connector. */
 export interface ProviderMetricsResult {
@@ -153,4 +154,32 @@ export async function fetchWorkspaceMetrics(
     granularity: query.granularity,
     providers,
   };
+}
+
+/**
+ * Canonical, cached entry point (Phase 4). The single symbol consumers
+ * (dashboard, AI tools, reports) should import. Wraps fetchWorkspaceMetrics with
+ * the workspace+query-scoped 5-minute cache.
+ *
+ * Caching policy: only fully-successful results are cached. If ANY provider
+ * returned status "error", the result is returned but NOT stored — transient
+ * upstream failures (e.g. 429) must not be pinned for the TTL. no_data and
+ * unsupported are stable outcomes and are cached normally.
+ *
+ * MUST be called only AFTER the caller's RBAC gate — the cache is keyed by
+ * workspaceId and performs no authorization itself.
+ */
+export async function getMetrics(
+  workspaceId: string,
+  query: MetricsQuery
+): Promise<WorkspaceMetrics> {
+  const cached = getCached(workspaceId, query);
+  if (cached) return cached;
+
+  const result = await fetchWorkspaceMetrics(workspaceId, query);
+
+  const hasError = result.providers.some((p) => p.status === "error");
+  if (!hasError) setCached(workspaceId, query, result);
+
+  return result;
 }
