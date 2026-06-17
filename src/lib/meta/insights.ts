@@ -71,3 +71,118 @@ export async function getAccountInsightsByDay(
   const json = await res.json();
   return (json.data ?? []) as DailyInsightRow[];
 }
+
+/* ─── Metrics-layer fetcher (canonical, raw) ──────────────────────────────── */
+
+/** Action-value entry from the Meta insights API. */
+type MetaActionValue = { action_type?: string; value?: string };
+
+/** One raw insights row from getAccountMetrics (revenue/conversions resolved). */
+export interface MetaMetricsRow {
+  /** Present only when granularity = "daily". */
+  date_start?: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  reach: number;
+  /** Monetary value of purchase conversions (from action_values). */
+  revenue: number;
+  /** Count of purchase conversions. */
+  conversions: number;
+}
+
+export interface GetAccountMetricsOptions {
+  since: string; // YYYY-MM-DD
+  until: string; // YYYY-MM-DD
+  granularity: "total" | "daily";
+  level?: "account" | "campaign";
+}
+
+const META_PURCHASE_ACTION_TYPES = new Set([
+  "offsite_conversion.fb_pixel_purchase",
+  "purchase",
+]);
+
+/** Sum the monetary value of purchase action_values. */
+function sumPurchaseValue(actions: MetaActionValue[] | undefined): number {
+  if (!actions) return 0;
+  return actions.reduce((acc, a) => {
+    if (a.action_type && META_PURCHASE_ACTION_TYPES.has(a.action_type)) {
+      return acc + parseFloat(a.value ?? "0");
+    }
+    return acc;
+  }, 0);
+}
+
+/** Count purchase conversion entries present in action_values. */
+function countPurchaseActions(actions: MetaActionValue[] | undefined): number {
+  if (!actions) return 0;
+  return actions.reduce(
+    (acc, a) =>
+      a.action_type && META_PURCHASE_ACTION_TYPES.has(a.action_type)
+        ? acc + 1
+        : acc,
+    0
+  );
+}
+
+/**
+ * Canonical raw metrics fetch for the metrics abstraction layer.
+ *
+ * Returns raw additive rows (spend, impressions, clicks, reach, revenue,
+ * conversions) over an explicit date range — no ratio derivation (the metrics
+ * engine derives ctr/cpc/cpm/roas). Revenue/conversions come from action_values
+ * (purchase). For granularity "daily", rows carry date_start; for "total" a
+ * single aggregate row is returned.
+ */
+export async function getAccountMetrics(
+  accessToken: string,
+  accountId: string,
+  options: GetAccountMetricsOptions
+): Promise<MetaMetricsRow[]> {
+  const baseFields = ["spend", "impressions", "clicks", "reach", "action_values"];
+  const fields =
+    options.granularity === "daily"
+      ? ["date_start", ...baseFields]
+      : baseFields;
+
+  const params = new URLSearchParams({
+    fields: fields.join(","),
+    level: options.level ?? "account",
+    time_range: JSON.stringify({ since: options.since, until: options.until }),
+    limit: "5000",
+    access_token: accessToken,
+  });
+  if (options.granularity === "daily") {
+    params.set("time_increment", "1");
+  }
+
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/act_${accountId}/insights?${params}`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || "Failed to fetch Meta metrics");
+  }
+
+  const json = (await res.json()) as {
+    data?: Array<{
+      date_start?: string;
+      spend?: string;
+      impressions?: string;
+      clicks?: string;
+      reach?: string;
+      action_values?: MetaActionValue[];
+    }>;
+  };
+
+  return (json.data ?? []).map((row) => ({
+    ...(row.date_start ? { date_start: row.date_start } : {}),
+    spend: parseFloat(row.spend ?? "0"),
+    impressions: parseInt(row.impressions ?? "0", 10),
+    clicks: parseInt(row.clicks ?? "0", 10),
+    reach: parseInt(row.reach ?? "0", 10),
+    revenue: sumPurchaseValue(row.action_values),
+    conversions: countPurchaseActions(row.action_values),
+  }));
+}

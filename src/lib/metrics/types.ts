@@ -96,9 +96,25 @@ export interface MetricsQuery {
 }
 
 /**
+ * Raw, un-derived result returned by a connector adapter (Step 2). Adapters
+ * normalize a provider response into additive raw fields + currency only — they
+ * do NOT compute ctr/cpc/cpm/roas. The engine (Step 3) turns this into a full
+ * MetricSet via derive.ts. `rawTotals` is authoritative for totals; `series`
+ * (daily only) carries per-day raw rows.
+ */
+export interface RawMetricResult {
+  provider: MetricsProvider;
+  currency: string;
+  dateRange: MetricsDateRange;
+  granularity: MetricsGranularity;
+  rawTotals: RawMetricSet;
+  series?: MetricSeriesPoint[];
+}
+
+/**
  * Contract every connector adapter implements (Step 2). The adapter normalizes
  * a provider's response into raw, additive fields + currency; the engine derives
- * ratios. Returns null when the connector has no data (not zeros).
+ * ratios. Returns null when the connector has no data / is not connected.
  */
 export interface ConnectorMetricsAdapter {
   readonly provider: MetricsProvider;
@@ -106,5 +122,5 @@ export interface ConnectorMetricsAdapter {
     workspaceId: string,
     connectorId: string,
     query: MetricsQuery
-  ): Promise<MetricSet | null>;
+  ): Promise<RawMetricResult | null>;
 }

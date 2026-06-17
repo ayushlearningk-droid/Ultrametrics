@@ -10,7 +10,11 @@ export type GoogleAdsCampaignRow = {
   costCurrency: number; // costMicros / 1_000_000
   conversions: number;
   conversionsValue: number; // metrics.conversions_value (monetary)
+  currencyCode?: string; // customer.currency_code (ISO 4217)
 };
+
+/** Optional explicit date range (YYYY-MM-DD) for metrics queries. */
+export type GoogleAdsDateRange = { since: string; until: string };
 
 type GaqlErrorDetail = {
   "@type"?: string;
@@ -38,6 +42,9 @@ type GaqlSearchResponse = {
       conversions?: string;
       conversionsValue?: string;
     };
+    customer?: {
+      currencyCode?: string;
+    };
   }>;
   error?: {
     code?: number;
@@ -47,7 +54,16 @@ type GaqlSearchResponse = {
   };
 };
 
-const CAMPAIGN_INSIGHTS_QUERY = `
+/**
+ * Build the campaign-insights GAQL. With an explicit range, filters
+ * `segments.date BETWEEN`; without one, preserves the original
+ * `DURING LAST_30_DAYS` behaviour (backward compatible for existing callers).
+ */
+function buildCampaignInsightsQuery(range?: GoogleAdsDateRange): string {
+  const dateClause = range
+    ? `segments.date BETWEEN '${range.since}' AND '${range.until}'`
+    : "segments.date DURING LAST_30_DAYS";
+  return `
   SELECT
     campaign.id,
     campaign.name,
@@ -56,13 +72,15 @@ const CAMPAIGN_INSIGHTS_QUERY = `
     metrics.clicks,
     metrics.cost_micros,
     metrics.conversions,
-    metrics.conversions_value
+    metrics.conversions_value,
+    customer.currency_code
   FROM campaign
-  WHERE segments.date DURING LAST_30_DAYS
+  WHERE ${dateClause}
     AND campaign.status != 'REMOVED'
   ORDER BY segments.date DESC, metrics.impressions DESC
   LIMIT 2000
 `.trim();
+}
 
 export async function refreshGoogleAdsAccessToken(
   refreshToken: string
@@ -108,7 +126,8 @@ export async function getCampaignInsights(
   accessToken: string,
   developerToken: string,
   customerId: string,
-  mccCustomerId: string
+  mccCustomerId: string,
+  range?: GoogleAdsDateRange
 ): Promise<GoogleAdsCampaignRow[]> {
   const url = `${GOOGLE_ADS_API_BASE}/customers/${customerId}/googleAds:search`;
 
@@ -136,7 +155,7 @@ export async function getCampaignInsights(
   const res = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify({ query: CAMPAIGN_INSIGHTS_QUERY }),
+    body: JSON.stringify({ query: buildCampaignInsightsQuery(range) }),
     cache: "no-store",
   });
 
@@ -189,6 +208,7 @@ export async function getCampaignInsights(
       costCurrency: costMicros / 1_000_000,
       conversions: parseFloat(row.metrics?.conversions ?? "0"),
       conversionsValue: parseFloat(row.metrics?.conversionsValue ?? "0"),
+      currencyCode: row.customer?.currencyCode,
     };
   });
 }
