@@ -188,6 +188,7 @@ export function AskDrawer() {
                     m.role === "assistant" &&
                     i === messages.length - 1
                   }
+                  onPrompt={sendPrompt}
                 />
               ))}
 

@@ -19,6 +19,9 @@ import {
   AlertTriangle,
   CircleDashed,
   Sparkles,
+  Activity,
+  ShieldAlert,
+  ArrowUpRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/os/markdown";
@@ -149,12 +152,20 @@ function extractStatuses(body: string): ConnectorStatus[] {
 
 const RECOMMENDATION_RE =
   /\b(recommendation|recommend|next step|action item|action|suggest)\b/i;
-const INSIGHT_RE =
-  /\b(reason|insight|takeaway|finding|summary|why|opportunit|issue|observation)\b/i;
+const DIAGNOSTIC_RE = /\b(why|cause|reason|finding|diagnos|changed)\b/i;
+const OPPORTUNITY_RE = /\b(opportunit|growth|upside|potential)\b/i;
+const RISK_RE = /\b(risk|issue|warning|concern)\b/i;
 const STATUS_HEADING_RE =
   /\b(status|connector|source|connected|platform)\b/i;
 
-type Kind = "metric" | "status" | "recommendation" | "insight" | "plain";
+type Kind =
+  | "metric"
+  | "status"
+  | "recommendation"
+  | "diagnostic"
+  | "opportunity"
+  | "risk"
+  | "plain";
 
 function classify(section: Section): {
   kind: Kind;
@@ -171,15 +182,47 @@ function classify(section: Section): {
   if (metrics.length >= 2) {
     return { kind: "metric", metrics, statuses };
   }
-  // Recommendations are checked before insights so an "action/recommend"
+  // Recommendations are checked before insight variants so an "action/recommend"
   // heading renders as a recommendation card, not a generic insight.
   if (RECOMMENDATION_RE.test(heading)) {
     return { kind: "recommendation", metrics, statuses };
   }
-  if (INSIGHT_RE.test(heading)) {
-    return { kind: "insight", metrics, statuses };
+  if (RISK_RE.test(heading)) {
+    return { kind: "risk", metrics, statuses };
+  }
+  if (OPPORTUNITY_RE.test(heading)) {
+    return { kind: "opportunity", metrics, statuses };
+  }
+  if (DIAGNOSTIC_RE.test(heading)) {
+    return { kind: "diagnostic", metrics, statuses };
   }
   return { kind: "plain", metrics, statuses };
+}
+
+/** Parse optional Action/Impact/CTA fields from a recommendation body. */
+interface RecommendationFields {
+  action: string;
+  impact: string;
+  cta: string;
+}
+
+function parseRecommendation(body: string): RecommendationFields | null {
+  const field = (name: string): string | null => {
+    const re = new RegExp(
+      `^\\s*[-*]?\\s*\\*{0,2}${name}\\*{0,2}\\s*:\\s*(.+)$`,
+      "im"
+    );
+    const m = re.exec(body);
+    return m ? clean(m[1]) : null;
+  };
+
+  const action = field("action");
+  const impact = field("impact");
+  const cta = field("cta");
+
+  // Structured card only when ALL THREE exist — never fabricate a field.
+  if (action && impact && cta) return { action, impact, cta };
+  return null;
 }
 
 /* ── Card primitives ─────────────────────────────────────────────────────── */
@@ -212,15 +255,62 @@ function MetricCards({ heading, metrics }: { heading: string | null; metrics: Me
   );
 }
 
-function InsightCard({ heading, body }: { heading: string | null; body: string }) {
+type InsightVariant = "diagnostic" | "opportunity" | "risk";
+
+const INSIGHT_STYLES: Record<
+  InsightVariant,
+  {
+    icon: typeof Lightbulb;
+    border: string;
+    bg: string;
+    title: string;
+    iconColor: string;
+    fallbackLabel: string;
+  }
+> = {
+  diagnostic: {
+    icon: Activity,
+    border: "border-sky-400/20",
+    bg: "bg-sky-400/[0.06]",
+    title: "text-sky-100",
+    iconColor: "text-sky-300",
+    fallbackLabel: "Why it changed",
+  },
+  opportunity: {
+    icon: TrendingUp,
+    border: "border-emerald-400/20",
+    bg: "bg-emerald-400/[0.06]",
+    title: "text-emerald-100",
+    iconColor: "text-emerald-300",
+    fallbackLabel: "Opportunity",
+  },
+  risk: {
+    icon: ShieldAlert,
+    border: "border-red-400/20",
+    bg: "bg-red-400/[0.06]",
+    title: "text-red-100",
+    iconColor: "text-red-300",
+    fallbackLabel: "Risk",
+  },
+};
+
+function InsightCard({
+  variant,
+  heading,
+  body,
+}: {
+  variant: InsightVariant;
+  heading: string | null;
+  body: string;
+}) {
+  const s = INSIGHT_STYLES[variant];
+  const Icon = s.icon;
   return (
-    <div className="rounded-xl border border-brand/20 bg-brand/[0.06] p-4">
-      {heading && (
-        <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
-          <Lightbulb className="h-4 w-4 text-brand" />
-          {heading}
-        </div>
-      )}
+    <div className={cn("rounded-xl border p-4", s.border, s.bg)}>
+      <div className={cn("mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold", s.title)}>
+        <Icon className={cn("h-4 w-4", s.iconColor)} />
+        {heading ?? s.fallbackLabel}
+      </div>
       <Markdown>{body}</Markdown>
     </div>
   );
@@ -229,17 +319,50 @@ function InsightCard({ heading, body }: { heading: string | null; body: string }
 function RecommendationCard({
   heading,
   body,
+  onPrompt,
 }: {
   heading: string | null;
   body: string;
+  onPrompt?: (text: string) => void;
 }) {
+  const fields = parseRecommendation(body);
+
+  // Fallback: no complete Action/Impact/CTA set → render markdown, never fake fields.
+  if (!fields) {
+    return (
+      <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
+        <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-emerald-200">
+          <Sparkles className="h-4 w-4 text-emerald-300" />
+          {heading ?? "Recommendation"}
+        </div>
+        <Markdown>{body}</Markdown>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-emerald-200">
-        <Sparkles className="h-4 w-4 text-emerald-300" />
-        {heading ?? "Recommendations"}
+      <div className="flex items-start gap-2">
+        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[14px] font-semibold text-foreground">
+            {fields.action}
+          </div>
+          <div className="mt-1 text-[12px] leading-relaxed text-foreground-muted">
+            <span className="font-medium text-emerald-300/90">Impact: </span>
+            {fields.impact}
+          </div>
+          <button
+            type="button"
+            onClick={() => onPrompt?.(fields.cta)}
+            disabled={!onPrompt}
+            className="mt-3 inline-flex items-center gap-1 rounded-lg bg-emerald-400/15 px-3 py-1.5 text-[12px] font-medium text-emerald-200 transition-colors hover:bg-emerald-400/25 disabled:cursor-default disabled:opacity-60"
+          >
+            {fields.cta}
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
-      <Markdown>{body}</Markdown>
     </div>
   );
 }
@@ -318,10 +441,12 @@ function reconstruct(section: Section): string {
 
 export interface AiResponseProps {
   content: string;
+  /** Interactive CTA handler (reuses the existing send path). Optional. */
+  onPrompt?: (text: string) => void;
 }
 
 /** Render an AI markdown answer as structured cards, with markdown fallback. */
-export function AiResponse({ content }: AiResponseProps) {
+export function AiResponse({ content, onPrompt }: AiResponseProps) {
   const sections = parseSections(content);
 
   // No headings → nothing to structure; render straight markdown.
@@ -341,11 +466,23 @@ export function AiResponse({ content }: AiResponseProps) {
         }
         if (kind === "recommendation") {
           return (
-            <RecommendationCard key={i} heading={section.heading} body={section.body} />
+            <RecommendationCard
+              key={i}
+              heading={section.heading}
+              body={section.body}
+              onPrompt={onPrompt}
+            />
           );
         }
-        if (kind === "insight") {
-          return <InsightCard key={i} heading={section.heading} body={section.body} />;
+        if (kind === "diagnostic" || kind === "opportunity" || kind === "risk") {
+          return (
+            <InsightCard
+              key={i}
+              variant={kind}
+              heading={section.heading}
+              body={section.body}
+            />
+          );
         }
         return <Markdown key={i}>{reconstruct(section)}</Markdown>;
       })}

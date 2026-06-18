@@ -16,9 +16,11 @@ export interface ChatMessageProps {
   content: string;
   /** When true, show a blinking cursor after the (assistant) content. */
   streaming?: boolean;
+  /** Interactive CTA handler for assistant recommendation cards. */
+  onPrompt?: (text: string) => void;
 }
 
-export function ChatMessage({ role, content, streaming }: ChatMessageProps) {
+export function ChatMessage({ role, content, streaming, onPrompt }: ChatMessageProps) {
   if (role === "user") {
     return (
       <div className="flex justify-end">
@@ -32,7 +34,7 @@ export function ChatMessage({ role, content, streaming }: ChatMessageProps) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] min-w-0">
-        <AiResponse content={content} />
+        <AiResponse content={content} onPrompt={onPrompt} />
         {streaming && (
           <span className="ml-0.5 animate-pulse text-foreground/70">▋</span>
         )}
