@@ -9,7 +9,6 @@
  * Pure presentation — no state, no data. NO drawer / provider / shell wiring.
  */
 
-import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/os/markdown";
 
 export interface ChatMessageProps {
@@ -23,7 +22,7 @@ export function ChatMessage({ role, content, streaming }: ChatMessageProps) {
   if (role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md border border-white/[0.08] bg-white/[0.06] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-foreground shadow-sm">
+        <div className="max-w-[85%] rounded-2xl rounded-br-md border border-emerald-400/25 bg-emerald-400/[0.10] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-foreground shadow-lg shadow-emerald-500/10">
           <span className="whitespace-pre-wrap">{content}</span>
         </div>
       </div>

@@ -22,6 +22,30 @@ import { ChatMessage } from "@/components/os/chat-message";
 /** Distance (px) from the bottom within which we treat the user as "at bottom". */
 const NEAR_BOTTOM_PX = 80;
 
+/** Empty-state starter chips. Each sends a metrics-grounded analytics prompt. */
+const PROMPT_CHIPS: { label: string; prompt: string }[] = [
+  {
+    label: "Analyze ROAS",
+    prompt:
+      "Analyze my ROAS across all connected sources for the last 30 days. Use the metrics tools and explain what's driving it.",
+  },
+  {
+    label: "Compare Channels",
+    prompt:
+      "Compare performance across my connected ad channels for the last 30 days — spend, conversions, and ROAS side by side.",
+  },
+  {
+    label: "Top Campaigns",
+    prompt:
+      "Show my top-performing campaigns over the last 30 days based on the available metrics.",
+  },
+  {
+    label: "Find Performance Issues",
+    prompt:
+      "Review my metrics for the last 30 days and flag any unusual changes or underperforming areas, grounded in the data.",
+  },
+];
+
 export function AskDrawer() {
   const { messages, streaming, error, isOpen, close, send } = useAsk();
 
@@ -63,6 +87,12 @@ export function AskDrawer() {
     atBottomRef.current = true;
   }
 
+  function sendPrompt(prompt: string) {
+    if (streaming) return;
+    void send(prompt);
+    atBottomRef.current = true;
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     submit();
@@ -93,7 +123,7 @@ export function AskDrawer() {
 
           {/* Drawer panel */}
           <motion.aside
-            className="fixed inset-y-0 right-0 z-[61] flex w-full flex-col border-l border-white/[0.08] bg-[hsl(var(--card))] shadow-2xl md:w-[560px]"
+            className="fixed inset-y-0 right-0 z-[61] flex w-full flex-col border-l border-white/[0.08] bg-[hsl(var(--card))] shadow-2xl md:w-[680px]"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -102,10 +132,16 @@ export function AskDrawer() {
             aria-label="Ask Ultrametrics"
           >
             {/* Header */}
-            <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.07] px-5">
-              <span className="type-body font-semibold tracking-tight">
-                Ask Ultra<span className="text-brand">metrics</span>
-              </span>
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/[0.07] px-6">
+              <div className="flex flex-col gap-0.5">
+                <span className="type-body font-semibold tracking-tight">
+                  Ask Ultra<span className="text-brand">metrics</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-foreground-muted">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_0] shadow-emerald-400/60" />
+                  AI Online
+                </span>
+              </div>
               <button
                 onClick={close}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-white/[0.05] hover:text-foreground"
@@ -119,12 +155,27 @@ export function AskDrawer() {
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="flex-1 space-y-4 overflow-y-auto px-5 py-4"
+              className="flex-1 space-y-6 overflow-y-auto px-6 py-6"
             >
               {messages.length === 0 && !error && (
-                <p className="mt-8 text-center text-[13px] text-foreground-muted">
-                  Ask about your campaigns, spend, or performance.
-                </p>
+                <div className="mt-6 space-y-4">
+                  <p className="text-[13px] font-medium text-foreground/70">
+                    What would you like to look into?
+                  </p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {PROMPT_CHIPS.map((chip) => (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        onClick={() => sendPrompt(chip.prompt)}
+                        disabled={streaming}
+                        className="rounded-xl border border-white/[0.08] bg-white/[0.025] px-3.5 py-3 text-left text-[13px] font-medium text-foreground/80 transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-foreground disabled:opacity-40"
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {messages.map((m, i) => (
