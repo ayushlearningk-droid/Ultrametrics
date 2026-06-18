@@ -96,6 +96,11 @@ export interface GetAccountMetricsOptions {
   until: string; // YYYY-MM-DD
   granularity: "total" | "daily";
   level?: "account" | "campaign";
+  /**
+   * Time window. "range" (default) uses the explicit since/until via time_range.
+   * "lifetime" uses date_preset=maximum (all-time) and ignores since/until.
+   */
+  mode?: "range" | "lifetime";
 }
 
 const META_PURCHASE_ACTION_TYPES = new Set([
@@ -149,10 +154,18 @@ export async function getAccountMetrics(
   const params = new URLSearchParams({
     fields: fields.join(","),
     level: options.level ?? "account",
-    time_range: JSON.stringify({ since: options.since, until: options.until }),
     limit: "5000",
     access_token: accessToken,
   });
+  // Lifetime → all-time via date_preset=maximum; range → explicit time_range.
+  if (options.mode === "lifetime") {
+    params.set("date_preset", "maximum");
+  } else {
+    params.set(
+      "time_range",
+      JSON.stringify({ since: options.since, until: options.until })
+    );
+  }
   if (options.granularity === "daily") {
     params.set("time_increment", "1");
   }

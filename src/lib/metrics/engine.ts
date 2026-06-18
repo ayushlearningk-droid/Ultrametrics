@@ -20,6 +20,7 @@
 import type {
   MetricsProvider,
   MetricsQuery,
+  MetricsMode,
   MetricsDateRange,
   MetricsGranularity,
   MetricSet,
@@ -45,6 +46,8 @@ export interface ProviderMetricsResult {
   metrics: MetricSet | null;
   /** Present only when status === "error". */
   error?: string;
+  /** Which time window produced this result ("range" default, or "lifetime"). */
+  windowUsed?: MetricsMode;
 }
 
 /** Per-provider workspace metrics (no blended aggregate in Step 3). */
@@ -80,21 +83,23 @@ export async function fetchProviderMetrics(
   provider: MetricsProvider,
   query: MetricsQuery
 ): Promise<ProviderMetricsResult> {
+  const windowUsed: MetricsMode = query.mode ?? "range";
   const adapter = getAdapter(provider);
   if (!adapter) {
-    return { provider, connectorId, status: "unsupported", metrics: null };
+    return { provider, connectorId, status: "unsupported", metrics: null, windowUsed };
   }
 
   try {
     const raw = await adapter.fetch(workspaceId, connectorId, query);
     if (!raw) {
-      return { provider, connectorId, status: "no_data", metrics: null };
+      return { provider, connectorId, status: "no_data", metrics: null, windowUsed };
     }
     return {
       provider,
       connectorId,
       status: "ok",
       metrics: toMetricSet(raw),
+      windowUsed,
     };
   } catch (err) {
     return {
@@ -103,6 +108,7 @@ export async function fetchProviderMetrics(
       status: "error",
       metrics: null,
       error: err instanceof Error ? err.message : String(err),
+      windowUsed,
     };
   }
 }
@@ -182,4 +188,43 @@ export async function getMetrics(
   if (!hasError) setCached(workspaceId, query, result);
 
   return result;
+}
+
+/**
+ * Default-range fetch with per-provider lifetime fallback (Phase 4+).
+ *
+ * Runs the requested (range) query via getMetrics, then — for each provider that
+ * came back "no_data" — retries that ONE provider in "lifetime" mode. If the
+ * lifetime retry is "ok" it replaces the result; otherwise the original no_data
+ * is kept. Providers that already had data, errored, or are unsupported are left
+ * untouched. Each result carries windowUsed so consumers can label the window.
+ *
+ * The base (range) pass is cached by getMetrics; the per-provider lifetime
+ * retries are uncached (they only fire on the empty-data path).
+ */
+export async function getMetricsWithFallback(
+  workspaceId: string,
+  query: MetricsQuery
+): Promise<WorkspaceMetrics> {
+  const base = await getMetrics(workspaceId, query);
+
+  const providers = await Promise.all(
+    base.providers.map(async (p) => {
+      if (p.status !== "no_data") return p;
+
+      const lifetime = await fetchProviderMetrics(
+        workspaceId,
+        p.connectorId,
+        p.provider,
+        { ...query, mode: "lifetime" }
+      );
+      return lifetime.status === "ok" ? lifetime : p;
+    })
+  );
+
+  return {
+    dateRange: base.dateRange,
+    granularity: base.granularity,
+    providers,
+  };
 }

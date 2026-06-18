@@ -75,6 +75,17 @@ export type DerivedKey =
 /** Time granularity of a metric result. */
 export type MetricsGranularity = "total" | "daily";
 
+/**
+ * Which time window a fetch targeted (default-range policy, Phase 4+):
+ *  - "range"    → an explicit/default bounded window (e.g. the trailing 180 days)
+ *  - "lifetime" → all-time (Meta date_preset=maximum; Google a wide BETWEEN)
+ *
+ * Carried on MetricsQuery as the requested mode, and reported back per provider
+ * as `windowUsed` (on ProviderMetricsResult in engine.ts) so consumers can label
+ * results and never compare metrics across different windows.
+ */
+export type MetricsMode = "range" | "lifetime";
+
 /** Aggregation level requested from a provider, when applicable. */
 export type MetricsLevel = "account" | "campaign";
 
@@ -143,6 +154,11 @@ export interface MetricsQuery {
   dateRange: MetricsDateRange;
   granularity: MetricsGranularity;
   level?: MetricsLevel;
+  /**
+   * Time-window mode. Defaults to "range" (the bounded dateRange) when omitted;
+   * "lifetime" requests all-time and ignores dateRange at the adapter level.
+   */
+  mode?: MetricsMode;
 }
 
 /**

@@ -83,13 +83,20 @@ export const googleAdsMetricsAdapter: ConnectorMetricsAdapter = {
     const mccCustomerId = process.env.GOOGLE_ADS_MCC_CUSTOMER_ID?.trim();
     if (!developerToken || !mccCustomerId) return null;
 
+    // Google Ads (GAQL) has no all-time preset, so lifetime is a wide explicit
+    // window: 2015-01-01 → today. Range mode uses the requested dateRange.
+    const range =
+      query.mode === "lifetime"
+        ? { since: "2015-01-01", until: new Date().toISOString().slice(0, 10) }
+        : { since: query.dateRange.since, until: query.dateRange.until };
+
     const accessToken = await refreshGoogleAdsAccessToken(refreshToken);
     const rows = await getCampaignInsights(
       accessToken,
       developerToken,
       String(connector.external_account_id),
       mccCustomerId,
-      { since: query.dateRange.since, until: query.dateRange.until }
+      range
     );
     if (rows.length === 0) return null;
 
@@ -105,7 +112,7 @@ export const googleAdsMetricsAdapter: ConnectorMetricsAdapter = {
     return {
       provider: "google_ads",
       currency,
-      dateRange: query.dateRange,
+      dateRange: range,
       granularity: query.granularity,
       rawTotals,
       series,

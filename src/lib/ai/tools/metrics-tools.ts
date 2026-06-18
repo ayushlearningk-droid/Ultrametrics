@@ -15,6 +15,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type {
   MetricsProvider,
   MetricsQuery,
+  MetricsDateRange,
   MetricsGranularity,
   MetricsLevel,
   MetricSet,
@@ -23,7 +24,7 @@ import type {
 } from "@/lib/metrics/types";
 import type { WorkspaceContext } from "@/lib/ai/types";
 import type { ProviderMetricsResult } from "@/lib/metrics/engine";
-import { getMetrics } from "@/lib/metrics/engine";
+import { getMetricsWithFallback } from "@/lib/metrics/engine";
 import { getCapabilities } from "@/lib/metrics/registry";
 import { CAPABILITIES } from "@/lib/metrics/capabilities";
 
@@ -74,11 +75,46 @@ function asProvider(value: unknown): MetricsProvider {
   );
 }
 
-function buildQuery(input: Record<string, unknown>): MetricsQuery {
+/** The trailing-180-day window ending at todayISO (inclusive), as ISO dates. */
+function last180(todayISO: string): MetricsDateRange {
+  const d = new Date(`${todayISO}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 180);
+  return { since: d.toISOString().slice(0, 10), until: todayISO };
+}
+
+/**
+ * Build a MetricsQuery from model input. When the model supplies both since and
+ * until, use them (mode "range"). When dates are omitted, default to the trailing
+ * 180 days, total granularity, mode "range" — the engine then falls back to
+ * lifetime per-provider when 180 days is empty.
+ */
+function buildQuery(
+  input: Record<string, unknown>,
+  todayISO: string
+): MetricsQuery {
+  const hasDates =
+    typeof input.since === "string" &&
+    ISO_DATE.test(input.since) &&
+    typeof input.until === "string" &&
+    ISO_DATE.test(input.until);
+
+  if (hasDates) {
+    return {
+      dateRange: {
+        since: asDate(input.since, "since"),
+        until: asDate(input.until, "until"),
+      },
+      granularity: asGranularity(input.granularity),
+      level: asLevel(input.level),
+      mode: "range",
+    };
+  }
+
   return {
-    dateRange: { since: asDate(input.since, "since"), until: asDate(input.until, "until") },
-    granularity: asGranularity(input.granularity),
+    dateRange: last180(todayISO),
+    granularity: "total",
     level: asLevel(input.level),
+    mode: "range",
   };
 }
 
@@ -114,12 +150,14 @@ function serializeProviderResult(r: ProviderMetricsResult) {
     return {
       provider: r.provider,
       status: r.status,
+      window_used: r.windowUsed ?? "range",
       ...(r.error ? { error: r.error } : {}),
     };
   }
   return {
     provider: r.provider,
     status: r.status,
+    window_used: r.windowUsed ?? "range",
     ...serializeTotals(r.provider, r.metrics),
   };
 }
@@ -128,12 +166,12 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_workspace_metrics",
     description:
-      "Get advertising/commerce metrics for ALL connected sources in the current workspace over a date range. Returns one entry per source with its status (ok/no_data/unsupported/error), currency, raw metrics, and derived ratios. Use this for cross-source or 'overall' questions.",
+      "Get advertising/commerce metrics for ALL connected sources in the current workspace. Omit since/until to use the default window (last 180 days, with automatic per-source fallback to all-time when 180 days is empty). Returns one entry per source with its status (ok/no_data/unsupported/error), window_used, currency, raw metrics, and derived ratios. Use this for cross-source or 'overall' questions.",
     input_schema: {
       type: "object",
       properties: {
-        since: { type: "string", description: "Start date, inclusive (YYYY-MM-DD)" },
-        until: { type: "string", description: "End date, inclusive (YYYY-MM-DD)" },
+        since: { type: "string", description: "Optional start date, inclusive (YYYY-MM-DD). Omit for the default window." },
+        until: { type: "string", description: "Optional end date, inclusive (YYYY-MM-DD). Omit for the default window." },
         granularity: {
           type: "string",
           enum: ["total", "daily"],
@@ -145,13 +183,12 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
           description: "Aggregation level when supported. Default account.",
         },
       },
-      required: ["since", "until"],
     },
   },
   {
     name: "get_provider_metrics",
     description:
-      "Get metrics for ONE specific source (e.g. meta_ads, google_ads) over a date range. Use when the user asks about a single platform.",
+      "Get metrics for ONE specific source (e.g. meta_ads, google_ads). Omit since/until to use the default window (last 180 days, with automatic fallback to all-time when empty). Use when the user asks about a single platform.",
     input_schema: {
       type: "object",
       properties: {
@@ -159,15 +196,15 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
           type: "string",
           description: `The source. One of: ${Object.keys(CAPABILITIES).join(", ")}`,
         },
-        since: { type: "string", description: "Start date, inclusive (YYYY-MM-DD)" },
-        until: { type: "string", description: "End date, inclusive (YYYY-MM-DD)" },
+        since: { type: "string", description: "Optional start date, inclusive (YYYY-MM-DD). Omit for the default window." },
+        until: { type: "string", description: "Optional end date, inclusive (YYYY-MM-DD). Omit for the default window." },
         granularity: {
           type: "string",
           enum: ["total", "daily"],
           description: "total = one aggregate; daily = per-day series. Default total.",
         },
       },
-      required: ["provider", "since", "until"],
+      required: ["provider"],
     },
   },
   {
@@ -180,8 +217,8 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
 
 export const metricsToolHandlers: Record<string, ReadToolHandler> = {
   async get_workspace_metrics(input, ctx) {
-    const query = buildQuery(input);
-    const result = await getMetrics(ctx.workspaceId, query);
+    const query = buildQuery(input, ctx.todayISO);
+    const result = await getMetricsWithFallback(ctx.workspaceId, query);
     return JSON.stringify({
       dateRange: result.dateRange,
       granularity: result.granularity,
@@ -191,11 +228,11 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
 
   async get_provider_metrics(input, ctx) {
     const provider = asProvider(input.provider);
-    const query = buildQuery(input);
-    // Go through the workspace engine (correct connector resolution + cache),
-    // then narrow to the requested provider. A provider with no active
-    // connector simply isn't in the result → report it as not connected.
-    const result = await getMetrics(ctx.workspaceId, query);
+    const query = buildQuery(input, ctx.todayISO);
+    // Go through the workspace engine (correct connector resolution + cache +
+    // per-provider lifetime fallback), then narrow to the requested provider. A
+    // provider with no active connector simply isn't in the result.
+    const result = await getMetricsWithFallback(ctx.workspaceId, query);
     const match = result.providers.find((p) => p.provider === provider);
     if (!match) {
       return JSON.stringify({ provider, status: "unsupported" });

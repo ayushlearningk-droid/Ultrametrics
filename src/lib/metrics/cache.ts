@@ -51,6 +51,10 @@ export function cacheKey(workspaceId: string, query: MetricsQuery): string {
     until: query.dateRange.until,
     granularity: query.granularity,
     level: query.level ?? null,
+    // Mode must be part of the key: a "range" (180d) and a "lifetime" fetch can
+    // share the same dateRange yet return different data — without this they'd
+    // collide and serve the wrong window.
+    mode: query.mode ?? "range",
   };
   return `${workspaceId}::${JSON.stringify(normalized)}`;
 }
