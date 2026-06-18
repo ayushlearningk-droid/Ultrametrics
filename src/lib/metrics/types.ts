@@ -136,9 +136,21 @@ export interface MetricSeriesPoint extends RawMetricSet {
 }
 
 /**
+ * Derived per-campaign breakdown entry (Issue #3, campaign-level V1). Totals are
+ * raw + derived ratios for a single campaign. Present only when a fetch was made
+ * at level "campaign". No per-campaign series in V1.
+ */
+export interface CampaignBreakdown {
+  campaignId: string;
+  campaignName: string;
+  totals: MetricTotals;
+}
+
+/**
  * The canonical result returned by the engine for one provider (or blended).
  * `currency` is the ISO code the monetary fields are expressed in. `series` is
- * present only for daily granularity.
+ * present only for daily granularity. `campaigns` is present only when the fetch
+ * was made at level "campaign" (Issue #3); account-level fetches omit it.
  */
 export interface MetricSet {
   provider: MetricsProvider;
@@ -147,6 +159,7 @@ export interface MetricSet {
   granularity: MetricsGranularity;
   totals: MetricTotals;
   series?: MetricSeriesPoint[];
+  campaigns?: CampaignBreakdown[];
 }
 
 /** Query parameters for a metrics fetch. */
@@ -175,6 +188,19 @@ export interface RawMetricResult {
   granularity: MetricsGranularity;
   rawTotals: RawMetricSet;
   series?: MetricSeriesPoint[];
+  campaigns?: CampaignRawBreakdown[];
+}
+
+/**
+ * Raw, un-derived per-campaign breakdown entry (Issue #3). One additive
+ * RawMetricSet scoped to a single campaign. Adapters populate this only when the
+ * query level is "campaign"; the engine derives ratios into CampaignBreakdown.
+ * Invariant: the sum of all campaigns' rawTotals equals the account rawTotals.
+ */
+export interface CampaignRawBreakdown {
+  campaignId: string;
+  campaignName: string;
+  rawTotals: RawMetricSet;
 }
 
 /**
