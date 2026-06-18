@@ -15,6 +15,7 @@ import type {
   RawMetricSet,
   MetricSeriesPoint,
   CampaignRawBreakdown,
+  AssetRawBreakdown,
 } from "@/lib/metrics/types";
 import type { MetaMetricsRow } from "@/lib/meta/insights";
 import { getActiveMetaToken } from "@/lib/meta/token";
@@ -56,6 +57,29 @@ function groupByCampaign(rows: MetaMetricsRow[]): CampaignRawBreakdown[] {
   }));
 }
 
+/**
+ * Group ad-level rows by ad_id into per-ad raw totals (AI-002). Rows lacking an
+ * ad_id are skipped. Flat (not nested under campaigns); top-K selection happens
+ * later in serialization.
+ */
+function groupByAsset(rows: MetaMetricsRow[]): AssetRawBreakdown[] {
+  const byId = new Map<string, { name: string; rows: RawMetricSet[] }>();
+  for (const r of rows) {
+    if (!r.ad_id) continue;
+    const entry = byId.get(r.ad_id) ?? {
+      name: r.ad_name ?? r.ad_id,
+      rows: [],
+    };
+    entry.rows.push(toRaw(r));
+    byId.set(r.ad_id, entry);
+  }
+  return [...byId.entries()].map(([assetId, { name, rows: assetRows }]) => ({
+    assetId,
+    assetName: name,
+    rawTotals: sumRaw(assetRows),
+  }));
+}
+
 export const metaMetricsAdapter: ConnectorMetricsAdapter = {
   provider: "meta_ads",
 
@@ -76,10 +100,11 @@ export const metaMetricsAdapter: ConnectorMetricsAdapter = {
     const rawRows: RawMetricSet[] = rows.map(toRaw);
     const rawTotals = sumRaw(rawRows);
 
-    // Issue #3: per-campaign breakdown only when fetched at campaign level.
-    // Account rawTotals above is unchanged (still the full sum of all rows).
+    // Issue #3 / AI-002: per-campaign or per-ad breakdown only when fetched at
+    // that level. Account rawTotals above is unchanged (still the full sum).
     const campaigns =
       query.level === "campaign" ? groupByCampaign(rows) : undefined;
+    const assets = query.level === "ad" ? groupByAsset(rows) : undefined;
 
     // V1: revenue is totals-only — per-day series omits revenue (0).
     const series: MetricSeriesPoint[] | undefined =
@@ -105,6 +130,7 @@ export const metaMetricsAdapter: ConnectorMetricsAdapter = {
       rawTotals,
       series,
       campaigns,
+      assets,
     };
   },
 };

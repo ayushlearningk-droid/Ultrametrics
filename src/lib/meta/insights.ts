@@ -85,6 +85,10 @@ export interface MetaMetricsRow {
   campaign_id?: string;
   /** Present only when level = "campaign" (Issue #3). */
   campaign_name?: string;
+  /** Present only when level = "ad" (AI-002). */
+  ad_id?: string;
+  /** Present only when level = "ad" (AI-002). */
+  ad_name?: string;
   spend: number;
   impressions: number;
   clicks: number;
@@ -99,7 +103,7 @@ export interface GetAccountMetricsOptions {
   since: string; // YYYY-MM-DD
   until: string; // YYYY-MM-DD
   granularity: "total" | "daily";
-  level?: "account" | "campaign";
+  level?: "account" | "campaign" | "ad";
   /**
    * Time window. "range" (default) uses the explicit since/until via time_range.
    * "lifetime" uses date_preset=maximum (all-time) and ignores since/until.
@@ -150,11 +154,14 @@ export async function getAccountMetrics(
   options: GetAccountMetricsOptions
 ): Promise<MetaMetricsRow[]> {
   const baseFields = ["spend", "impressions", "clicks", "reach", "action_values"];
-  // Campaign level (Issue #3) needs the campaign identity fields to group by.
+  // Campaign level (Issue #3) / ad level (AI-002) need their identity fields to
+  // group by. Account level is unchanged.
   const leveledFields =
     options.level === "campaign"
       ? ["campaign_id", "campaign_name", ...baseFields]
-      : baseFields;
+      : options.level === "ad"
+        ? ["ad_id", "ad_name", ...baseFields]
+        : baseFields;
   const fields =
     options.granularity === "daily"
       ? ["date_start", ...leveledFields]
@@ -192,6 +199,8 @@ export async function getAccountMetrics(
       date_start?: string;
       campaign_id?: string;
       campaign_name?: string;
+      ad_id?: string;
+      ad_name?: string;
       spend?: string;
       impressions?: string;
       clicks?: string;
@@ -204,6 +213,8 @@ export async function getAccountMetrics(
     ...(row.date_start ? { date_start: row.date_start } : {}),
     ...(row.campaign_id ? { campaign_id: row.campaign_id } : {}),
     ...(row.campaign_name ? { campaign_name: row.campaign_name } : {}),
+    ...(row.ad_id ? { ad_id: row.ad_id } : {}),
+    ...(row.ad_name ? { ad_name: row.ad_name } : {}),
     spend: parseFloat(row.spend ?? "0"),
     impressions: parseInt(row.impressions ?? "0", 10),
     clicks: parseInt(row.clicks ?? "0", 10),

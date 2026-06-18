@@ -87,7 +87,7 @@ export type MetricsGranularity = "total" | "daily";
 export type MetricsMode = "range" | "lifetime";
 
 /** Aggregation level requested from a provider, when applicable. */
-export type MetricsLevel = "account" | "campaign";
+export type MetricsLevel = "account" | "campaign" | "ad";
 
 /** A closed date range, inclusive, as ISO date strings (YYYY-MM-DD). */
 export interface MetricsDateRange {
@@ -147,10 +147,22 @@ export interface CampaignBreakdown {
 }
 
 /**
+ * Derived per-ad (asset) breakdown entry (AI-002, ad-level V1). Totals are raw +
+ * derived ratios for a single ad. Present only when a fetch was made at level
+ * "ad". Flat (not nested under campaigns); no per-ad series in V1.
+ */
+export interface AssetBreakdown {
+  assetId: string;
+  assetName: string;
+  totals: MetricTotals;
+}
+
+/**
  * The canonical result returned by the engine for one provider (or blended).
  * `currency` is the ISO code the monetary fields are expressed in. `series` is
- * present only for daily granularity. `campaigns` is present only when the fetch
- * was made at level "campaign" (Issue #3); account-level fetches omit it.
+ * present only for daily granularity. `campaigns` is present only at level
+ * "campaign" (Issue #3); `assets` only at level "ad" (AI-002). Account-level
+ * fetches omit both.
  */
 export interface MetricSet {
   provider: MetricsProvider;
@@ -160,6 +172,7 @@ export interface MetricSet {
   totals: MetricTotals;
   series?: MetricSeriesPoint[];
   campaigns?: CampaignBreakdown[];
+  assets?: AssetBreakdown[];
 }
 
 /** Query parameters for a metrics fetch. */
@@ -189,6 +202,7 @@ export interface RawMetricResult {
   rawTotals: RawMetricSet;
   series?: MetricSeriesPoint[];
   campaigns?: CampaignRawBreakdown[];
+  assets?: AssetRawBreakdown[];
 }
 
 /**
@@ -200,6 +214,18 @@ export interface RawMetricResult {
 export interface CampaignRawBreakdown {
   campaignId: string;
   campaignName: string;
+  rawTotals: RawMetricSet;
+}
+
+/**
+ * Raw, un-derived per-ad (asset) breakdown entry (AI-002). One additive
+ * RawMetricSet scoped to a single ad. Adapters populate this only when the query
+ * level is "ad"; the engine derives ratios into AssetBreakdown. Invariant: the
+ * sum of all assets' rawTotals equals the account rawTotals.
+ */
+export interface AssetRawBreakdown {
+  assetId: string;
+  assetName: string;
   rawTotals: RawMetricSet;
 }
 
