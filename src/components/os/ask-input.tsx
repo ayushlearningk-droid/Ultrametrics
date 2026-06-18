@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, RefreshCw, Sparkles, TrendingUp, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAskUltrametrics } from "@/components/os/use-ask-ultrametrics";
 
 const SUGGESTIONS = [
   { label: "Why did my ROAS drop?", icon: TrendingUp, href: "/dashboard/connectors/meta" },
@@ -14,36 +15,22 @@ const SUGGESTIONS = [
   { label: "Optimize Meta budget", icon: Sparkles, href: "/dashboard/connectors/meta" },
 ];
 
-const KEYWORD_ROUTES: [RegExp, string][] = [
-  [/meta|facebook|roas|ctr|spend|creative/i, "/dashboard/connectors/meta"],
-  [/google ads|gads|campaign|keyword/i, "/dashboard/connectors/google-ads"],
-  [/sync|job|history|pipeline/i, "/dashboard/sync-jobs"],
-  [/connect|source|integration/i, "/dashboard/connectors"],
-  [/setting|billing|plan/i, "/dashboard/settings"],
-];
-
 export function AskInput() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
   const [value, setValue] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const { messages, streaming, error, send } = useAskUltrametrics();
 
   function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!value.trim()) {
+    const trimmed = value.trim();
+    if (!trimmed) {
       inputRef.current?.focus();
       return;
     }
-    const match = KEYWORD_ROUTES.find(([re]) => re.test(value));
-    if (match) {
-      router.push(match[1]);
-    } else {
-      toast("AI responses are coming soon.", {
-        description: "Use ⌘K to navigate and take actions now.",
-        action: { label: "Open ⌘K", onClick: () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true })) },
-      });
-    }
+    void send(trimmed);
     setValue("");
   }
 
@@ -148,6 +135,37 @@ export function AskInput() {
           );
         })}
       </div>
+
+      {/* Conversation panel — streamed Ask Ultrametrics responses */}
+      {(messages.length > 0 || error) && (
+        <div className="mt-4 space-y-3 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+          {messages.map((m, i) => (
+            <div key={i} className="text-[13px] leading-relaxed">
+              <span
+                className={cn(
+                  "mr-2 font-medium",
+                  m.role === "user" ? "text-white/45" : "text-brand"
+                )}
+              >
+                {m.role === "user" ? "You" : "Ultrametrics"}
+              </span>
+              <span className="whitespace-pre-wrap text-white/70">
+                {m.content}
+                {streaming &&
+                  m.role === "assistant" &&
+                  i === messages.length - 1 && (
+                    <span className="ml-0.5 animate-pulse">▋</span>
+                  )}
+              </span>
+            </div>
+          ))}
+          {error && (
+            <div className="text-[12px] text-red-400/80">
+              Couldn&apos;t complete that request: {error}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
