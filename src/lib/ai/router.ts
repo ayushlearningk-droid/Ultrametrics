@@ -1,0 +1,72 @@
+/**
+ * Ask Ultrametrics — model router (Phase 1).
+ *
+ * Pure model selection. Default is Sonnet 4.6 with thinking disabled and low
+ * effort (the cheap baseline). Escalates to Opus 4.8 (adaptive thinking + high
+ * effort) only on conservative signals. Escalation is STICKY: once a
+ * conversation escalates, it stays on Opus (the caller round-trips `escalated`
+ * into `signals.stickyEscalated`). Escalation is PLAN-GATED: when opusAllowed is
+ * false, the router never escalates.
+ *
+ * No I/O, no SDK calls — deterministic and unit-testable.
+ */
+
+import type { RouterSignals, RouteDecision } from "@/lib/ai/types";
+
+const SONNET = "claude-sonnet-4-6" as const;
+const OPUS = "claude-opus-4-8" as const;
+
+/** Conservative escalation triggers: deep analysis / reasoning intent. */
+const COMPLEX_INTENT =
+  /\b(why|analy[sz]e|analysis|compare|comparison|forecast|predict|diagnos|explain the|root cause|optimi[sz]e|recommend|trend|correlat|attribut)\b/i;
+
+/** Token estimate above which a turn is treated as heavy enough to escalate. */
+const LARGE_INPUT_TOKENS = 6000;
+
+/** Tool-loop depth at/above which we escalate (multi-step reasoning). */
+const DEEP_TOOL_ROUNDS = 2;
+
+const SONNET_DEFAULT: Pick<RouteDecision, "model" | "thinking" | "effort"> = {
+  model: SONNET,
+  thinking: { type: "disabled" },
+  effort: "low",
+};
+
+const OPUS_ESCALATED: Pick<RouteDecision, "model" | "thinking" | "effort"> = {
+  model: OPUS,
+  thinking: { type: "adaptive", display: "summarized" },
+  effort: "high",
+};
+
+export function routeModel(signals: RouterSignals): RouteDecision {
+  // Explicit override (admin/testing) wins, still honoring the plan gate.
+  if (signals.explicitModel === OPUS && signals.opusAllowed) {
+    return { ...OPUS_ESCALATED, escalated: true, reason: "explicit override → opus" };
+  }
+  if (signals.explicitModel === SONNET) {
+    return { ...SONNET_DEFAULT, escalated: false, reason: "explicit override → sonnet" };
+  }
+
+  // Plan gate: starter-tier (or any plan without Opus) never escalates.
+  if (!signals.opusAllowed) {
+    return { ...SONNET_DEFAULT, escalated: false, reason: "plan does not allow opus" };
+  }
+
+  // Sticky: once escalated, stay escalated for the rest of the conversation.
+  if (signals.stickyEscalated) {
+    return { ...OPUS_ESCALATED, escalated: true, reason: "sticky escalation" };
+  }
+
+  // Conservative one-way escalation signals.
+  if (signals.toolRoundsSoFar >= DEEP_TOOL_ROUNDS) {
+    return { ...OPUS_ESCALATED, escalated: true, reason: `tool rounds ≥ ${DEEP_TOOL_ROUNDS}` };
+  }
+  if (signals.approxInputTokens >= LARGE_INPUT_TOKENS) {
+    return { ...OPUS_ESCALATED, escalated: true, reason: "large input" };
+  }
+  if (COMPLEX_INTENT.test(signals.userMessage)) {
+    return { ...OPUS_ESCALATED, escalated: true, reason: "complex-analysis intent" };
+  }
+
+  return { ...SONNET_DEFAULT, escalated: false, reason: "default" };
+}
