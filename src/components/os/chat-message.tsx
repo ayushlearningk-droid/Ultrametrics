@@ -9,7 +9,7 @@
  * Pure presentation — no state, no data. NO drawer / provider / shell wiring.
  */
 
-import { Markdown } from "@/components/os/markdown";
+import { AiResponse } from "@/components/os/ai-response";
 
 export interface ChatMessageProps {
   role: "user" | "assistant";
@@ -32,7 +32,7 @@ export function ChatMessage({ role, content, streaming }: ChatMessageProps) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] min-w-0">
-        <Markdown>{content}</Markdown>
+        <AiResponse content={content} />
         {streaming && (
           <span className="ml-0.5 animate-pulse text-foreground/70">▋</span>
         )}
