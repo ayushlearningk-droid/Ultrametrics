@@ -22,6 +22,7 @@ import type {
   RawMetricSet,
   DerivedMetrics,
   CampaignBreakdown,
+  AssetBreakdown,
 } from "@/lib/metrics/types";
 import type { WorkspaceContext } from "@/lib/ai/types";
 import type { ProviderMetricsResult } from "@/lib/metrics/engine";
@@ -64,7 +65,9 @@ function asGranularity(value: unknown): MetricsGranularity {
 }
 
 function asLevel(value: unknown): MetricsLevel | undefined {
-  return value === "campaign" || value === "account" ? value : undefined;
+  return value === "campaign" || value === "account" || value === "ad"
+    ? value
+    : undefined;
 }
 
 function asProvider(value: unknown): MetricsProvider {
@@ -188,6 +191,47 @@ function serializeCampaigns(
   };
 }
 
+/** AI-002 V1: cap to the top 10 ads by spend. */
+const TOP_K_ASSETS = 10;
+
+/**
+ * Serialize a provider's ad (asset) breakdown (AI-002): sort by spend desc, cap
+ * to the top 10, capability-gate the same raw/derived keys as totals, and report
+ * how many were omitted. Returns null-equivalent empty when there is no breakdown.
+ */
+function serializeAssets(
+  provider: MetricsProvider,
+  assets: AssetBreakdown[]
+) {
+  const cap = getCapabilities(provider);
+  const sorted = [...assets].sort((a, b) => b.totals.spend - a.totals.spend);
+  const top = sorted.slice(0, TOP_K_ASSETS);
+
+  const list = top.map((a) => {
+    const raw: Record<string, number> = {};
+    for (const key of RAW_KEYS_ON_TOTALS) {
+      if (!cap.rawMetrics.includes(key)) continue;
+      const v = a.totals[key];
+      if (v !== null && v !== undefined) raw[key] = v;
+    }
+    const derived: Record<string, number> = {};
+    for (const key of DERIVED_KEYS_ON_TOTALS) {
+      if (cap.derivedMetrics.includes(key)) derived[key] = a.totals[key];
+    }
+    return {
+      ad_id: a.assetId,
+      ad_name: a.assetName,
+      raw,
+      derived,
+    };
+  });
+
+  return {
+    assets: list,
+    assets_omitted: Math.max(0, assets.length - top.length),
+  };
+}
+
 /** Serialize one provider result, preserving status verbatim. */
 function serializeProviderResult(r: ProviderMetricsResult) {
   if (r.status !== "ok" || !r.metrics) {
@@ -206,6 +250,9 @@ function serializeProviderResult(r: ProviderMetricsResult) {
     ...(r.metrics.campaigns
       ? serializeCampaigns(r.provider, r.metrics.campaigns)
       : {}),
+    ...(r.metrics.assets
+      ? serializeAssets(r.provider, r.metrics.assets)
+      : {}),
   };
 }
 
@@ -213,7 +260,7 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_workspace_metrics",
     description:
-      "Get advertising/commerce metrics for ALL connected sources in the current workspace. Omit since/until to use the default window (last 180 days, with automatic per-source fallback to all-time when 180 days is empty). Returns one entry per source with its status (ok/no_data/unsupported/error), window_used, currency, raw metrics, and derived ratios. Use this for cross-source or 'overall' questions. IMPORTANT: when the user asks about individual campaigns — top/best/worst campaigns, a campaign breakdown, or which campaign has the highest ROAS / lowest CTR / most spend — set level:\"campaign\" so each source also returns a per-campaign list; otherwise you only get account totals and cannot answer campaign questions.",
+      "Get advertising/commerce metrics for ALL connected sources in the current workspace. Omit since/until to use the default window (last 180 days, with automatic per-source fallback to all-time when 180 days is empty). Returns one entry per source with its status (ok/no_data/unsupported/error), window_used, currency, raw metrics, and derived ratios. Use this for cross-source or 'overall' questions. IMPORTANT: when the user asks about individual campaigns — top/best/worst campaigns, a campaign breakdown, or which campaign has the highest ROAS / lowest CTR / most spend — set level:\"campaign\" so each source also returns a per-campaign list. When the user asks about individual ads — best/worst ads, an ad breakdown, or which ad has the highest CTR / highest ROAS / most spend — set level:\"ad\" to also return a per-ad list. Otherwise you only get account totals and cannot answer campaign- or ad-level questions.",
     input_schema: {
       type: "object",
       properties: {
@@ -226,8 +273,8 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
         },
         level: {
           type: "string",
-          enum: ["account", "campaign"],
-          description: "account = workspace/account totals only (default). campaign = also return a per-campaign breakdown. Use \"campaign\" whenever the question is about specific campaigns: top/best/worst campaigns, campaign breakdown, highest-ROAS campaign, lowest-CTR campaign, or which campaign to fund.",
+          enum: ["account", "campaign", "ad"],
+          description: "account = workspace/account totals only (default). campaign = also return a per-campaign breakdown (top/best/worst campaigns, highest-ROAS / lowest-CTR campaign, which campaign to fund). ad = also return a per-ad breakdown (best/worst ads, highest-CTR / highest-ROAS / highest-spend ad).",
         },
       },
     },
@@ -235,7 +282,7 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_provider_metrics",
     description:
-      "Get metrics for ONE specific source (e.g. meta_ads, google_ads). Omit since/until to use the default window (last 180 days, with automatic fallback to all-time when empty). Use when the user asks about a single platform. IMPORTANT: when the user asks about individual campaigns on that platform — top/best/worst campaigns, a campaign breakdown, or which campaign has the highest ROAS / lowest CTR / most spend — set level:\"campaign\" to get the per-campaign list; otherwise only account totals are returned.",
+      "Get metrics for ONE specific source (e.g. meta_ads, google_ads). Omit since/until to use the default window (last 180 days, with automatic fallback to all-time when empty). Use when the user asks about a single platform. IMPORTANT: when the user asks about individual campaigns on that platform — top/best/worst campaigns, a campaign breakdown, or which campaign has the highest ROAS / lowest CTR / most spend — set level:\"campaign\" to get the per-campaign list. When the user asks about individual ads — best/worst ads, an ad breakdown, or which ad has the highest CTR / highest ROAS / most spend — set level:\"ad\" to get the per-ad list. Otherwise only account totals are returned.",
     input_schema: {
       type: "object",
       properties: {
@@ -252,8 +299,8 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
         },
         level: {
           type: "string",
-          enum: ["account", "campaign"],
-          description: "Aggregation level when supported. Use 'campaign' for per-campaign breakdown (top/worst/compare campaigns, campaign ROAS). Default account.",
+          enum: ["account", "campaign", "ad"],
+          description: "Aggregation level when supported. Use 'campaign' for a per-campaign breakdown (top/worst/compare campaigns, campaign ROAS). Use 'ad' for a per-ad breakdown (best/worst ads, highest CTR/ROAS/spend ad). Default account.",
         },
       },
       required: ["provider"],

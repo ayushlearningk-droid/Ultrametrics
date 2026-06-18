@@ -19,13 +19,16 @@ import type {
   RawMetricSet,
   MetricSeriesPoint,
   CampaignRawBreakdown,
+  AssetRawBreakdown,
 } from "@/lib/metrics/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConnectorToken } from "@/lib/data/connector-credentials";
 import {
   refreshGoogleAdsAccessToken,
   getCampaignInsights,
+  getAdInsights,
   type GoogleAdsCampaignRow,
+  type GoogleAdsAdRow,
 } from "@/lib/google-ads/insights";
 import { sumRaw, emptyRaw } from "@/lib/metrics/derive";
 
@@ -78,6 +81,41 @@ function groupByCampaign(rows: GoogleAdsCampaignRow[]): CampaignRawBreakdown[] {
   }));
 }
 
+/** Raw additive view of one Google Ads ad-level row (AI-002). */
+function adToRaw(row: GoogleAdsAdRow): RawMetricSet {
+  return {
+    spend: row.costCurrency,
+    revenue: row.conversionsValue,
+    impressions: row.impressions,
+    clicks: row.clicks,
+    conversions: row.conversions,
+    reach: 0,
+  };
+}
+
+/**
+ * Group ad rows by adId into per-ad raw totals (AI-002). Rows lacking an adId
+ * are skipped. Flat (not nested under campaigns); top-K selection happens later
+ * in serialization.
+ */
+function groupByAsset(rows: GoogleAdsAdRow[]): AssetRawBreakdown[] {
+  const byId = new Map<string, { name: string; acc: RawMetricSet }>();
+  for (const row of rows) {
+    if (!row.adId) continue;
+    const entry = byId.get(row.adId) ?? {
+      name: row.adName || row.adId,
+      acc: emptyRaw(),
+    };
+    entry.acc = sumRaw([entry.acc, adToRaw(row)]);
+    byId.set(row.adId, entry);
+  }
+  return [...byId.entries()].map(([assetId, { name, acc }]) => ({
+    assetId,
+    assetName: name,
+    rawTotals: acc,
+  }));
+}
+
 export const googleAdsMetricsAdapter: ConnectorMetricsAdapter = {
   provider: "google_ads",
 
@@ -115,6 +153,33 @@ export const googleAdsMetricsAdapter: ConnectorMetricsAdapter = {
         : { since: query.dateRange.since, until: query.dateRange.until };
 
     const accessToken = await refreshGoogleAdsAccessToken(refreshToken);
+
+    // AI-002: ad-level path uses the ad_group_ad query and returns a flat
+    // per-ad breakdown. Separate from the campaign/account path below, which is
+    // unchanged. rawTotals here is the full sum of all ad rows.
+    if (query.level === "ad") {
+      const adRows = await getAdInsights(
+        accessToken,
+        developerToken,
+        String(connector.external_account_id),
+        mccCustomerId,
+        range
+      );
+      if (adRows.length === 0) return null;
+
+      return {
+        provider: "google_ads",
+        currency:
+          adRows.find((r) => r.currencyCode)?.currencyCode ??
+          config.currency ??
+          "USD",
+        dateRange: range,
+        granularity: query.granularity,
+        rawTotals: sumRaw(adRows.map(adToRaw)),
+        assets: groupByAsset(adRows),
+      };
+    }
+
     const rows = await getCampaignInsights(
       accessToken,
       developerToken,

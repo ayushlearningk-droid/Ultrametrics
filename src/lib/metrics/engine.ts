@@ -77,6 +77,11 @@ function toMetricSet(raw: RawMetricResult): MetricSet {
       campaignName: c.campaignName,
       totals: toTotals(c.rawTotals),
     })),
+    assets: raw.assets?.map((a) => ({
+      assetId: a.assetId,
+      assetName: a.assetName,
+      totals: toTotals(a.rawTotals),
+    })),
   };
 }
 
