@@ -81,6 +81,10 @@ type MetaActionValue = { action_type?: string; value?: string };
 export interface MetaMetricsRow {
   /** Present only when granularity = "daily". */
   date_start?: string;
+  /** Present only when level = "campaign" (Issue #3). */
+  campaign_id?: string;
+  /** Present only when level = "campaign" (Issue #3). */
+  campaign_name?: string;
   spend: number;
   impressions: number;
   clicks: number;
@@ -146,10 +150,15 @@ export async function getAccountMetrics(
   options: GetAccountMetricsOptions
 ): Promise<MetaMetricsRow[]> {
   const baseFields = ["spend", "impressions", "clicks", "reach", "action_values"];
+  // Campaign level (Issue #3) needs the campaign identity fields to group by.
+  const leveledFields =
+    options.level === "campaign"
+      ? ["campaign_id", "campaign_name", ...baseFields]
+      : baseFields;
   const fields =
     options.granularity === "daily"
-      ? ["date_start", ...baseFields]
-      : baseFields;
+      ? ["date_start", ...leveledFields]
+      : leveledFields;
 
   const params = new URLSearchParams({
     fields: fields.join(","),
@@ -181,6 +190,8 @@ export async function getAccountMetrics(
   const json = (await res.json()) as {
     data?: Array<{
       date_start?: string;
+      campaign_id?: string;
+      campaign_name?: string;
       spend?: string;
       impressions?: string;
       clicks?: string;
@@ -191,6 +202,8 @@ export async function getAccountMetrics(
 
   return (json.data ?? []).map((row) => ({
     ...(row.date_start ? { date_start: row.date_start } : {}),
+    ...(row.campaign_id ? { campaign_id: row.campaign_id } : {}),
+    ...(row.campaign_name ? { campaign_name: row.campaign_name } : {}),
     spend: parseFloat(row.spend ?? "0"),
     impressions: parseInt(row.impressions ?? "0", 10),
     clicks: parseInt(row.clicks ?? "0", 10),

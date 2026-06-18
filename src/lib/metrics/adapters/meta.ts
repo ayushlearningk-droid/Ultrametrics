@@ -14,10 +14,47 @@ import type {
   RawMetricResult,
   RawMetricSet,
   MetricSeriesPoint,
+  CampaignRawBreakdown,
 } from "@/lib/metrics/types";
+import type { MetaMetricsRow } from "@/lib/meta/insights";
 import { getActiveMetaToken } from "@/lib/meta/token";
 import { getAccountMetrics } from "@/lib/meta/insights";
 import { sumRaw } from "@/lib/metrics/derive";
+
+/** Raw additive view of one Meta insights row. */
+function toRaw(r: MetaMetricsRow): RawMetricSet {
+  return {
+    spend: r.spend,
+    revenue: r.revenue,
+    impressions: r.impressions,
+    clicks: r.clicks,
+    conversions: r.conversions,
+    reach: r.reach,
+  };
+}
+
+/**
+ * Group campaign-level rows by campaign_id into per-campaign raw totals
+ * (Issue #3). Rows lacking a campaign_id are skipped. Order is preserved by
+ * first appearance; top-K selection happens later in serialization.
+ */
+function groupByCampaign(rows: MetaMetricsRow[]): CampaignRawBreakdown[] {
+  const byId = new Map<string, { name: string; rows: RawMetricSet[] }>();
+  for (const r of rows) {
+    if (!r.campaign_id) continue;
+    const entry = byId.get(r.campaign_id) ?? {
+      name: r.campaign_name ?? r.campaign_id,
+      rows: [],
+    };
+    entry.rows.push(toRaw(r));
+    byId.set(r.campaign_id, entry);
+  }
+  return [...byId.entries()].map(([campaignId, { name, rows: campaignRows }]) => ({
+    campaignId,
+    campaignName: name,
+    rawTotals: sumRaw(campaignRows),
+  }));
+}
 
 export const metaMetricsAdapter: ConnectorMetricsAdapter = {
   provider: "meta_ads",
@@ -36,15 +73,13 @@ export const metaMetricsAdapter: ConnectorMetricsAdapter = {
     });
     if (rows.length === 0) return null;
 
-    const rawRows: RawMetricSet[] = rows.map((r) => ({
-      spend: r.spend,
-      revenue: r.revenue,
-      impressions: r.impressions,
-      clicks: r.clicks,
-      conversions: r.conversions,
-      reach: r.reach,
-    }));
+    const rawRows: RawMetricSet[] = rows.map(toRaw);
     const rawTotals = sumRaw(rawRows);
+
+    // Issue #3: per-campaign breakdown only when fetched at campaign level.
+    // Account rawTotals above is unchanged (still the full sum of all rows).
+    const campaigns =
+      query.level === "campaign" ? groupByCampaign(rows) : undefined;
 
     // V1: revenue is totals-only — per-day series omits revenue (0).
     const series: MetricSeriesPoint[] | undefined =
@@ -69,6 +104,7 @@ export const metaMetricsAdapter: ConnectorMetricsAdapter = {
       granularity: query.granularity,
       rawTotals,
       series,
+      campaigns,
     };
   },
 };

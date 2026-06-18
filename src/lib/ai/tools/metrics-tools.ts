@@ -21,6 +21,7 @@ import type {
   MetricSet,
   RawMetricSet,
   DerivedMetrics,
+  CampaignBreakdown,
 } from "@/lib/metrics/types";
 import type { WorkspaceContext } from "@/lib/ai/types";
 import type { ProviderMetricsResult } from "@/lib/metrics/engine";
@@ -144,6 +145,49 @@ function serializeTotals(provider: MetricsProvider, set: MetricSet) {
   };
 }
 
+/** Issue #3 V1: cap to the top 15 campaigns by spend. */
+const TOP_K_CAMPAIGNS = 15;
+
+/**
+ * Serialize a provider's campaign breakdown (Issue #3): sort by spend desc, cap
+ * to the top 15, capability-gate the same raw/derived keys as totals, and report
+ * how many were omitted. Returns null when there is no breakdown.
+ */
+function serializeCampaigns(
+  provider: MetricsProvider,
+  campaigns: CampaignBreakdown[]
+) {
+  const cap = getCapabilities(provider);
+  const sorted = [...campaigns].sort(
+    (a, b) => b.totals.spend - a.totals.spend
+  );
+  const top = sorted.slice(0, TOP_K_CAMPAIGNS);
+
+  const list = top.map((c) => {
+    const raw: Record<string, number> = {};
+    for (const key of RAW_KEYS_ON_TOTALS) {
+      if (!cap.rawMetrics.includes(key)) continue;
+      const v = c.totals[key];
+      if (v !== null && v !== undefined) raw[key] = v;
+    }
+    const derived: Record<string, number> = {};
+    for (const key of DERIVED_KEYS_ON_TOTALS) {
+      if (cap.derivedMetrics.includes(key)) derived[key] = c.totals[key];
+    }
+    return {
+      campaign_id: c.campaignId,
+      campaign_name: c.campaignName,
+      raw,
+      derived,
+    };
+  });
+
+  return {
+    campaigns: list,
+    campaigns_omitted: Math.max(0, campaigns.length - top.length),
+  };
+}
+
 /** Serialize one provider result, preserving status verbatim. */
 function serializeProviderResult(r: ProviderMetricsResult) {
   if (r.status !== "ok" || !r.metrics) {
@@ -159,6 +203,9 @@ function serializeProviderResult(r: ProviderMetricsResult) {
     status: r.status,
     window_used: r.windowUsed ?? "range",
     ...serializeTotals(r.provider, r.metrics),
+    ...(r.metrics.campaigns
+      ? serializeCampaigns(r.provider, r.metrics.campaigns)
+      : {}),
   };
 }
 
@@ -166,7 +213,7 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_workspace_metrics",
     description:
-      "Get advertising/commerce metrics for ALL connected sources in the current workspace. Omit since/until to use the default window (last 180 days, with automatic per-source fallback to all-time when 180 days is empty). Returns one entry per source with its status (ok/no_data/unsupported/error), window_used, currency, raw metrics, and derived ratios. Use this for cross-source or 'overall' questions.",
+      "Get advertising/commerce metrics for ALL connected sources in the current workspace. Omit since/until to use the default window (last 180 days, with automatic per-source fallback to all-time when 180 days is empty). Returns one entry per source with its status (ok/no_data/unsupported/error), window_used, currency, raw metrics, and derived ratios. Use this for cross-source or 'overall' questions. IMPORTANT: when the user asks about individual campaigns — top/best/worst campaigns, a campaign breakdown, or which campaign has the highest ROAS / lowest CTR / most spend — set level:\"campaign\" so each source also returns a per-campaign list; otherwise you only get account totals and cannot answer campaign questions.",
     input_schema: {
       type: "object",
       properties: {
@@ -180,7 +227,7 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
         level: {
           type: "string",
           enum: ["account", "campaign"],
-          description: "Aggregation level when supported. Default account.",
+          description: "account = workspace/account totals only (default). campaign = also return a per-campaign breakdown. Use \"campaign\" whenever the question is about specific campaigns: top/best/worst campaigns, campaign breakdown, highest-ROAS campaign, lowest-CTR campaign, or which campaign to fund.",
         },
       },
     },
@@ -188,7 +235,7 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_provider_metrics",
     description:
-      "Get metrics for ONE specific source (e.g. meta_ads, google_ads). Omit since/until to use the default window (last 180 days, with automatic fallback to all-time when empty). Use when the user asks about a single platform.",
+      "Get metrics for ONE specific source (e.g. meta_ads, google_ads). Omit since/until to use the default window (last 180 days, with automatic fallback to all-time when empty). Use when the user asks about a single platform. IMPORTANT: when the user asks about individual campaigns on that platform — top/best/worst campaigns, a campaign breakdown, or which campaign has the highest ROAS / lowest CTR / most spend — set level:\"campaign\" to get the per-campaign list; otherwise only account totals are returned.",
     input_schema: {
       type: "object",
       properties: {
@@ -202,6 +249,11 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
           type: "string",
           enum: ["total", "daily"],
           description: "total = one aggregate; daily = per-day series. Default total.",
+        },
+        level: {
+          type: "string",
+          enum: ["account", "campaign"],
+          description: "Aggregation level when supported. Use 'campaign' for per-campaign breakdown (top/worst/compare campaigns, campaign ROAS). Default account.",
         },
       },
       required: ["provider"],

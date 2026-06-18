@@ -60,7 +60,9 @@ export interface WorkspaceMetrics {
 /**
  * Turn an adapter's raw result into a derived MetricSet. Totals come from
  * deriving ratios off the summed raw totals; `series` (daily only) passes
- * through unchanged — it already carries raw MetricSeriesPoint rows.
+ * through unchanged — it already carries raw MetricSeriesPoint rows. When the
+ * adapter supplied a per-campaign breakdown (Issue #3), each campaign's raw
+ * totals are derived through the SAME toTotals() — no new calculations.
  */
 function toMetricSet(raw: RawMetricResult): MetricSet {
   return {
@@ -70,6 +72,11 @@ function toMetricSet(raw: RawMetricResult): MetricSet {
     granularity: raw.granularity,
     totals: toTotals(raw.rawTotals),
     series: raw.series,
+    campaigns: raw.campaigns?.map((c) => ({
+      campaignId: c.campaignId,
+      campaignName: c.campaignName,
+      totals: toTotals(c.rawTotals),
+    })),
   };
 }
 

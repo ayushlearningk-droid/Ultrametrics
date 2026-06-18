@@ -18,6 +18,7 @@ import type {
   RawMetricResult,
   RawMetricSet,
   MetricSeriesPoint,
+  CampaignRawBreakdown,
 } from "@/lib/metrics/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConnectorToken } from "@/lib/data/connector-credentials";
@@ -52,6 +53,29 @@ function seriesByDate(rows: GoogleAdsCampaignRow[]): MetricSeriesPoint[] {
   return [...byDate.entries()]
     .map(([date, raw]) => ({ date, ...raw }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Group campaign×day rows by campaignId into per-campaign raw totals (Issue #3).
+ * Rows lacking a campaignId are skipped. Order preserved by first appearance;
+ * top-K selection happens later in serialization.
+ */
+function groupByCampaign(rows: GoogleAdsCampaignRow[]): CampaignRawBreakdown[] {
+  const byId = new Map<string, { name: string; acc: RawMetricSet }>();
+  for (const row of rows) {
+    if (!row.campaignId) continue;
+    const entry = byId.get(row.campaignId) ?? {
+      name: row.campaignName || row.campaignId,
+      acc: emptyRaw(),
+    };
+    entry.acc = sumRaw([entry.acc, toRaw(row)]);
+    byId.set(row.campaignId, entry);
+  }
+  return [...byId.entries()].map(([campaignId, { name, acc }]) => ({
+    campaignId,
+    campaignName: name,
+    rawTotals: acc,
+  }));
 }
 
 export const googleAdsMetricsAdapter: ConnectorMetricsAdapter = {
@@ -109,6 +133,11 @@ export const googleAdsMetricsAdapter: ConnectorMetricsAdapter = {
     const series =
       query.granularity === "daily" ? seriesByDate(rows) : undefined;
 
+    // Issue #3: per-campaign breakdown only when fetched at campaign level.
+    // Account rawTotals above is unchanged (still the full sum of all rows).
+    const campaigns =
+      query.level === "campaign" ? groupByCampaign(rows) : undefined;
+
     return {
       provider: "google_ads",
       currency,
@@ -116,6 +145,7 @@ export const googleAdsMetricsAdapter: ConnectorMetricsAdapter = {
       granularity: query.granularity,
       rawTotals,
       series,
+      campaigns,
     };
   },
 };
