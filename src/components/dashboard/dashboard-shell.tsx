@@ -6,6 +6,8 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { BottomCommandBar } from "@/components/os/bottom-command-bar";
+import { AskProvider } from "@/components/os/ask-provider";
+import { AskDrawer } from "@/components/os/ask-drawer";
 import { EnvironmentLayer } from "@/components/dashboard/environment-layer";
 import type { User, Workspace } from "@/types/database";
 
@@ -40,6 +42,7 @@ export function DashboardShell({
   }, []);
 
   return (
+    <AskProvider>
     <div className="relative flex h-screen overflow-hidden bg-surface-0">
       {/* ── L0 — Environment layer (ambient light + cursor parallax) ── */}
       <EnvironmentLayer />
@@ -90,6 +93,10 @@ export function DashboardShell({
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
+
+      {/* ── L4 — Ask Ultrametrics drawer (shared conversation) ──── */}
+      <AskDrawer />
     </div>
+    </AskProvider>
   );
 }

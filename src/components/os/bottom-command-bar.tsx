@@ -5,14 +5,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, RefreshCw, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useAskUltrametrics } from "@/components/os/use-ask-ultrametrics";
+import { useAsk } from "@/components/os/ask-provider";
 
 export function BottomCommandBar() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
   const [value, setValue] = useState("");
   const [syncing, setSyncing] = useState(false);
-  const { messages, streaming, error, send } = useAskUltrametrics();
+  const { send, open } = useAsk();
 
   function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -22,6 +22,7 @@ export function BottomCommandBar() {
       return;
     }
     void send(trimmed);
+    open();
     setValue("");
   }
 
@@ -42,35 +43,6 @@ export function BottomCommandBar() {
 
   return (
     <div className="relative z-[2] shrink-0 px-4 pb-4 pt-2">
-      {(messages.length > 0 || error) && (
-        <div className="mx-auto mb-2 max-h-[40vh] max-w-3xl space-y-3 overflow-y-auto rounded-2xl border border-white/[0.07] bg-[hsl(var(--card))] p-4">
-          {messages.map((m, i) => (
-            <div key={i} className="text-[13px] leading-relaxed">
-              <span
-                className={cn(
-                  "mr-2 font-medium",
-                  m.role === "user" ? "text-foreground-muted" : "text-brand"
-                )}
-              >
-                {m.role === "user" ? "You" : "Ultrametrics"}
-              </span>
-              <span className="whitespace-pre-wrap text-foreground/80">
-                {m.content}
-                {streaming &&
-                  m.role === "assistant" &&
-                  i === messages.length - 1 && (
-                    <span className="ml-0.5 animate-pulse">▋</span>
-                  )}
-              </span>
-            </div>
-          ))}
-          {error && (
-            <div className="text-[12px] text-red-400/80">
-              Couldn&apos;t complete that request: {error}
-            </div>
-          )}
-        </div>
-      )}
       <form onSubmit={handleSubmit} className="relative mx-auto max-w-3xl">
         <div
           className={cn(
