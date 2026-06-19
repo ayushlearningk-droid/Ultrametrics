@@ -42,7 +42,12 @@ export type RecommendationKind =
   // AI-008 funnel diagnoses (account-level).
   | "funnel_offer_problem"
   | "funnel_cart_friction"
-  | "funnel_checkout_problem";
+  | "funnel_checkout_problem"
+  // Pixel diagnostics (account-level). pixel_healthy is never surfaced.
+  | "pixel_not_detected"
+  | "purchase_not_tracked"
+  | "purchase_value_missing"
+  | "partial_event_coverage";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -170,6 +175,11 @@ const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
   funnel_checkout_problem: 0.9,
   funnel_cart_friction: 0.7,
   funnel_offer_problem: 0.6,
+  // Pixel diagnostics.
+  pixel_not_detected: 1.0,
+  purchase_not_tracked: 0.95,
+  purchase_value_missing: 0.9,
+  partial_event_coverage: 0.5,
 };
 
 /**

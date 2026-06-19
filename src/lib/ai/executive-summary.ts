@@ -12,6 +12,7 @@
 
 import type { Recommendation, RecommendationKind } from "@/lib/ai/recommendations";
 import type { FunnelDiagnosis } from "@/lib/ai/funnel-intelligence";
+import type { PixelDiagnosis } from "@/lib/ai/pixel-diagnostics";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -55,6 +56,8 @@ export interface ExecutiveSummaryInput {
   recommendations: Recommendation[];
   /** Funnel diagnosis for the funnel-status section; null = insufficient data. */
   funnelDiagnosis: FunnelDiagnosis | null;
+  /** Pixel diagnosis when it fires (never pixel_healthy); supersedes tracking. */
+  pixelDiagnosis?: PixelDiagnosis | null;
 }
 
 /* ── Composer ─────────────────────────────────────────────────────────────── */
@@ -97,18 +100,23 @@ export function composeExecutiveSummary(
     };
   }
 
-  // Watch-outs: degraded source + tracking gap (gates trust in the numbers).
+  // Watch-outs: degraded source + pixel/tracking gap (gate trust in the numbers).
   const watch_outs: string[] = [];
   if (status !== "ok") {
     watch_outs.push(`Source ${provider} returned "${status}".`);
   }
-  const tracking = input.recommendations.find(
-    (r) => r.kind === "tracking_issue"
-  );
-  if (tracking) {
-    watch_outs.push(
-      `Conversion tracking gap — ${tracking.impact} Metrics may be unreliable until fixed.`
+  if (input.pixelDiagnosis) {
+    // Pixel issue supersedes the coarse tracking_issue watch-out.
+    watch_outs.push(`Pixel: ${input.pixelDiagnosis.impact}`);
+  } else {
+    const tracking = input.recommendations.find(
+      (r) => r.kind === "tracking_issue"
     );
+    if (tracking) {
+      watch_outs.push(
+        `Conversion tracking gap — ${tracking.impact} Metrics may be unreliable until fixed.`
+      );
+    }
   }
 
   return {

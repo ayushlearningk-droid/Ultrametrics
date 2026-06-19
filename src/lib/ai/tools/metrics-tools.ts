@@ -37,7 +37,14 @@ import {
   deriveRecommendations,
   type Recommendation,
 } from "@/lib/ai/recommendations";
-import { deriveFunnelDiagnosis } from "@/lib/ai/funnel-intelligence";
+import {
+  deriveFunnelDiagnosis,
+  type FunnelDiagnosis,
+} from "@/lib/ai/funnel-intelligence";
+import {
+  derivePixelDiagnostics,
+  type PixelDiagnosis,
+} from "@/lib/ai/pixel-diagnostics";
 import {
   composeExecutiveSummary,
   type SummaryHeadline,
@@ -542,6 +549,112 @@ function recsForResult(
   );
 }
 
+/** Map an account-level diagnosis (funnel or pixel) into a Recommendation. */
+function diagnosisToRec(
+  d: FunnelDiagnosis | PixelDiagnosis,
+  provider: MetricsProvider
+): Recommendation {
+  return {
+    kind: d.kind as Recommendation["kind"],
+    provider,
+    level: "account",
+    entityId: "account",
+    entityName: "your account",
+    action: d.action,
+    impact: d.impact,
+    cta: d.cta,
+    confidence: d.confidence,
+    score: d.opportunityScore / 100,
+    opportunityScore: d.opportunityScore,
+  };
+}
+
+/** Rank recommendations by opportunityScore desc, tie-break score, then name. */
+function rankRecs(recs: Recommendation[]): Recommendation[] {
+  return [...recs].sort((a, b) =>
+    b.opportunityScore !== a.opportunityScore
+      ? b.opportunityScore - a.opportunityScore
+      : b.score !== a.score
+        ? b.score - a.score
+        : a.entityName.localeCompare(b.entityName)
+  );
+}
+
+/** What assembleProviderRecs returns: ranked recs + the raw diagnoses. */
+interface AssembledRecs {
+  okSource: ProviderMetricsResult | undefined;
+  /** Ranked, suppression-applied recommendations (uncapped). */
+  recs: Recommendation[];
+  /** Pixel diagnosis when it fires (never pixel_healthy), else null. */
+  pixelDiagnosis: PixelDiagnosis | null;
+  /** Funnel diagnosis as computed (for the summary's funnel_status), or null. */
+  funnelDiagnosis: FunnelDiagnosis | null;
+}
+
+/**
+ * Build one provider's recommendation set with the AI-008/pixel precedence
+ * applied (single source of truth for get_recommendations + get_executive_summary).
+ *
+ * Precedence (pixel diagnoses, account-level, Meta-only):
+ *  - any pixel issue            → suppress ALL tracking_issue recs (any level)
+ *  - pixel_not_detected /
+ *    purchase_not_tracked       → ALSO suppress the funnel diagnosis
+ *  - purchase_value_missing /
+ *    partial_event_coverage     → keep the funnel diagnosis
+ *  - pixel_healthy              → never surfaced (treated as no pixel issue)
+ */
+function assembleProviderRecs(
+  camp: ProviderMetricsResult | undefined,
+  ad: ProviderMetricsResult | undefined,
+  provider: MetricsProvider
+): AssembledRecs {
+  const okSource =
+    camp?.status === "ok" ? camp : ad?.status === "ok" ? ad : camp ?? ad;
+
+  let recs: Recommendation[] = [...recsForResult(camp), ...recsForResult(ad)];
+
+  const supportsFunnel = getCapabilities(provider).supportsFunnel;
+  const funnelEvents =
+    okSource?.status === "ok" ? okSource.metrics?.funnel : undefined;
+  const totals = okSource?.status === "ok" ? okSource.metrics?.totals : undefined;
+
+  const funnelDiagnosis =
+    funnelEvents && supportsFunnel ? deriveFunnelDiagnosis(funnelEvents) : null;
+
+  const pixelRaw =
+    funnelEvents && totals && supportsFunnel
+      ? derivePixelDiagnostics(funnelEvents, totals)
+      : null;
+  const pixelDiagnosis =
+    pixelRaw && pixelRaw.kind !== "pixel_healthy" ? pixelRaw : null;
+
+  const suppressFunnel =
+    pixelDiagnosis !== null &&
+    (pixelDiagnosis.kind === "pixel_not_detected" ||
+      pixelDiagnosis.kind === "purchase_not_tracked");
+
+  // Pixel issue suppresses every tracking_issue (any level).
+  if (pixelDiagnosis) {
+    recs = recs.filter((r) => r.kind !== "tracking_issue");
+  }
+
+  // Funnel diagnosis (unless suppressed by a severe pixel issue).
+  if (
+    funnelDiagnosis &&
+    funnelDiagnosis.kind !== "funnel_healthy" &&
+    !suppressFunnel
+  ) {
+    recs.push(diagnosisToRec(funnelDiagnosis, provider));
+  }
+
+  // Pixel diagnosis participates in ranking.
+  if (pixelDiagnosis) {
+    recs.push(diagnosisToRec(pixelDiagnosis, provider));
+  }
+
+  return { okSource, recs: rankRecs(recs), pixelDiagnosis, funnelDiagnosis };
+}
+
 export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_workspace_metrics",
@@ -715,48 +828,10 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
       const camp = campRes.providers.find((p) => p.provider === provider);
       const ad = adRes.providers.find((p) => p.provider === provider);
 
-      const merged = [...recsForResult(camp), ...recsForResult(ad)];
-
-      // Prefer an "ok" source for status/window/currency; otherwise pass a
-      // present result's status (no_data/error/unsupported) through verbatim.
-      const okSource =
-        camp?.status === "ok" ? camp : ad?.status === "ok" ? ad : camp ?? ad;
-
-      // AI-008: account-level funnel diagnosis, when the source supports funnel
-      // and has funnel data. funnel_healthy is informational only — not surfaced
-      // as a recommendation.
-      const funnel =
-        okSource?.status === "ok" ? okSource.metrics?.funnel : undefined;
-      if (funnel && getCapabilities(provider).supportsFunnel) {
-        const diag = deriveFunnelDiagnosis(funnel);
-        if (diag && diag.kind !== "funnel_healthy") {
-          merged.push({
-            kind: diag.kind,
-            provider,
-            level: diag.level,
-            entityId: "account",
-            entityName: "your account",
-            action: diag.action,
-            impact: diag.impact,
-            cta: diag.cta,
-            confidence: diag.confidence,
-            score: diag.opportunityScore / 100,
-            opportunityScore: diag.opportunityScore,
-          });
-        }
-      }
-
-      // AI-007: rank by business-impact opportunityScore desc, tie-break by the
-      // internal rule-fit score, then name for determinism. Cap last.
-      const ranked = merged
-        .sort((a, b) =>
-          b.opportunityScore !== a.opportunityScore
-            ? b.opportunityScore - a.opportunityScore
-            : b.score !== a.score
-              ? b.score - a.score
-              : a.entityName.localeCompare(b.entityName)
-        )
-        .slice(0, REC_CAP);
+      // Shared assembly: campaign + ad recs + funnel/pixel diagnoses with the
+      // pixel-precedence suppression applied, ranked by opportunityScore.
+      const { okSource, recs } = assembleProviderRecs(camp, ad, provider);
+      const ranked = recs.slice(0, REC_CAP);
 
       return {
         provider,
@@ -796,38 +871,10 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
     const summaries = [...providers].map((provider) => {
       const camp = campRes.providers.find((p) => p.provider === provider);
       const ad = adRes.providers.find((p) => p.provider === provider);
-      const okSource =
-        camp?.status === "ok" ? camp : ad?.status === "ok" ? ad : camp ?? ad;
 
-      const recs: Recommendation[] = [
-        ...recsForResult(camp),
-        ...recsForResult(ad),
-      ];
-
-      // Funnel diagnosis (Meta, account-level) — drives both the funnel_status
-      // section and an appended funnel recommendation for top-opportunity ranking.
-      const funnelEvents =
-        okSource?.status === "ok" ? okSource.metrics?.funnel : undefined;
-      const supportsFunnel = getCapabilities(provider).supportsFunnel;
-      const funnelDiagnosis =
-        funnelEvents && supportsFunnel
-          ? deriveFunnelDiagnosis(funnelEvents)
-          : null;
-      if (funnelDiagnosis && funnelDiagnosis.kind !== "funnel_healthy") {
-        recs.push({
-          kind: funnelDiagnosis.kind,
-          provider,
-          level: funnelDiagnosis.level,
-          entityId: "account",
-          entityName: "your account",
-          action: funnelDiagnosis.action,
-          impact: funnelDiagnosis.impact,
-          cta: funnelDiagnosis.cta,
-          confidence: funnelDiagnosis.confidence,
-          score: funnelDiagnosis.opportunityScore / 100,
-          opportunityScore: funnelDiagnosis.opportunityScore,
-        });
-      }
+      // Shared assembly — same precedence as get_recommendations.
+      const { okSource, recs, pixelDiagnosis, funnelDiagnosis } =
+        assembleProviderRecs(camp, ad, provider);
 
       const totals: SummaryHeadline | null =
         okSource?.status === "ok" && okSource.metrics
@@ -849,6 +896,7 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
         totals,
         recommendations: recs,
         funnelDiagnosis,
+        pixelDiagnosis,
       });
     });
 
