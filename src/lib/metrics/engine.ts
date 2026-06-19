@@ -91,6 +91,8 @@ function toMetricSet(raw: RawMetricResult): MetricSet {
       ...(c.thumbnailUrl ? { thumbnailUrl: c.thumbnailUrl } : {}),
       totals: toTotals(c.rawTotals),
     })),
+    // AI-007: funnel counts are raw — passed through, never derived.
+    funnel: raw.funnel,
   };
 }
 

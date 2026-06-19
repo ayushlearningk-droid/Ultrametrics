@@ -97,6 +97,14 @@ export interface MetaMetricsRow {
   revenue: number;
   /** Count of purchase conversions. */
   conversions: number;
+  /**
+   * Ad-attributed funnel event counts (AI-007), parsed from the `actions` field
+   * via single canonical action_type keys (no double counting). 0 when absent.
+   */
+  viewContent: number;
+  addToCart: number;
+  initiateCheckout: number;
+  purchaseEvents: number;
 }
 
 export interface GetAccountMetricsOptions {
@@ -140,6 +148,31 @@ function countPurchaseActions(actions: MetaActionValue[] | undefined): number {
 }
 
 /**
+ * Canonical funnel action_type keys (AI-007). ONE key per event so the same
+ * conversion is never counted from overlapping variants (offsite_conversion.* vs
+ * omni_* vs the bare key).
+ */
+const FUNNEL_ACTION_TYPE = {
+  viewContent: "offsite_conversion.fb_pixel_view_content",
+  addToCart: "offsite_conversion.fb_pixel_add_to_cart",
+  initiateCheckout: "offsite_conversion.fb_pixel_initiate_checkout",
+  purchase: "offsite_conversion.fb_pixel_purchase",
+} as const;
+
+/** Sum the count (value) of a single canonical action_type in the actions array. */
+function sumActionCount(
+  actions: MetaActionValue[] | undefined,
+  actionType: string
+): number {
+  if (!actions) return 0;
+  return actions.reduce(
+    (acc, a) =>
+      a.action_type === actionType ? acc + parseFloat(a.value ?? "0") : acc,
+    0
+  );
+}
+
+/**
  * Canonical raw metrics fetch for the metrics abstraction layer.
  *
  * Returns raw additive rows (spend, impressions, clicks, reach, revenue,
@@ -153,7 +186,7 @@ export async function getAccountMetrics(
   accountId: string,
   options: GetAccountMetricsOptions
 ): Promise<MetaMetricsRow[]> {
-  const baseFields = ["spend", "impressions", "clicks", "reach", "action_values"];
+  const baseFields = ["spend", "impressions", "clicks", "reach", "action_values", "actions"];
   // Campaign level (Issue #3) / ad level (AI-002) need their identity fields to
   // group by. Account level is unchanged.
   const leveledFields =
@@ -206,6 +239,7 @@ export async function getAccountMetrics(
       clicks?: string;
       reach?: string;
       action_values?: MetaActionValue[];
+      actions?: MetaActionValue[];
     }>;
   };
 
@@ -221,6 +255,13 @@ export async function getAccountMetrics(
     reach: parseInt(row.reach ?? "0", 10),
     revenue: sumPurchaseValue(row.action_values),
     conversions: countPurchaseActions(row.action_values),
+    viewContent: sumActionCount(row.actions, FUNNEL_ACTION_TYPE.viewContent),
+    addToCart: sumActionCount(row.actions, FUNNEL_ACTION_TYPE.addToCart),
+    initiateCheckout: sumActionCount(
+      row.actions,
+      FUNNEL_ACTION_TYPE.initiateCheckout
+    ),
+    purchaseEvents: sumActionCount(row.actions, FUNNEL_ACTION_TYPE.purchase),
   }));
 }
 

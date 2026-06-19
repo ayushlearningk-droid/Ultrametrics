@@ -137,6 +137,19 @@ export interface DerivedMetrics {
 /** Raw totals plus the metrics derived from them. */
 export type MetricTotals = RawMetricSet & DerivedMetrics;
 
+/**
+ * Ad-attributed funnel event counts (AI-007). Additive counts of pixel funnel
+ * events attributed to ads (Meta), parsed from single canonical action_type
+ * keys. Account-level only in V1. These are ad-attributed (windowed) counts, NOT
+ * raw pixel/Events-Manager totals.
+ */
+export interface FunnelEvents {
+  viewContent: number;
+  addToCart: number;
+  initiateCheckout: number;
+  purchase: number;
+}
+
 /** A single dated row of raw metrics (used for granularity = "daily"). */
 export interface MetricSeriesPoint extends RawMetricSet {
   /** ISO date (YYYY-MM-DD) for this point. */
@@ -201,6 +214,8 @@ export interface MetricSet {
   campaigns?: CampaignBreakdown[];
   assets?: AssetBreakdown[];
   creatives?: CreativeBreakdown[];
+  /** Account-level ad-attributed funnel event counts (AI-007). */
+  funnel?: FunnelEvents;
 }
 
 /** Query parameters for a metrics fetch. */
@@ -232,6 +247,8 @@ export interface RawMetricResult {
   campaigns?: CampaignRawBreakdown[];
   assets?: AssetRawBreakdown[];
   creatives?: CreativeRawBreakdown[];
+  /** Account-level ad-attributed funnel event counts (AI-007). */
+  funnel?: FunnelEvents;
 }
 
 /**

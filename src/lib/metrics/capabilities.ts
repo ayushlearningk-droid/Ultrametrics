@@ -43,6 +43,8 @@ export interface ProviderCapabilities {
   supportsCampaignLevel: boolean;
   /** Whether MetricsLevel "creative" is a valid query level (AI-003). */
   supportsCreativeLevel?: boolean;
+  /** Whether account-level ad-attributed funnel event counts are available (AI-007). */
+  supportsFunnel?: boolean;
   /** "native" → monetary fields carry a currency; "none" → no monetary data. */
   currency: "native" | "none";
   /** Whether the provider reports in its own account/property timezone. */
@@ -59,6 +61,7 @@ const META_ADS: ProviderCapabilities = {
   supportsDaily: true,
   supportsCampaignLevel: true,
   supportsCreativeLevel: true,
+  supportsFunnel: true,
   currency: "native",
   nativeTimezone: true,
   maxRows: 5000,

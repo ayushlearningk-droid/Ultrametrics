@@ -52,6 +52,7 @@ export function buildSystemPrompt(ctx: WorkspaceContext): string {
 TOOLS — choosing the right one:
 - Use get_workspace_metrics / get_provider_metrics for FACTUAL questions: what a metric is, totals, comparisons, and ranked lists (top/worst/best/highest-X campaign or ad).
 - Use get_recommendations for ACTION questions: "what should I do", "how do I improve", "where am I wasting spend", "what should I scale/pause/fix". It returns deterministic, pre-computed recommendations (action, impact, cta, confidence) per source.
+- Use get_executive_summary for OVERVIEW questions: "summary", "overview", "how is my account doing", "give me the big picture". It returns a per-source block (headline, top opportunity, funnel status, watch-outs). Relay per source; never blend currencies across sources.
 - Relay each recommendation's action, impact, and cta verbatim; do not re-derive or invent figures. Surface the confidence. An empty list means no clear action this window — say so, don't fabricate one.
 - You may call a metrics tool first for context and then get_recommendations, but do not present a raw metrics table when the user asked what to DO; lead with the recommendations.
 - When relaying a recommendation, keep the exact structure on their own lines so it renders as a card:

@@ -37,6 +37,11 @@ import {
   deriveRecommendations,
   type Recommendation,
 } from "@/lib/ai/recommendations";
+import { deriveFunnelDiagnosis } from "@/lib/ai/funnel-intelligence";
+import {
+  composeExecutiveSummary,
+  type SummaryHeadline,
+} from "@/lib/ai/executive-summary";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -495,6 +500,17 @@ function serializeProviderResult(
           creativeType
         )
       : {}),
+    ...(r.metrics.funnel && getCapabilities(r.provider).supportsFunnel
+      ? {
+          funnel: {
+            view_content: r.metrics.funnel.viewContent,
+            add_to_cart: r.metrics.funnel.addToCart,
+            initiate_checkout: r.metrics.funnel.initiateCheckout,
+            purchase: r.metrics.funnel.purchase,
+            attribution: "ad-attributed",
+          },
+        }
+      : {}),
   };
 }
 
@@ -619,6 +635,18 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
     },
   },
   {
+    name: "get_executive_summary",
+    description:
+      "Get a concise, account-level executive summary for each connected source: headline performance (spend, revenue, ROAS, CTR), the single top opportunity (highest business-impact recommendation), funnel status, and watch-outs (tracking gaps / degraded sources). Use for 'summary', 'overview', 'how is my account doing', 'give me the big picture'. One block PER SOURCE — never blend currencies across sources. Relay the numbers verbatim; an empty/degraded source is reported honestly via its status and watch-outs. Omit since/until for the default window.",
+    input_schema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "Optional start date, inclusive (YYYY-MM-DD). Omit for the default window." },
+        until: { type: "string", description: "Optional end date, inclusive (YYYY-MM-DD). Omit for the default window." },
+      },
+    },
+  },
+  {
     name: "list_connected_providers",
     description:
       "List which data sources are connected to the current workspace and what metrics each can report. Use to answer 'what's connected' or before deciding which source to query.",
@@ -687,18 +715,48 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
       const camp = campRes.providers.find((p) => p.provider === provider);
       const ad = adRes.providers.find((p) => p.provider === provider);
 
-      const merged = [...recsForResult(camp), ...recsForResult(ad)]
-        .sort((a, b) =>
-          b.score !== a.score
-            ? b.score - a.score
-            : a.entityName.localeCompare(b.entityName)
-        )
-        .slice(0, REC_CAP);
+      const merged = [...recsForResult(camp), ...recsForResult(ad)];
 
       // Prefer an "ok" source for status/window/currency; otherwise pass a
       // present result's status (no_data/error/unsupported) through verbatim.
       const okSource =
         camp?.status === "ok" ? camp : ad?.status === "ok" ? ad : camp ?? ad;
+
+      // AI-008: account-level funnel diagnosis, when the source supports funnel
+      // and has funnel data. funnel_healthy is informational only — not surfaced
+      // as a recommendation.
+      const funnel =
+        okSource?.status === "ok" ? okSource.metrics?.funnel : undefined;
+      if (funnel && getCapabilities(provider).supportsFunnel) {
+        const diag = deriveFunnelDiagnosis(funnel);
+        if (diag && diag.kind !== "funnel_healthy") {
+          merged.push({
+            kind: diag.kind,
+            provider,
+            level: diag.level,
+            entityId: "account",
+            entityName: "your account",
+            action: diag.action,
+            impact: diag.impact,
+            cta: diag.cta,
+            confidence: diag.confidence,
+            score: diag.opportunityScore / 100,
+            opportunityScore: diag.opportunityScore,
+          });
+        }
+      }
+
+      // AI-007: rank by business-impact opportunityScore desc, tie-break by the
+      // internal rule-fit score, then name for determinism. Cap last.
+      const ranked = merged
+        .sort((a, b) =>
+          b.opportunityScore !== a.opportunityScore
+            ? b.opportunityScore - a.opportunityScore
+            : b.score !== a.score
+              ? b.score - a.score
+              : a.entityName.localeCompare(b.entityName)
+        )
+        .slice(0, REC_CAP);
 
       return {
         provider,
@@ -707,11 +765,94 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
         ...(okSource?.status === "ok" && okSource.metrics
           ? { currency: okSource.metrics.currency }
           : {}),
-        recommendations: merged.map(serializeRecommendation),
+        recommendations: ranked.map(serializeRecommendation),
       };
     });
 
     return JSON.stringify({ dateRange: campRes.dateRange, providers: out });
+  },
+
+  async get_executive_summary(input, ctx) {
+    const base = buildQuery(input, ctx.todayISO);
+    // Same two-level fetch as get_recommendations (campaign + ad), reused to
+    // build per-provider recs, funnel diagnosis, and headline totals.
+    const [campRes, adRes] = await Promise.all([
+      getMetricsWithFallback(ctx.workspaceId, {
+        ...base,
+        level: "campaign",
+        granularity: "total",
+      }),
+      getMetricsWithFallback(ctx.workspaceId, {
+        ...base,
+        level: "ad",
+        granularity: "total",
+      }),
+    ]);
+
+    const providers = new Set<MetricsProvider>();
+    for (const p of campRes.providers) providers.add(p.provider);
+    for (const p of adRes.providers) providers.add(p.provider);
+
+    const summaries = [...providers].map((provider) => {
+      const camp = campRes.providers.find((p) => p.provider === provider);
+      const ad = adRes.providers.find((p) => p.provider === provider);
+      const okSource =
+        camp?.status === "ok" ? camp : ad?.status === "ok" ? ad : camp ?? ad;
+
+      const recs: Recommendation[] = [
+        ...recsForResult(camp),
+        ...recsForResult(ad),
+      ];
+
+      // Funnel diagnosis (Meta, account-level) — drives both the funnel_status
+      // section and an appended funnel recommendation for top-opportunity ranking.
+      const funnelEvents =
+        okSource?.status === "ok" ? okSource.metrics?.funnel : undefined;
+      const supportsFunnel = getCapabilities(provider).supportsFunnel;
+      const funnelDiagnosis =
+        funnelEvents && supportsFunnel
+          ? deriveFunnelDiagnosis(funnelEvents)
+          : null;
+      if (funnelDiagnosis && funnelDiagnosis.kind !== "funnel_healthy") {
+        recs.push({
+          kind: funnelDiagnosis.kind,
+          provider,
+          level: funnelDiagnosis.level,
+          entityId: "account",
+          entityName: "your account",
+          action: funnelDiagnosis.action,
+          impact: funnelDiagnosis.impact,
+          cta: funnelDiagnosis.cta,
+          confidence: funnelDiagnosis.confidence,
+          score: funnelDiagnosis.opportunityScore / 100,
+          opportunityScore: funnelDiagnosis.opportunityScore,
+        });
+      }
+
+      const totals: SummaryHeadline | null =
+        okSource?.status === "ok" && okSource.metrics
+          ? {
+              spend: okSource.metrics.totals.spend,
+              revenue: okSource.metrics.totals.revenue,
+              roas: okSource.metrics.totals.roas,
+              ctr: okSource.metrics.totals.ctr,
+            }
+          : null;
+
+      return composeExecutiveSummary({
+        provider,
+        status: okSource?.status ?? "no_data",
+        windowUsed: okSource?.windowUsed ?? "range",
+        ...(okSource?.status === "ok" && okSource.metrics
+          ? { currency: okSource.metrics.currency }
+          : {}),
+        totals,
+        recommendations: recs,
+        funnelDiagnosis,
+      });
+    });
+
+    return JSON.stringify({ dateRange: campRes.dateRange, summaries });
   },
 
   async list_connected_providers(_input, ctx) {

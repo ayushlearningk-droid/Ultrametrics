@@ -38,7 +38,11 @@ export type RecommendationKind =
   | "scale"
   | "creative_refresh"
   | "budget_concentration"
-  | "bid_review";
+  | "bid_review"
+  // AI-008 funnel diagnoses (account-level).
+  | "funnel_offer_problem"
+  | "funnel_cart_friction"
+  | "funnel_checkout_problem";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -162,6 +166,10 @@ const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
   creative_refresh: 0.5,
   bid_review: 0.4,
   budget_concentration: 0.4,
+  // AI-008 funnel diagnoses.
+  funnel_checkout_problem: 0.9,
+  funnel_cart_friction: 0.7,
+  funnel_offer_problem: 0.6,
 };
 
 /**

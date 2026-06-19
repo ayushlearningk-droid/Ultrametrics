@@ -18,11 +18,28 @@ import type {
   AssetRawBreakdown,
   CreativeRawBreakdown,
   CreativeType,
+  FunnelEvents,
 } from "@/lib/metrics/types";
 import type { MetaMetricsRow, ResolvedAdCreative } from "@/lib/meta/insights";
 import { getActiveMetaToken } from "@/lib/meta/token";
 import { getAccountMetrics, getAdCreatives } from "@/lib/meta/insights";
 import { sumRaw } from "@/lib/metrics/derive";
+
+/**
+ * Account-level funnel totals (AI-007): sum the per-row ad-attributed event
+ * counts across all returned rows. Account-level only — not per entity.
+ */
+function sumFunnel(rows: MetaMetricsRow[]): FunnelEvents {
+  return rows.reduce<FunnelEvents>(
+    (acc, r) => ({
+      viewContent: acc.viewContent + r.viewContent,
+      addToCart: acc.addToCart + r.addToCart,
+      initiateCheckout: acc.initiateCheckout + r.initiateCheckout,
+      purchase: acc.purchase + r.purchaseEvents,
+    }),
+    { viewContent: 0, addToCart: 0, initiateCheckout: 0, purchase: 0 }
+  );
+}
 
 /** Raw additive view of one Meta insights row. */
 function toRaw(r: MetaMetricsRow): RawMetricSet {
@@ -207,6 +224,8 @@ export const metaMetricsAdapter: ConnectorMetricsAdapter = {
       campaigns,
       assets,
       creatives,
+      // AI-007: account-level ad-attributed funnel counts (sum of all rows).
+      funnel: sumFunnel(rows),
     };
   },
 };
