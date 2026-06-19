@@ -16,10 +16,12 @@ import type {
   MetricSeriesPoint,
   CampaignRawBreakdown,
   AssetRawBreakdown,
+  CreativeRawBreakdown,
+  CreativeType,
 } from "@/lib/metrics/types";
-import type { MetaMetricsRow } from "@/lib/meta/insights";
+import type { MetaMetricsRow, ResolvedAdCreative } from "@/lib/meta/insights";
 import { getActiveMetaToken } from "@/lib/meta/token";
-import { getAccountMetrics } from "@/lib/meta/insights";
+import { getAccountMetrics, getAdCreatives } from "@/lib/meta/insights";
 import { sumRaw } from "@/lib/metrics/derive";
 
 /** Raw additive view of one Meta insights row. */
@@ -80,6 +82,65 @@ function groupByAsset(rows: MetaMetricsRow[]): AssetRawBreakdown[] {
   }));
 }
 
+/**
+ * Map Meta's creative type signals onto the canonical CreativeType (AI-003).
+ * Best-effort: a video_id (or VIDEO object_type) → "video", an image_url (or
+ * PHOTO) → "image", text-only stories → "text"; anything unresolved → "other".
+ */
+function creativeTypeFrom(creative: ResolvedAdCreative): CreativeType {
+  const ot = creative.objectType?.toUpperCase();
+  if (creative.videoId || ot === "VIDEO") return "video";
+  if (creative.imageUrl || ot === "PHOTO" || ot === "SHARE") return "image";
+  if (ot === "STATUS" || ot === "TEXT") return "text";
+  return "other";
+}
+
+/**
+ * Group ad-level rows into per-creative raw totals (AI-003). Ads are mapped to
+ * their creative via the resolved side-map; ads sharing a creative collapse into
+ * one entry. Rows whose ad has no resolvable creative are bucketed under the
+ * ad_id with type "other" so no spend is dropped. Rows lacking an ad_id are
+ * skipped. Top-K selection happens later in serialization.
+ */
+function groupByCreative(
+  rows: MetaMetricsRow[],
+  creatives: Map<string, ResolvedAdCreative>
+): CreativeRawBreakdown[] {
+  const byId = new Map<
+    string,
+    {
+      name: string;
+      type: CreativeType;
+      thumbnailUrl?: string;
+      rows: RawMetricSet[];
+    }
+  >();
+
+  for (const r of rows) {
+    if (!r.ad_id) continue;
+    const resolved = creatives.get(r.ad_id);
+    const creativeId = resolved?.creativeId ?? r.ad_id;
+    const entry = byId.get(creativeId) ?? {
+      name: resolved?.creativeName ?? r.ad_name ?? creativeId,
+      type: resolved ? creativeTypeFrom(resolved) : "other",
+      thumbnailUrl: resolved?.thumbnailUrl,
+      rows: [],
+    };
+    entry.rows.push(toRaw(r));
+    byId.set(creativeId, entry);
+  }
+
+  return [...byId.entries()].map(
+    ([creativeId, { name, type, thumbnailUrl, rows: creativeRows }]) => ({
+      creativeId,
+      creativeName: name,
+      creativeType: type,
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      rawTotals: sumRaw(creativeRows),
+    })
+  );
+}
+
 export const metaMetricsAdapter: ConnectorMetricsAdapter = {
   provider: "meta_ads",
 
@@ -89,11 +150,17 @@ export const metaMetricsAdapter: ConnectorMetricsAdapter = {
     const token = await getActiveMetaToken(workspaceId);
     if (token.status !== "ok") return null;
 
+    // AI-003: creative breakdown is built from ad-level insights (Meta has no
+    // "creative" insights level), then ads are mapped to creatives via a side
+    // call. All other levels pass through unchanged.
+    const insightsLevel =
+      query.level === "creative" ? "ad" : query.level;
+
     const rows = await getAccountMetrics(token.accessToken, token.accountId, {
       since: query.dateRange.since,
       until: query.dateRange.until,
       granularity: query.granularity,
-      level: query.level,
+      level: insightsLevel,
     });
     if (rows.length === 0) return null;
 
@@ -105,6 +172,14 @@ export const metaMetricsAdapter: ConnectorMetricsAdapter = {
     const campaigns =
       query.level === "campaign" ? groupByCampaign(rows) : undefined;
     const assets = query.level === "ad" ? groupByAsset(rows) : undefined;
+
+    // AI-003: resolve ad → creative and group, only at level "creative".
+    let creatives: CreativeRawBreakdown[] | undefined;
+    if (query.level === "creative") {
+      const adIds = rows.map((r) => r.ad_id).filter((id): id is string => !!id);
+      const resolved = await getAdCreatives(token.accessToken, adIds);
+      creatives = groupByCreative(rows, resolved);
+    }
 
     // V1: revenue is totals-only — per-day series omits revenue (0).
     const series: MetricSeriesPoint[] | undefined =
@@ -131,6 +206,7 @@ export const metaMetricsAdapter: ConnectorMetricsAdapter = {
       series,
       campaigns,
       assets,
+      creatives,
     };
   },
 };

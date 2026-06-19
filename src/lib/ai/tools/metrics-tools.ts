@@ -24,6 +24,8 @@ import type {
   DerivedMetrics,
   CampaignBreakdown,
   AssetBreakdown,
+  CreativeBreakdown,
+  CreativeType,
 } from "@/lib/metrics/types";
 import type { WorkspaceContext } from "@/lib/ai/types";
 import type { ProviderMetricsResult } from "@/lib/metrics/engine";
@@ -71,8 +73,27 @@ function asGranularity(value: unknown): MetricsGranularity {
 }
 
 function asLevel(value: unknown): MetricsLevel | undefined {
-  return value === "campaign" || value === "account" || value === "ad"
+  return value === "campaign" ||
+    value === "account" ||
+    value === "ad" ||
+    value === "creative"
     ? value
+    : undefined;
+}
+
+const CREATIVE_TYPES: readonly CreativeType[] = [
+  "image",
+  "video",
+  "carousel",
+  "text",
+  "other",
+];
+
+/** Validate an optional creative-type filter; undefined = no filter. */
+function asCreativeType(value: unknown): CreativeType | undefined {
+  return typeof value === "string" &&
+    (CREATIVE_TYPES as readonly string[]).includes(value)
+    ? (value as CreativeType)
     : undefined;
 }
 
@@ -383,11 +404,68 @@ function serializeAssets(
   };
 }
 
+/** AI-003 V1: cap to the top 10 creatives. */
+const TOP_K_CREATIVES = 10;
+
+/**
+ * Serialize a provider's creative breakdown (AI-003). Optionally filters to one
+ * creative_type FIRST (so "best video" ranks only videos), then reuses the
+ * AI-004A pipeline: ratio qualification, sort by sort_by/order, cap to the top
+ * 10, capability-gate the same raw/derived keys. thumbnail_url is intentionally
+ * NOT serialized in this step. Meta-only in practice (only Meta populates a
+ * creative breakdown).
+ */
+function serializeCreatives(
+  provider: MetricsProvider,
+  creatives: CreativeBreakdown[],
+  sortBy: SortKey = "spend",
+  order: Order = "desc",
+  creativeType?: CreativeType
+) {
+  const cap = getCapabilities(provider);
+  const filtered = creativeType
+    ? creatives.filter((c) => c.creativeType === creativeType)
+    : creatives;
+  const { base, meta } = qualify(filtered, sortBy);
+  const sorted = [...base].sort((a, b) =>
+    compareByKey(a.totals, b.totals, sortBy, order)
+  );
+  const top = sorted.slice(0, TOP_K_CREATIVES);
+
+  const list = top.map((c) => {
+    const raw: Record<string, number> = {};
+    for (const key of RAW_KEYS_ON_TOTALS) {
+      if (!cap.rawMetrics.includes(key)) continue;
+      const v = c.totals[key];
+      if (v !== null && v !== undefined) raw[key] = v;
+    }
+    const derived: Record<string, number> = {};
+    for (const key of DERIVED_KEYS_ON_TOTALS) {
+      if (cap.derivedMetrics.includes(key)) derived[key] = c.totals[key];
+    }
+    return {
+      creative_id: c.creativeId,
+      creative_name: c.creativeName,
+      creative_type: c.creativeType,
+      raw,
+      derived,
+    };
+  });
+
+  return {
+    creatives: list,
+    creatives_omitted: Math.max(0, base.length - top.length),
+    ...(creativeType ? { creative_type_filter: creativeType } : {}),
+    ...(meta.applied ? { qualification: meta } : {}),
+  };
+}
+
 /** Serialize one provider result, preserving status verbatim. */
 function serializeProviderResult(
   r: ProviderMetricsResult,
   sortBy: SortKey = "spend",
-  order: Order = "desc"
+  order: Order = "desc",
+  creativeType?: CreativeType
 ) {
   if (r.status !== "ok" || !r.metrics) {
     return {
@@ -407,6 +485,15 @@ function serializeProviderResult(
       : {}),
     ...(r.metrics.assets
       ? serializeAssets(r.provider, r.metrics.assets, sortBy, order)
+      : {}),
+    ...(r.metrics.creatives && getCapabilities(r.provider).supportsCreativeLevel
+      ? serializeCreatives(
+          r.provider,
+          r.metrics.creatives,
+          sortBy,
+          order,
+          creativeType
+        )
       : {}),
   };
 }
@@ -456,18 +543,23 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
         },
         level: {
           type: "string",
-          enum: ["account", "campaign", "ad"],
-          description: "account = workspace/account totals only (default). campaign = also return a per-campaign breakdown (top/best/worst campaigns, highest-ROAS / lowest-CTR campaign, which campaign to fund). ad = also return a per-ad breakdown (best/worst ads, highest-CTR / highest-ROAS / highest-spend ad).",
+          enum: ["account", "campaign", "ad", "creative"],
+          description: "account = workspace/account totals only (default). campaign = also return a per-campaign breakdown (top/best/worst campaigns, highest-ROAS / lowest-CTR campaign, which campaign to fund). ad = also return a per-ad breakdown (best/worst ads, highest-CTR / highest-ROAS / highest-spend ad). creative = also return a per-creative breakdown (best/worst creative, highest-CTR creative, which image/video to scale, fatiguing creative). Creative level is Meta only.",
         },
         sort_by: {
           type: "string",
           enum: ["spend", "ctr", "roas", "cpc", "conversions", "revenue", "impressions", "clicks"],
-          description: "How to rank the campaign/ad breakdown. Pick the metric the question is about: 'highest CTR' → ctr, 'highest ROAS' / 'best' → roas, 'lowest CPC' / 'cheapest clicks' → cpc, 'most spend' / 'top' → spend, 'most conversions' → conversions. Default spend. The returned list is sorted by this key but NOT volume-filtered yet, so very low-volume entities can rank high on a ratio.",
+          description: "How to rank the campaign/ad/creative breakdown. Pick the metric the question is about: 'highest CTR' → ctr, 'highest ROAS' / 'best' → roas, 'lowest CPC' / 'cheapest clicks' → cpc, 'most spend' / 'top' → spend, 'most conversions' → conversions. Default spend. The returned list is sorted by this key but NOT volume-filtered yet, so very low-volume entities can rank high on a ratio.",
         },
         order: {
           type: "string",
           enum: ["asc", "desc"],
           description: "Sort direction for sort_by. desc = highest first (default). Use asc for 'lowest' / 'cheapest' / 'worst on a higher-is-better metric' (e.g. lowest CPC → sort_by:cpc, order:asc).",
+        },
+        creative_type: {
+          type: "string",
+          enum: ["image", "video", "carousel", "text", "other"],
+          description: "Only with level:\"creative\". Restrict the creative breakdown to one format — use for 'best image' (image) or 'best video' (video). Omit to include all creative formats.",
         },
       },
     },
@@ -492,18 +584,23 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
         },
         level: {
           type: "string",
-          enum: ["account", "campaign", "ad"],
-          description: "Aggregation level when supported. Use 'campaign' for a per-campaign breakdown (top/worst/compare campaigns, campaign ROAS). Use 'ad' for a per-ad breakdown (best/worst ads, highest CTR/ROAS/spend ad). Default account.",
+          enum: ["account", "campaign", "ad", "creative"],
+          description: "Aggregation level when supported. Use 'campaign' for a per-campaign breakdown (top/worst/compare campaigns, campaign ROAS). Use 'ad' for a per-ad breakdown (best/worst ads, highest CTR/ROAS/spend ad). Use 'creative' for a per-creative breakdown (best/worst creative, highest-CTR creative, which image/video to scale). Creative level is Meta only. Default account.",
         },
         sort_by: {
           type: "string",
           enum: ["spend", "ctr", "roas", "cpc", "conversions", "revenue", "impressions", "clicks"],
-          description: "How to rank the campaign/ad breakdown. Pick the metric the question is about: 'highest CTR' → ctr, 'highest ROAS' / 'best' → roas, 'lowest CPC' / 'cheapest clicks' → cpc, 'most spend' / 'top' → spend, 'most conversions' → conversions. Default spend. The returned list is sorted by this key but NOT volume-filtered yet, so very low-volume entities can rank high on a ratio.",
+          description: "How to rank the campaign/ad/creative breakdown. Pick the metric the question is about: 'highest CTR' → ctr, 'highest ROAS' / 'best' → roas, 'lowest CPC' / 'cheapest clicks' → cpc, 'most spend' / 'top' → spend, 'most conversions' → conversions. Default spend. The returned list is sorted by this key but NOT volume-filtered yet, so very low-volume entities can rank high on a ratio.",
         },
         order: {
           type: "string",
           enum: ["asc", "desc"],
           description: "Sort direction for sort_by. desc = highest first (default). Use asc for 'lowest' / 'cheapest' / 'worst on a higher-is-better metric' (e.g. lowest CPC → sort_by:cpc, order:asc).",
+        },
+        creative_type: {
+          type: "string",
+          enum: ["image", "video", "carousel", "text", "other"],
+          description: "Only with level:\"creative\". Restrict the creative breakdown to one format — use for 'best image' (image) or 'best video' (video). Omit to include all creative formats.",
         },
       },
       required: ["provider"],
@@ -534,12 +631,13 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
     const query = buildQuery(input, ctx.todayISO);
     const sortBy = asSortKey(input.sort_by);
     const order = asOrder(input.order);
+    const creativeType = asCreativeType(input.creative_type);
     const result = await getMetricsWithFallback(ctx.workspaceId, query);
     return JSON.stringify({
       dateRange: result.dateRange,
       granularity: result.granularity,
       providers: result.providers.map((p) =>
-        serializeProviderResult(p, sortBy, order)
+        serializeProviderResult(p, sortBy, order, creativeType)
       ),
     });
   },
@@ -549,6 +647,7 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
     const query = buildQuery(input, ctx.todayISO);
     const sortBy = asSortKey(input.sort_by);
     const order = asOrder(input.order);
+    const creativeType = asCreativeType(input.creative_type);
     // Go through the workspace engine (correct connector resolution + cache +
     // per-provider lifetime fallback), then narrow to the requested provider. A
     // provider with no active connector simply isn't in the result.
@@ -557,7 +656,9 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
     if (!match) {
       return JSON.stringify({ provider, status: "unsupported" });
     }
-    return JSON.stringify(serializeProviderResult(match, sortBy, order));
+    return JSON.stringify(
+      serializeProviderResult(match, sortBy, order, creativeType)
+    );
   },
 
   async get_recommendations(input, ctx) {

@@ -62,7 +62,9 @@ export interface WorkspaceMetrics {
  * deriving ratios off the summed raw totals; `series` (daily only) passes
  * through unchanged — it already carries raw MetricSeriesPoint rows. When the
  * adapter supplied a per-campaign breakdown (Issue #3), each campaign's raw
- * totals are derived through the SAME toTotals() — no new calculations.
+ * totals are derived through the SAME toTotals() — no new calculations. The
+ * per-creative breakdown (AI-003) is forwarded the same way, carrying creative
+ * identity/type/thumbnail through unchanged.
  */
 function toMetricSet(raw: RawMetricResult): MetricSet {
   return {
@@ -81,6 +83,13 @@ function toMetricSet(raw: RawMetricResult): MetricSet {
       assetId: a.assetId,
       assetName: a.assetName,
       totals: toTotals(a.rawTotals),
+    })),
+    creatives: raw.creatives?.map((c) => ({
+      creativeId: c.creativeId,
+      creativeName: c.creativeName,
+      creativeType: c.creativeType,
+      ...(c.thumbnailUrl ? { thumbnailUrl: c.thumbnailUrl } : {}),
+      totals: toTotals(c.rawTotals),
     })),
   };
 }

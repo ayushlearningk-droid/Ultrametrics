@@ -87,7 +87,15 @@ export type MetricsGranularity = "total" | "daily";
 export type MetricsMode = "range" | "lifetime";
 
 /** Aggregation level requested from a provider, when applicable. */
-export type MetricsLevel = "account" | "campaign" | "ad";
+export type MetricsLevel = "account" | "campaign" | "ad" | "creative";
+
+/**
+ * Coarse, provider-agnostic creative classification (AI-003). Providers map
+ * their own taxonomy (Meta object_type, Google ad.type / asset.type) onto these
+ * buckets in their adapters. Unknown/unclassifiable creatives map to "other"
+ * rather than being guessed — the field is always present, never null.
+ */
+export type CreativeType = "image" | "video" | "carousel" | "text" | "other";
 
 /** A closed date range, inclusive, as ISO date strings (YYYY-MM-DD). */
 export interface MetricsDateRange {
@@ -158,6 +166,25 @@ export interface AssetBreakdown {
 }
 
 /**
+ * Derived per-creative breakdown entry (AI-003, creative-level V1). Totals are
+ * raw + derived ratios for a single creative. Present only when a fetch was made
+ * at level "creative". Flat (not nested under ads); no per-creative series in V1.
+ *
+ * Additivity is APPROXIMATE for creatives: a creative reused across multiple ads
+ * and carousel child cards mean the sum of all creatives' totals only roughly
+ * equals the account totals — unlike the strict campaign/ad invariant. Consumers
+ * must not assume exact reconciliation.
+ */
+export interface CreativeBreakdown {
+  creativeId: string;
+  creativeName: string;
+  creativeType: CreativeType;
+  /** Optional preview image; absent when the provider returns none. */
+  thumbnailUrl?: string;
+  totals: MetricTotals;
+}
+
+/**
  * The canonical result returned by the engine for one provider (or blended).
  * `currency` is the ISO code the monetary fields are expressed in. `series` is
  * present only for daily granularity. `campaigns` is present only at level
@@ -173,6 +200,7 @@ export interface MetricSet {
   series?: MetricSeriesPoint[];
   campaigns?: CampaignBreakdown[];
   assets?: AssetBreakdown[];
+  creatives?: CreativeBreakdown[];
 }
 
 /** Query parameters for a metrics fetch. */
@@ -203,6 +231,7 @@ export interface RawMetricResult {
   series?: MetricSeriesPoint[];
   campaigns?: CampaignRawBreakdown[];
   assets?: AssetRawBreakdown[];
+  creatives?: CreativeRawBreakdown[];
 }
 
 /**
@@ -226,6 +255,23 @@ export interface CampaignRawBreakdown {
 export interface AssetRawBreakdown {
   assetId: string;
   assetName: string;
+  rawTotals: RawMetricSet;
+}
+
+/**
+ * Raw, un-derived per-creative breakdown entry (AI-003). One additive
+ * RawMetricSet scoped to a single creative, plus creative identity/type and an
+ * optional thumbnail. Adapters populate this only when the query level is
+ * "creative"; the engine derives ratios into CreativeBreakdown. Additivity vs
+ * account rawTotals is APPROXIMATE (shared/carousel creatives) — see
+ * CreativeBreakdown.
+ */
+export interface CreativeRawBreakdown {
+  creativeId: string;
+  creativeName: string;
+  creativeType: CreativeType;
+  /** Optional preview image; absent when the provider returns none. */
+  thumbnailUrl?: string;
   rawTotals: RawMetricSet;
 }
 

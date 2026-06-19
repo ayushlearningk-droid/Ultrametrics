@@ -103,7 +103,7 @@ export interface GetAccountMetricsOptions {
   since: string; // YYYY-MM-DD
   until: string; // YYYY-MM-DD
   granularity: "total" | "daily";
-  level?: "account" | "campaign" | "ad";
+  level?: "account" | "campaign" | "ad" | "creative";
   /**
    * Time window. "range" (default) uses the explicit since/until via time_range.
    * "lifetime" uses date_preset=maximum (all-time) and ignores since/until.
@@ -222,4 +222,83 @@ export async function getAccountMetrics(
     revenue: sumPurchaseValue(row.action_values),
     conversions: countPurchaseActions(row.action_values),
   }));
+}
+
+/* ─── Creative resolution (AI-003) ────────────────────────────────────────── */
+
+/**
+ * One ad's resolved creative identity, returned by getAdCreatives. The raw type
+ * signals (objectType/videoId/imageUrl) are carried through so the adapter maps
+ * them onto the canonical CreativeType — this module does not classify.
+ */
+export interface ResolvedAdCreative {
+  creativeId: string;
+  creativeName: string;
+  objectType?: string;
+  videoId?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+}
+
+/** Graph batch GET caps id lists; resolve in chunks well under the limit. */
+const AD_CREATIVE_BATCH = 50;
+
+/**
+ * Resolve ad_id → creative identity for a set of ads (AI-003). The Meta insights
+ * endpoint does not return creative fields, so they are read from the ad objects
+ * via a batched `?ids=...&fields=creative{...}` call. Resilient: a failed chunk
+ * is skipped (those ads simply won't resolve) rather than failing the whole
+ * fetch — the adapter buckets unresolved ads as "other".
+ */
+export async function getAdCreatives(
+  accessToken: string,
+  adIds: string[]
+): Promise<Map<string, ResolvedAdCreative>> {
+  const out = new Map<string, ResolvedAdCreative>();
+  const unique = [...new Set(adIds.filter(Boolean))];
+
+  for (let i = 0; i < unique.length; i += AD_CREATIVE_BATCH) {
+    const chunk = unique.slice(i, i + AD_CREATIVE_BATCH);
+    const params = new URLSearchParams({
+      ids: chunk.join(","),
+      fields: "creative{id,name,thumbnail_url,object_type,video_id,image_url}",
+      access_token: accessToken,
+    });
+    const url = `https://graph.facebook.com/${GRAPH_VERSION}/?${params}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const json = (await res.json()) as Record<
+        string,
+        {
+          creative?: {
+            id?: string;
+            name?: string;
+            thumbnail_url?: string;
+            object_type?: string;
+            video_id?: string;
+            image_url?: string;
+          };
+        }
+      >;
+
+      for (const adId of chunk) {
+        const creative = json[adId]?.creative;
+        if (!creative?.id) continue;
+        out.set(adId, {
+          creativeId: creative.id,
+          creativeName: creative.name ?? creative.id,
+          objectType: creative.object_type,
+          videoId: creative.video_id,
+          imageUrl: creative.image_url,
+          thumbnailUrl: creative.thumbnail_url,
+        });
+      }
+    } catch {
+      // Skip this chunk; unresolved ads are bucketed as "other" by the adapter.
+    }
+  }
+
+  return out;
 }
