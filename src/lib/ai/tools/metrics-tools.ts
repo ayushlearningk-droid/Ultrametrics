@@ -30,6 +30,11 @@ import type { ProviderMetricsResult } from "@/lib/metrics/engine";
 import { getMetricsWithFallback } from "@/lib/metrics/engine";
 import { getCapabilities } from "@/lib/metrics/registry";
 import { CAPABILITIES } from "@/lib/metrics/capabilities";
+import { MIN_IMPRESSIONS, MIN_SPEND, MIN_CLICKS } from "@/lib/ai/thresholds";
+import {
+  deriveRecommendations,
+  type Recommendation,
+} from "@/lib/ai/recommendations";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -217,11 +222,10 @@ function serializeTotals(provider: MetricsProvider, set: MetricSet) {
  * 12-impression entity can't win "highest CTR". Non-ratio sorts are not
  * filtered (output stays byte-identical). If every entity is below the floor,
  * we fall back to the full unfiltered list so an answer is never suppressed.
+ *
+ * Floors (MIN_IMPRESSIONS / MIN_SPEND / MIN_CLICKS) come from the shared
+ * thresholds module so ranking and the recommendation engine stay in sync.
  */
-const MIN_IMPRESSIONS = 500;
-const MIN_SPEND = 50;
-const MIN_CLICKS = 20;
-
 const RATIO_QUALIFICATION: Partial<
   Record<SortKey, { field: keyof MetricTotals; threshold: number }>
 > = {
@@ -407,6 +411,34 @@ function serializeProviderResult(
   };
 }
 
+/** AI-005: max recommendations returned per provider. */
+const REC_CAP = 5;
+
+/** Compact, score-free view of a recommendation (score is sort-only). */
+function serializeRecommendation(r: Recommendation) {
+  return {
+    kind: r.kind,
+    level: r.level,
+    entity_id: r.entityId,
+    entity_name: r.entityName,
+    action: r.action,
+    impact: r.impact,
+    cta: r.cta,
+    confidence: r.confidence,
+  };
+}
+
+/** Run the rules for one provider result, or [] when it has no usable metrics. */
+function recsForResult(
+  result: ProviderMetricsResult | undefined
+): Recommendation[] {
+  if (!result || result.status !== "ok" || !result.metrics) return [];
+  return deriveRecommendations(
+    result.metrics,
+    getCapabilities(result.provider)
+  );
+}
+
 export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_workspace_metrics",
@@ -478,6 +510,18 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
     },
   },
   {
+    name: "get_recommendations",
+    description:
+      "Get deterministic, grounded ACTION recommendations (scale / pause / creative refresh / budget concentration / bid review / tracking issue) for the workspace's campaigns AND ads. Use when the user asks 'what should I do', 'how do I improve', 'where am I wasting spend', or wants next steps. Each recommendation is computed from retrieved metrics versus that source's own account average; relay them verbatim (action, impact, cta, confidence) and NEVER claim to have taken an action — you can only advise. Omit since/until for the default window (last 180 days, with per-source all-time fallback). Returns up to 5 recommendations per source; an empty list means no clear action this window — say so rather than inventing one.",
+    input_schema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "Optional start date, inclusive (YYYY-MM-DD). Omit for the default window." },
+        until: { type: "string", description: "Optional end date, inclusive (YYYY-MM-DD). Omit for the default window." },
+      },
+    },
+  },
+  {
     name: "list_connected_providers",
     description:
       "List which data sources are connected to the current workspace and what metrics each can report. Use to answer 'what's connected' or before deciding which source to query.",
@@ -514,6 +558,59 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
       return JSON.stringify({ provider, status: "unsupported" });
     }
     return JSON.stringify(serializeProviderResult(match, sortBy, order));
+  },
+
+  async get_recommendations(input, ctx) {
+    const base = buildQuery(input, ctx.todayISO);
+    // Two fetches: campaign-level and ad-level. The rules run separately per
+    // result (so a per-source lifetime-fallback window divergence can't blend
+    // breakdowns), and the resulting lists are merged + capped afterward.
+    const [campRes, adRes] = await Promise.all([
+      getMetricsWithFallback(ctx.workspaceId, {
+        ...base,
+        level: "campaign",
+        granularity: "total",
+      }),
+      getMetricsWithFallback(ctx.workspaceId, {
+        ...base,
+        level: "ad",
+        granularity: "total",
+      }),
+    ]);
+
+    const providers = new Set<MetricsProvider>();
+    for (const p of campRes.providers) providers.add(p.provider);
+    for (const p of adRes.providers) providers.add(p.provider);
+
+    const out = [...providers].map((provider) => {
+      const camp = campRes.providers.find((p) => p.provider === provider);
+      const ad = adRes.providers.find((p) => p.provider === provider);
+
+      const merged = [...recsForResult(camp), ...recsForResult(ad)]
+        .sort((a, b) =>
+          b.score !== a.score
+            ? b.score - a.score
+            : a.entityName.localeCompare(b.entityName)
+        )
+        .slice(0, REC_CAP);
+
+      // Prefer an "ok" source for status/window/currency; otherwise pass a
+      // present result's status (no_data/error/unsupported) through verbatim.
+      const okSource =
+        camp?.status === "ok" ? camp : ad?.status === "ok" ? ad : camp ?? ad;
+
+      return {
+        provider,
+        status: okSource?.status ?? "no_data",
+        window_used: okSource?.windowUsed ?? "range",
+        ...(okSource?.status === "ok" && okSource.metrics
+          ? { currency: okSource.metrics.currency }
+          : {}),
+        recommendations: merged.map(serializeRecommendation),
+      };
+    });
+
+    return JSON.stringify({ dateRange: campRes.dateRange, providers: out });
   },
 
   async list_connected_providers(_input, ctx) {
