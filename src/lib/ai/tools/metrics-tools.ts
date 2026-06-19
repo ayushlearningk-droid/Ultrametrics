@@ -19,6 +19,7 @@ import type {
   MetricsGranularity,
   MetricsLevel,
   MetricSet,
+  MetricTotals,
   RawMetricSet,
   DerivedMetrics,
   CampaignBreakdown,
@@ -68,6 +69,66 @@ function asLevel(value: unknown): MetricsLevel | undefined {
   return value === "campaign" || value === "account" || value === "ad"
     ? value
     : undefined;
+}
+
+/**
+ * AI-004A — ranking primitives (Step 1A: types + parsers only).
+ *
+ * SortKey is constrained to keys present on MetricTotals so a comparator can
+ * index totals[sortBy] soundly. Order is the sort direction. These are wired
+ * into the serializers as optional params whose defaults ("spend"/"desc")
+ * reproduce the previous spend-descending behavior byte-for-byte — no schema,
+ * thresholds, or filtering in this step.
+ */
+type SortKey =
+  | "spend"
+  | "ctr"
+  | "roas"
+  | "cpc"
+  | "conversions"
+  | "revenue"
+  | "impressions"
+  | "clicks";
+
+type Order = "asc" | "desc";
+
+const SORT_KEYS: readonly SortKey[] = [
+  "spend",
+  "ctr",
+  "roas",
+  "cpc",
+  "conversions",
+  "revenue",
+  "impressions",
+  "clicks",
+];
+
+/** Validate a model-supplied sort key; default to "spend". */
+function asSortKey(value: unknown): SortKey {
+  return typeof value === "string" && (SORT_KEYS as readonly string[]).includes(value)
+    ? (value as SortKey)
+    : "spend";
+}
+
+/** Validate a model-supplied sort order; default to "desc". */
+function asOrder(value: unknown): Order {
+  return value === "asc" ? "asc" : "desc";
+}
+
+/**
+ * Comparator over MetricTotals by `sortBy`/`order`. With the defaults
+ * ("spend", "desc") this is exactly `b.totals.spend - a.totals.spend`,
+ * preserving the prior sort byte-for-byte.
+ */
+function compareByKey(
+  a: MetricTotals,
+  b: MetricTotals,
+  sortBy: SortKey,
+  order: Order
+): number {
+  const av = a[sortBy];
+  const bv = b[sortBy];
+  return order === "asc" ? av - bv : bv - av;
 }
 
 function asProvider(value: unknown): MetricsProvider {
@@ -158,11 +219,13 @@ const TOP_K_CAMPAIGNS = 15;
  */
 function serializeCampaigns(
   provider: MetricsProvider,
-  campaigns: CampaignBreakdown[]
+  campaigns: CampaignBreakdown[],
+  sortBy: SortKey = "spend",
+  order: Order = "desc"
 ) {
   const cap = getCapabilities(provider);
-  const sorted = [...campaigns].sort(
-    (a, b) => b.totals.spend - a.totals.spend
+  const sorted = [...campaigns].sort((a, b) =>
+    compareByKey(a.totals, b.totals, sortBy, order)
   );
   const top = sorted.slice(0, TOP_K_CAMPAIGNS);
 
@@ -201,10 +264,14 @@ const TOP_K_ASSETS = 10;
  */
 function serializeAssets(
   provider: MetricsProvider,
-  assets: AssetBreakdown[]
+  assets: AssetBreakdown[],
+  sortBy: SortKey = "spend",
+  order: Order = "desc"
 ) {
   const cap = getCapabilities(provider);
-  const sorted = [...assets].sort((a, b) => b.totals.spend - a.totals.spend);
+  const sorted = [...assets].sort((a, b) =>
+    compareByKey(a.totals, b.totals, sortBy, order)
+  );
   const top = sorted.slice(0, TOP_K_ASSETS);
 
   const list = top.map((a) => {
@@ -233,7 +300,11 @@ function serializeAssets(
 }
 
 /** Serialize one provider result, preserving status verbatim. */
-function serializeProviderResult(r: ProviderMetricsResult) {
+function serializeProviderResult(
+  r: ProviderMetricsResult,
+  sortBy: SortKey = "spend",
+  order: Order = "desc"
+) {
   if (r.status !== "ok" || !r.metrics) {
     return {
       provider: r.provider,
@@ -248,10 +319,10 @@ function serializeProviderResult(r: ProviderMetricsResult) {
     window_used: r.windowUsed ?? "range",
     ...serializeTotals(r.provider, r.metrics),
     ...(r.metrics.campaigns
-      ? serializeCampaigns(r.provider, r.metrics.campaigns)
+      ? serializeCampaigns(r.provider, r.metrics.campaigns, sortBy, order)
       : {}),
     ...(r.metrics.assets
-      ? serializeAssets(r.provider, r.metrics.assets)
+      ? serializeAssets(r.provider, r.metrics.assets, sortBy, order)
       : {}),
   };
 }
@@ -321,7 +392,7 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
     return JSON.stringify({
       dateRange: result.dateRange,
       granularity: result.granularity,
-      providers: result.providers.map(serializeProviderResult),
+      providers: result.providers.map((p) => serializeProviderResult(p)),
     });
   },
 
