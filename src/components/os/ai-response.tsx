@@ -22,6 +22,7 @@ import {
   Activity,
   ShieldAlert,
   ArrowUpRight,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/os/markdown";
@@ -116,6 +117,89 @@ function extractMetrics(body: string): Metric[] {
   return out;
 }
 
+/* ── Ranking leaderboards (AI-004B) ──────────────────────────────────────────
+ * Detect an entity×metric GFM table (rows = campaign/ad/creative names, columns
+ * = known metrics) and render it as a ranked leaderboard instead of a raw
+ * markdown table. Pure presentation; only fires on a recognized ranking table,
+ * so every other section is unaffected. */
+
+/** First-column header that marks a row as a named entity, not a metric label. */
+const NAME_COL_RE = /\b(campaign|ad|ads|creative|asset|name)\b/i;
+
+interface RankingMetric {
+  label: string;
+  value: string;
+}
+
+interface RankingRow {
+  name: string;
+  values: RankingMetric[];
+}
+
+interface RankingTable {
+  nameLabel: string;
+  rows: RankingRow[];
+}
+
+/** Split a GFM table row into cleaned cells (outer pipes stripped). */
+function splitTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((c) => clean(c));
+}
+
+/** True when every cell is a GFM separator token (---, :--, --:, :--:). */
+function isSeparatorRow(cells: string[]): boolean {
+  return (
+    cells.length > 0 &&
+    cells.every((c) => /^:?-{2,}:?$/.test(c.replace(/\s/g, "")))
+  );
+}
+
+/**
+ * Recognize a ranking table: header whose FIRST column is an entity name and
+ * which has at least one known-metric column. Returns the parsed rows, or null
+ * when the section is not an entity×metric table (so it stays plain markdown /
+ * a normal metric card).
+ */
+function detectRankingTable(body: string): RankingTable | null {
+  const lines = body
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("|"));
+  // Need header + separator + at least one data row.
+  if (lines.length < 3) return null;
+
+  const header = splitTableRow(lines[0]);
+  if (header.length < 2) return null;
+  if (!NAME_COL_RE.test(header[0])) return null;
+  if (!isSeparatorRow(splitTableRow(lines[1]))) return null;
+
+  const metricIdx: number[] = [];
+  header.forEach((h, i) => {
+    if (i > 0 && METRIC_LABELS.has(h.toLowerCase())) metricIdx.push(i);
+  });
+  if (metricIdx.length === 0) return null;
+
+  const rows: RankingRow[] = [];
+  for (const line of lines.slice(2)) {
+    const cells = splitTableRow(line);
+    const name = cells[0];
+    if (!name) continue;
+    const values = metricIdx
+      .filter((i) => i < cells.length && cells[i] !== "")
+      .map((i) => ({ label: header[i], value: cells[i] }));
+    if (values.length === 0) continue;
+    rows.push({ name, values });
+  }
+  if (rows.length === 0) return null;
+
+  return { nameLabel: header[0], rows };
+}
+
 const PROVIDER_RE =
   /(meta(?:\sads)?|facebook|google(?:\sads)?|ga4|shopify|tiktok|amazon(?:\sads)?|linkedin(?:\sads)?)/i;
 const STATUS_RE =
@@ -160,6 +244,7 @@ const STATUS_HEADING_RE =
 
 type Kind =
   | "metric"
+  | "ranking"
   | "status"
   | "recommendation"
   | "diagnostic"
@@ -171,32 +256,39 @@ function classify(section: Section): {
   kind: Kind;
   metrics: Metric[];
   statuses: ConnectorStatus[];
+  ranking: RankingTable | null;
 } {
   const metrics = extractMetrics(section.body);
   const statuses = extractStatuses(section.body);
+  const ranking = detectRankingTable(section.body);
   const heading = section.heading ?? "";
 
   if (STATUS_HEADING_RE.test(heading) && statuses.length > 0) {
-    return { kind: "status", metrics, statuses };
+    return { kind: "status", metrics, statuses, ranking };
+  }
+  // Ranking (entity×metric table) is checked before the generic metric card so
+  // a leaderboard never collapses into a 2-up metric grid.
+  if (ranking) {
+    return { kind: "ranking", metrics, statuses, ranking };
   }
   if (metrics.length >= 2) {
-    return { kind: "metric", metrics, statuses };
+    return { kind: "metric", metrics, statuses, ranking };
   }
   // Recommendations are checked before insight variants so an "action/recommend"
   // heading renders as a recommendation card, not a generic insight.
   if (RECOMMENDATION_RE.test(heading)) {
-    return { kind: "recommendation", metrics, statuses };
+    return { kind: "recommendation", metrics, statuses, ranking };
   }
   if (RISK_RE.test(heading)) {
-    return { kind: "risk", metrics, statuses };
+    return { kind: "risk", metrics, statuses, ranking };
   }
   if (OPPORTUNITY_RE.test(heading)) {
-    return { kind: "opportunity", metrics, statuses };
+    return { kind: "opportunity", metrics, statuses, ranking };
   }
   if (DIAGNOSTIC_RE.test(heading)) {
-    return { kind: "diagnostic", metrics, statuses };
+    return { kind: "diagnostic", metrics, statuses, ranking };
   }
-  return { kind: "plain", metrics, statuses };
+  return { kind: "plain", metrics, statuses, ranking };
 }
 
 /** Parse optional Action/Impact/CTA fields from a recommendation body. */
@@ -247,6 +339,63 @@ function MetricCards({ heading, metrics }: { heading: string | null; metrics: Me
             </div>
             <div className="mt-0.5 text-[18px] font-semibold tabular-nums text-foreground">
               {m.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Ranked leaderboard of named entities (AI-004B). Rank #1 is emphasized. */
+function LeaderboardCard({
+  heading,
+  table,
+}: {
+  heading: string | null;
+  table: RankingTable;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+        <Trophy className="h-3.5 w-3.5 text-brand" />
+        {heading ?? table.nameLabel}
+      </div>
+      <div className="space-y-1.5">
+        {table.rows.map((row, i) => (
+          <div
+            key={i}
+            className={cn(
+              "flex items-center gap-3 rounded-xl border px-3.5 py-2.5",
+              i === 0
+                ? "border-brand/25 bg-brand/[0.06]"
+                : "border-white/[0.08] bg-white/[0.03]"
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold tabular-nums",
+                i === 0
+                  ? "bg-brand/20 text-brand"
+                  : "bg-white/[0.05] text-foreground-muted"
+              )}
+            >
+              {i + 1}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+              {row.name}
+            </span>
+            <div className="flex shrink-0 items-center gap-3">
+              {row.values.map((v, j) => (
+                <div key={j} className="text-right">
+                  <div className="text-[10px] uppercase tracking-wide text-foreground-muted">
+                    {v.label}
+                  </div>
+                  <div className="text-[13px] font-semibold tabular-nums text-foreground">
+                    {v.value}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
@@ -449,15 +598,23 @@ export interface AiResponseProps {
 export function AiResponse({ content, onPrompt }: AiResponseProps) {
   const sections = parseSections(content);
 
-  // No headings → nothing to structure; render straight markdown.
+  // No headings → nothing to structure; render straight markdown — unless the
+  // whole answer is a ranking table, which still deserves a leaderboard card.
   if (sections.length <= 1 && sections[0]?.heading === null) {
+    const ranking = sections[0] ? detectRankingTable(sections[0].body) : null;
+    if (ranking) {
+      return <LeaderboardCard heading={null} table={ranking} />;
+    }
     return <Markdown>{content}</Markdown>;
   }
 
   return (
     <div className="space-y-4">
       {sections.map((section, i) => {
-        const { kind, metrics, statuses } = classify(section);
+        const { kind, metrics, statuses, ranking } = classify(section);
+        if (kind === "ranking" && ranking) {
+          return <LeaderboardCard key={i} heading={section.heading} table={ranking} />;
+        }
         if (kind === "metric") {
           return <MetricCards key={i} heading={section.heading} metrics={metrics} />;
         }
