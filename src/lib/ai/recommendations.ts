@@ -55,8 +55,10 @@ export interface Recommendation {
   /** A read-only follow-up QUESTION, routed through onPrompt later. */
   cta: string;
   confidence: Confidence;
-  /** 0..1, for sorting/capping. Not shown to the user directly. */
+  /** 0..1 rule-fit signal. Internal — sort tie-break only (AI-007). */
   score: number;
+  /** AI-007 business-impact priority, 0-100. Primary opportunity sort key. */
+  opportunityScore: number;
 }
 
 /* ── Rule constants ───────────────────────────────────────────────────────── */
@@ -138,6 +140,54 @@ function capMedium(c: Confidence): Confidence {
   return c === "high" ? "medium" : c;
 }
 
+/* ── Opportunity scoring (AI-007) ─────────────────────────────────────────── */
+
+/** Composite weights — sum to 1. */
+const OPP_W_REVENUE = 0.45;
+const OPP_W_SPEND = 0.3;
+const OPP_W_SEVERITY = 0.25;
+
+/** Confidence dampening (not zeroing). */
+const CONFIDENCE_WEIGHT: Record<Confidence, number> = {
+  high: 1.0,
+  medium: 0.75,
+  low: 0.5,
+};
+
+/** Urgency by recommendation kind. */
+const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
+  tracking_issue: 1.0,
+  pause: 0.7,
+  scale: 0.6,
+  creative_refresh: 0.5,
+  bid_review: 0.4,
+  budget_concentration: 0.4,
+};
+
+/**
+ * Business-impact priority, 0-100 (AI-007). Blends a kind-specific revenue-impact
+ * proxy, budget exposure (spend share), and per-kind severity, then dampens by
+ * confidence:
+ *
+ *   opportunityScore = round( 100 · confidenceWeight ·
+ *     ( 0.45·revenueImpactNorm + 0.30·spendShare + 0.25·severity ) )
+ *
+ * All factors are 0..1; revenueImpactNorm/spendShare are clamped by the caller's
+ * inputs. This is a PRIORITY score, not a dollar forecast.
+ */
+function computeOpportunityScore(
+  kind: RecommendationKind,
+  confidence: Confidence,
+  spendShare: number,
+  revenueImpactNorm: number
+): number {
+  const composite =
+    OPP_W_REVENUE * clamp01(revenueImpactNorm) +
+    OPP_W_SPEND * clamp01(spendShare) +
+    OPP_W_SEVERITY * SEVERITY_BY_KIND[kind];
+  return Math.round(100 * CONFIDENCE_WEIGHT[confidence] * composite);
+}
+
 function money(value: number, currency: string): string {
   return `${currency} ${value.toLocaleString(undefined, {
     maximumFractionDigits: 2,
@@ -205,6 +255,7 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
     t.conversions === 0
   ) {
     const high = t.spend >= TRACKING_HIGH_SPEND;
+    const confidence: Confidence = high ? "high" : "medium";
     return {
       ...base,
       kind: "tracking_issue",
@@ -214,8 +265,15 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         ctx.currency
       )} spent with 0 conversions and 0 revenue — likely a tracking or pixel gap.`,
       cta: `Show "${e.name}" daily trend`,
-      confidence: high ? "high" : "medium",
+      confidence,
       score: high ? 0.8 : 0.5,
+      // All this spend is unmeasured → revenue impact tracks budget exposure.
+      opportunityScore: computeOpportunityScore(
+        "tracking_issue",
+        confidence,
+        share,
+        share
+      ),
     };
   }
 
@@ -244,6 +302,8 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         cta: `Compare "${e.name}" to top campaigns`,
         confidence: conf,
         score,
+        // Recoverable waste tracks budget exposure.
+        opportunityScore: computeOpportunityScore("pause", conf, share, share),
       };
     }
   }
@@ -272,6 +332,13 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         cta: `Show "${e.name}" daily trend`,
         confidence: conf,
         score,
+        // Upside scaled by ROAS headroom above benchmark × budget size.
+        opportunityScore: computeOpportunityScore(
+          "scale",
+          conf,
+          share,
+          clamp01(ev) * share
+        ),
       };
     }
   }
@@ -297,6 +364,13 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         cta: `Show best-performing ads`,
         confidence: conf,
         score,
+        // Impact scaled by CTR shortfall × budget size.
+        opportunityScore: computeOpportunityScore(
+          "creative_refresh",
+          conf,
+          share,
+          clamp01(ev) * share
+        ),
       };
     }
   }
@@ -317,6 +391,13 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         cta: `Which campaigns have the best ROAS?`,
         confidence: capMedium(bucket(score)),
         score,
+        // Mis-weighted budget × ROAS shortfall.
+        opportunityScore: computeOpportunityScore(
+          "budget_concentration",
+          capMedium(bucket(score)),
+          share,
+          clamp01(ev) * share
+        ),
       };
     }
   }
@@ -339,6 +420,13 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         cta: `Show "${e.name}" breakdown`,
         confidence: conf,
         score,
+        // Cost overspend scaled by CPC excess × budget size.
+        opportunityScore: computeOpportunityScore(
+          "bid_review",
+          conf,
+          share,
+          clamp01(ev) * share
+        ),
       };
     }
   }
@@ -402,6 +490,7 @@ export function deriveRecommendations(
   // tracking_issue so the warning is never silently dropped.
   if (trackingMode && !recs.some((r) => r.kind === "tracking_issue")) {
     const high = totals.spend >= TRACKING_HIGH_SPEND;
+    const confidence: Confidence = high ? "high" : "medium";
     recs.push({
       kind: "tracking_issue",
       provider: metricSet.provider,
@@ -414,8 +503,15 @@ export function deriveRecommendations(
         metricSet.currency
       )} spent account-wide with 0 conversions and 0 revenue — likely a tracking or pixel gap.`,
       cta: `Show daily trend`,
-      confidence: high ? "high" : "medium",
+      confidence,
       score: high ? 0.8 : 0.5,
+      // Account-wide: full budget exposure (spendShare = revenueImpact = 1).
+      opportunityScore: computeOpportunityScore(
+        "tracking_issue",
+        confidence,
+        1,
+        1
+      ),
     });
   }
 
