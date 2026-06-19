@@ -209,6 +209,82 @@ function serializeTotals(provider: MetricsProvider, set: MetricSet) {
   };
 }
 
+/**
+ * AI-004A Step 1C — ratio qualification floors.
+ *
+ * When ranking by a ratio (ctr/roas/cpc), entities below a minimum volume on
+ * the ratio's denominator/basis are excluded BEFORE sort+slice, so a 2-click /
+ * 12-impression entity can't win "highest CTR". Non-ratio sorts are not
+ * filtered (output stays byte-identical). If every entity is below the floor,
+ * we fall back to the full unfiltered list so an answer is never suppressed.
+ */
+const MIN_IMPRESSIONS = 500;
+const MIN_SPEND = 50;
+const MIN_CLICKS = 20;
+
+const RATIO_QUALIFICATION: Partial<
+  Record<SortKey, { field: keyof MetricTotals; threshold: number }>
+> = {
+  ctr: { field: "impressions", threshold: MIN_IMPRESSIONS },
+  roas: { field: "spend", threshold: MIN_SPEND },
+  cpc: { field: "clicks", threshold: MIN_CLICKS },
+};
+
+/** Additive metadata describing whether/how a qualification floor was applied. */
+interface QualificationMeta {
+  applied: boolean;
+  metric?: SortKey;
+  field?: string;
+  threshold?: number;
+  qualified_count?: number;
+  fell_back?: boolean;
+}
+
+/**
+ * Apply the ratio qualification floor for `sortBy`. Returns the population to
+ * rank from (`base`) plus metadata. For non-ratio sorts, `base` is the input
+ * unchanged and `applied` is false. When the floor empties the list, `base`
+ * falls back to the full input and `fell_back` is true.
+ */
+function qualify<T extends { totals: MetricTotals }>(
+  items: T[],
+  sortBy: SortKey
+): { base: T[]; meta: QualificationMeta } {
+  const rule = RATIO_QUALIFICATION[sortBy];
+  if (!rule) return { base: items, meta: { applied: false } };
+
+  const qualified = items.filter((it) => {
+    const v = it.totals[rule.field];
+    return typeof v === "number" && v >= rule.threshold;
+  });
+
+  if (qualified.length === 0) {
+    return {
+      base: items,
+      meta: {
+        applied: true,
+        metric: sortBy,
+        field: rule.field,
+        threshold: rule.threshold,
+        qualified_count: 0,
+        fell_back: true,
+      },
+    };
+  }
+
+  return {
+    base: qualified,
+    meta: {
+      applied: true,
+      metric: sortBy,
+      field: rule.field,
+      threshold: rule.threshold,
+      qualified_count: qualified.length,
+      fell_back: false,
+    },
+  };
+}
+
 /** Issue #3 V1: cap to the top 15 campaigns by spend. */
 const TOP_K_CAMPAIGNS = 15;
 
@@ -224,7 +300,8 @@ function serializeCampaigns(
   order: Order = "desc"
 ) {
   const cap = getCapabilities(provider);
-  const sorted = [...campaigns].sort((a, b) =>
+  const { base, meta } = qualify(campaigns, sortBy);
+  const sorted = [...base].sort((a, b) =>
     compareByKey(a.totals, b.totals, sortBy, order)
   );
   const top = sorted.slice(0, TOP_K_CAMPAIGNS);
@@ -250,7 +327,8 @@ function serializeCampaigns(
 
   return {
     campaigns: list,
-    campaigns_omitted: Math.max(0, campaigns.length - top.length),
+    campaigns_omitted: Math.max(0, base.length - top.length),
+    ...(meta.applied ? { qualification: meta } : {}),
   };
 }
 
@@ -269,7 +347,8 @@ function serializeAssets(
   order: Order = "desc"
 ) {
   const cap = getCapabilities(provider);
-  const sorted = [...assets].sort((a, b) =>
+  const { base, meta } = qualify(assets, sortBy);
+  const sorted = [...base].sort((a, b) =>
     compareByKey(a.totals, b.totals, sortBy, order)
   );
   const top = sorted.slice(0, TOP_K_ASSETS);
@@ -295,7 +374,8 @@ function serializeAssets(
 
   return {
     assets: list,
-    assets_omitted: Math.max(0, assets.length - top.length),
+    assets_omitted: Math.max(0, base.length - top.length),
+    ...(meta.applied ? { qualification: meta } : {}),
   };
 }
 
@@ -347,6 +427,16 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
           enum: ["account", "campaign", "ad"],
           description: "account = workspace/account totals only (default). campaign = also return a per-campaign breakdown (top/best/worst campaigns, highest-ROAS / lowest-CTR campaign, which campaign to fund). ad = also return a per-ad breakdown (best/worst ads, highest-CTR / highest-ROAS / highest-spend ad).",
         },
+        sort_by: {
+          type: "string",
+          enum: ["spend", "ctr", "roas", "cpc", "conversions", "revenue", "impressions", "clicks"],
+          description: "How to rank the campaign/ad breakdown. Pick the metric the question is about: 'highest CTR' → ctr, 'highest ROAS' / 'best' → roas, 'lowest CPC' / 'cheapest clicks' → cpc, 'most spend' / 'top' → spend, 'most conversions' → conversions. Default spend. The returned list is sorted by this key but NOT volume-filtered yet, so very low-volume entities can rank high on a ratio.",
+        },
+        order: {
+          type: "string",
+          enum: ["asc", "desc"],
+          description: "Sort direction for sort_by. desc = highest first (default). Use asc for 'lowest' / 'cheapest' / 'worst on a higher-is-better metric' (e.g. lowest CPC → sort_by:cpc, order:asc).",
+        },
       },
     },
   },
@@ -373,6 +463,16 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
           enum: ["account", "campaign", "ad"],
           description: "Aggregation level when supported. Use 'campaign' for a per-campaign breakdown (top/worst/compare campaigns, campaign ROAS). Use 'ad' for a per-ad breakdown (best/worst ads, highest CTR/ROAS/spend ad). Default account.",
         },
+        sort_by: {
+          type: "string",
+          enum: ["spend", "ctr", "roas", "cpc", "conversions", "revenue", "impressions", "clicks"],
+          description: "How to rank the campaign/ad breakdown. Pick the metric the question is about: 'highest CTR' → ctr, 'highest ROAS' / 'best' → roas, 'lowest CPC' / 'cheapest clicks' → cpc, 'most spend' / 'top' → spend, 'most conversions' → conversions. Default spend. The returned list is sorted by this key but NOT volume-filtered yet, so very low-volume entities can rank high on a ratio.",
+        },
+        order: {
+          type: "string",
+          enum: ["asc", "desc"],
+          description: "Sort direction for sort_by. desc = highest first (default). Use asc for 'lowest' / 'cheapest' / 'worst on a higher-is-better metric' (e.g. lowest CPC → sort_by:cpc, order:asc).",
+        },
       },
       required: ["provider"],
     },
@@ -388,17 +488,23 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
 export const metricsToolHandlers: Record<string, ReadToolHandler> = {
   async get_workspace_metrics(input, ctx) {
     const query = buildQuery(input, ctx.todayISO);
+    const sortBy = asSortKey(input.sort_by);
+    const order = asOrder(input.order);
     const result = await getMetricsWithFallback(ctx.workspaceId, query);
     return JSON.stringify({
       dateRange: result.dateRange,
       granularity: result.granularity,
-      providers: result.providers.map((p) => serializeProviderResult(p)),
+      providers: result.providers.map((p) =>
+        serializeProviderResult(p, sortBy, order)
+      ),
     });
   },
 
   async get_provider_metrics(input, ctx) {
     const provider = asProvider(input.provider);
     const query = buildQuery(input, ctx.todayISO);
+    const sortBy = asSortKey(input.sort_by);
+    const order = asOrder(input.order);
     // Go through the workspace engine (correct connector resolution + cache +
     // per-provider lifetime fallback), then narrow to the requested provider. A
     // provider with no active connector simply isn't in the result.
@@ -407,7 +513,7 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
     if (!match) {
       return JSON.stringify({ provider, status: "unsupported" });
     }
-    return JSON.stringify(serializeProviderResult(match));
+    return JSON.stringify(serializeProviderResult(match, sortBy, order));
   },
 
   async list_connected_providers(_input, ctx) {
