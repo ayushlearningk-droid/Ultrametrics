@@ -36,8 +36,9 @@ function sumFunnel(rows: MetaMetricsRow[]): FunnelEvents {
       addToCart: acc.addToCart + r.addToCart,
       initiateCheckout: acc.initiateCheckout + r.initiateCheckout,
       purchase: acc.purchase + r.purchaseEvents,
+      pageView: acc.pageView + r.pageView,
     }),
-    { viewContent: 0, addToCart: 0, initiateCheckout: 0, purchase: 0 }
+    { viewContent: 0, addToCart: 0, initiateCheckout: 0, purchase: 0, pageView: 0 }
   );
 }
 

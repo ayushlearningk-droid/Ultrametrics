@@ -100,6 +100,8 @@ export interface MetaMetricsRow {
   addToCart: number;
   initiateCheckout: number;
   purchaseEvents: number;
+  /** Ad-attributed landing page views (AI-007A). 0 when absent. */
+  pageView: number;
 }
 
 export interface GetAccountMetricsOptions {
@@ -165,6 +167,26 @@ function sumActionCount(
       a.action_type === actionType ? acc + parseFloat(a.value ?? "0") : acc,
     0
   );
+}
+
+/**
+ * Landing-page-view action types (AI-007A), in priority order. omni_* is the
+ * web+app aggregate of the bare key, so the two overlap — take the FIRST that is
+ * present rather than summing, to avoid double counting.
+ */
+const PAGEVIEW_ACTION_TYPES = [
+  "landing_page_view",
+  "omni_landing_page_view",
+] as const;
+
+/** Ad-attributed landing page views: first present of the priority list, no sum. */
+function sumPageView(actions: MetaActionValue[] | undefined): number {
+  if (!actions) return 0;
+  for (const type of PAGEVIEW_ACTION_TYPES) {
+    const v = sumActionCount(actions, type);
+    if (v > 0) return v;
+  }
+  return 0;
 }
 
 /**
@@ -257,6 +279,7 @@ export async function getAccountMetrics(
       FUNNEL_ACTION_TYPE.initiateCheckout
     ),
     purchaseEvents: sumActionCount(row.actions, FUNNEL_ACTION_TYPE.purchase),
+    pageView: sumPageView(row.actions),
   }));
 }
 

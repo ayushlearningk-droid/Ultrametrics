@@ -148,6 +148,8 @@ export interface FunnelEvents {
   addToCart: number;
   initiateCheckout: number;
   purchase: number;
+  /** Ad-attributed landing page views (AI-007A). Pixel-active signal. */
+  pageView: number;
 }
 
 /** A single dated row of raw metrics (used for granularity = "daily"). */

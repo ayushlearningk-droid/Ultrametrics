@@ -25,6 +25,7 @@ import type { FunnelEvents, MetricTotals } from "@/lib/metrics/types";
 
 export type PixelDiagnosisKind =
   | "pixel_not_detected"
+  | "conversion_events_missing"
   | "purchase_not_tracked"
   | "purchase_value_missing"
   | "partial_event_coverage"
@@ -167,19 +168,25 @@ export function derivePixelDiagnostics(
 ): PixelDiagnosis | null {
   if (totals.spend < PIXEL_MIN_SPEND) return null;
 
-  const { viewContent, addToCart, initiateCheckout, purchase } = funnel;
+  const { viewContent, addToCart, initiateCheckout, purchase, pageView } =
+    funnel;
   const confidence = confidenceFromSpend(totals.spend);
 
-  // 1. pixel_not_detected — no standard events at all despite active spend.
-  // AI-007 Phase 1: corroborate with account conversions/revenue. If Meta
-  // reports either, conversions ARE being tracked (just under an action_type the
-  // funnel parser doesn't recognize), so "no events" is contradicted — suppress
-  // to avoid a false positive.
-  if (
+  const noEcommerceEvents =
     viewContent === 0 &&
     addToCart === 0 &&
     initiateCheckout === 0 &&
-    purchase === 0 &&
+    purchase === 0;
+
+  // 1. pixel_not_detected — NOTHING firing at all despite active spend.
+  // AI-007 Phase 1: corroborate with account conversions/revenue (if Meta
+  // reports either, conversions ARE tracked under an unrecognized action_type).
+  // AI-007A: also require pageView === 0 — a firing PageView means the pixel IS
+  // installed, so the missing events are a configuration gap, not a missing
+  // pixel (see conversion_events_missing below).
+  if (
+    pageView === 0 &&
+    noEcommerceEvents &&
     totals.conversions === 0 &&
     totals.revenue === 0
   ) {
@@ -192,6 +199,28 @@ export function derivePixelDiagnostics(
       cta: "Show daily trend",
       confidence,
       opportunityScore: score("pixel_not_detected", confidence, totals, funnel),
+    };
+  }
+
+  // 1b. conversion_events_missing (AI-007A) — pixel IS active (PageView firing)
+  // but no conversion events are configured. Distinct from a missing pixel.
+  if (pageView > 0 && noEcommerceEvents) {
+    return {
+      kind: "conversion_events_missing",
+      level: "account",
+      action:
+        "Meta Pixel is active and recording landing page visits. No conversion events (ViewContent, AddToCart, InitiateCheckout, Purchase) were detected.",
+      impact: `${n(
+        pageView
+      )} landing page views recorded, but 0 ViewContent, AddToCart, InitiateCheckout, or Purchase events — configure the standard conversion events.`,
+      cta: "Show daily trend",
+      confidence,
+      opportunityScore: score(
+        "conversion_events_missing",
+        confidence,
+        totals,
+        funnel
+      ),
     };
   }
 
