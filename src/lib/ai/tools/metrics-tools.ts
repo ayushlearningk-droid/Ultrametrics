@@ -884,6 +884,11 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
         ...(okSource?.status === "error" && okSource.error
           ? { message: okSource.error }
           : {}),
+        // First-class "ok but nothing to do" state (AI-013): an explicit signal
+        // so the model reports a healthy no-action result rather than a failure.
+        ...(okSource?.status === "ok" && ranked.length === 0
+          ? { no_actions_this_window: true }
+          : {}),
         recommendations: ranked.map(serializeRecommendation),
       };
     });
