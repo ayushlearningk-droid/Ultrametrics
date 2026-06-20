@@ -102,6 +102,8 @@ export interface MetaMetricsRow {
   purchaseEvents: number;
   /** Ad-attributed landing page views (AI-007A). 0 when absent. */
   pageView: number;
+  /** Campaign objective (AI-008), present at campaign level, e.g. "OUTCOME_TRAFFIC". */
+  objective?: string;
 }
 
 export interface GetAccountMetricsOptions {
@@ -208,7 +210,7 @@ export async function getAccountMetrics(
   // group by. Account level is unchanged.
   const leveledFields =
     options.level === "campaign"
-      ? ["campaign_id", "campaign_name", ...baseFields]
+      ? ["campaign_id", "campaign_name", "objective", ...baseFields]
       : options.level === "ad"
         ? ["ad_id", "ad_name", ...baseFields]
         : baseFields;
@@ -255,6 +257,7 @@ export async function getAccountMetrics(
       impressions?: string;
       clicks?: string;
       reach?: string;
+      objective?: string;
       action_values?: MetaActionValue[];
       actions?: MetaActionValue[];
     }>;
@@ -266,6 +269,7 @@ export async function getAccountMetrics(
     ...(row.campaign_name ? { campaign_name: row.campaign_name } : {}),
     ...(row.ad_id ? { ad_id: row.ad_id } : {}),
     ...(row.ad_name ? { ad_name: row.ad_name } : {}),
+    ...(row.objective ? { objective: row.objective } : {}),
     spend: parseFloat(row.spend ?? "0"),
     impressions: parseInt(row.impressions ?? "0", 10),
     clicks: parseInt(row.clicks ?? "0", 10),

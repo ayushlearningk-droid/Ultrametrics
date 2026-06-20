@@ -60,21 +60,30 @@ function toRaw(r: MetaMetricsRow): RawMetricSet {
  * first appearance; top-K selection happens later in serialization.
  */
 function groupByCampaign(rows: MetaMetricsRow[]): CampaignRawBreakdown[] {
-  const byId = new Map<string, { name: string; rows: RawMetricSet[] }>();
+  const byId = new Map<
+    string,
+    { name: string; objective?: string; rows: RawMetricSet[] }
+  >();
   for (const r of rows) {
     if (!r.campaign_id) continue;
     const entry = byId.get(r.campaign_id) ?? {
       name: r.campaign_name ?? r.campaign_id,
+      objective: r.objective,
       rows: [],
     };
+    // First non-empty objective wins (campaign objective is constant per id).
+    if (!entry.objective && r.objective) entry.objective = r.objective;
     entry.rows.push(toRaw(r));
     byId.set(r.campaign_id, entry);
   }
-  return [...byId.entries()].map(([campaignId, { name, rows: campaignRows }]) => ({
-    campaignId,
-    campaignName: name,
-    rawTotals: sumRaw(campaignRows),
-  }));
+  return [...byId.entries()].map(
+    ([campaignId, { name, objective, rows: campaignRows }]) => ({
+      campaignId,
+      campaignName: name,
+      ...(objective ? { objective } : {}),
+      rawTotals: sumRaw(campaignRows),
+    })
+  );
 }
 
 /**

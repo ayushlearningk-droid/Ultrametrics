@@ -167,6 +167,8 @@ export interface CampaignBreakdown {
   campaignId: string;
   campaignName: string;
   totals: MetricTotals;
+  /** Provider campaign objective (AI-008), e.g. Meta "OUTCOME_TRAFFIC". */
+  objective?: string;
 }
 
 /**
@@ -263,6 +265,8 @@ export interface CampaignRawBreakdown {
   campaignId: string;
   campaignName: string;
   rawTotals: RawMetricSet;
+  /** Provider campaign objective (AI-008), passed through unparsed. */
+  objective?: string;
 }
 
 /**

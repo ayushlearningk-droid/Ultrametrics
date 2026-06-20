@@ -49,7 +49,9 @@ export type RecommendationKind =
   | "purchase_value_missing"
   | "partial_event_coverage"
   // AI-006 budget reallocation (account-level, cross-campaign).
-  | "budget_reallocation";
+  | "budget_reallocation"
+  // AI-008 objective routing: non-conversion account (funnel N/A).
+  | "objective_not_conversion";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -184,6 +186,8 @@ const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
   partial_event_coverage: 0.5,
   // AI-006 budget reallocation.
   budget_reallocation: 0.7,
+  // AI-008 informational routing note (never ranked by this engine).
+  objective_not_conversion: 0.1,
 };
 
 /**

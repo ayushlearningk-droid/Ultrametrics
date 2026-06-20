@@ -53,6 +53,7 @@ import {
   deriveBudgetRecommendations,
   type BudgetRecommendation,
 } from "@/lib/ai/budget-recommendations";
+import { hasConversionObjective } from "@/lib/ai/objective-classifier";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -577,6 +578,29 @@ function diagnosisToRec(
   };
 }
 
+/**
+ * AI-008 Phase 1: account-level note when the account is non-conversion, so
+ * ecommerce funnel/pixel diagnostics were intentionally skipped. Informational
+ * (low score) — it explains the absence of funnel recs, never competes to win.
+ */
+function objectiveNotConversionRec(provider: MetricsProvider): Recommendation {
+  return {
+    kind: "objective_not_conversion",
+    provider,
+    level: "account",
+    entityId: "account",
+    entityName: "your account",
+    action:
+      "This campaign is optimized for traffic, engagement, video views, messages, or awareness. Ecommerce funnel diagnostics are not applicable.",
+    impact:
+      "No conversion-objective campaigns detected, so ecommerce funnel and pixel diagnostics were not evaluated.",
+    cta: "Show top campaigns",
+    confidence: "high",
+    score: 0.1,
+    opportunityScore: 10,
+  };
+}
+
 /** Map an AI-006 budget reallocation (account-level) into a Recommendation. */
 function budgetToRec(
   b: BudgetRecommendation,
@@ -649,11 +673,22 @@ function assembleProviderRecs(
     okSource?.status === "ok" ? okSource.metrics?.funnel : undefined;
   const totals = okSource?.status === "ok" ? okSource.metrics?.totals : undefined;
 
+  // AI-008 Phase 1: route diagnostics by objective. Ecommerce funnel/pixel
+  // diagnostics only apply to conversion-objective accounts; a proven
+  // non-conversion account (traffic/engagement/video/messages/awareness) skips
+  // them. Objective comes from the campaign-level fetch; absent objective data
+  // leaves conversionObjective = true (existing behavior preserved).
+  const objectiveCampaigns =
+    camp?.status === "ok" ? camp.metrics?.campaigns : undefined;
+  const conversionObjective = hasConversionObjective(objectiveCampaigns);
+
   const funnelDiagnosis =
-    funnelEvents && supportsFunnel ? deriveFunnelDiagnosis(funnelEvents) : null;
+    funnelEvents && supportsFunnel && conversionObjective
+      ? deriveFunnelDiagnosis(funnelEvents)
+      : null;
 
   const pixelRaw =
-    funnelEvents && totals && supportsFunnel
+    funnelEvents && totals && supportsFunnel && conversionObjective
       ? derivePixelDiagnostics(funnelEvents, totals)
       : null;
   const pixelDiagnosis =
@@ -681,6 +716,12 @@ function assembleProviderRecs(
   // Pixel diagnosis participates in ranking.
   if (pixelDiagnosis) {
     recs.push(diagnosisToRec(pixelDiagnosis, provider));
+  }
+
+  // AI-008 Phase 1: on a proven non-conversion account, surface why ecommerce
+  // funnel/pixel diagnostics were skipped (in place of a false pixel rec).
+  if (supportsFunnel && !conversionObjective) {
+    recs.push(objectiveNotConversionRec(provider));
   }
 
   // AI-006 budget reallocation — cross-campaign move from account totals. Does
