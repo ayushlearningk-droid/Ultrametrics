@@ -29,11 +29,6 @@ export async function getAccountInsights(
 
   const json = await res.json();
 
-  console.log(
-    "META RAW INSIGHTS:",
-    JSON.stringify(json, null, 2)
-  );
-
   return json.data ?? [];
 }
 
