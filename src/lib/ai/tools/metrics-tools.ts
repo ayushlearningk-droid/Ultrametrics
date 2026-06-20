@@ -528,7 +528,7 @@ function serializeProviderResult(
 /** AI-005: max recommendations returned per provider. */
 const REC_CAP = 5;
 
-/** Compact, score-free view of a recommendation (score is sort-only). */
+/** Compact view of a recommendation (internal 0-1 `score` stays sort-only). */
 function serializeRecommendation(r: Recommendation) {
   return {
     kind: r.kind,
@@ -537,8 +537,12 @@ function serializeRecommendation(r: Recommendation) {
     entity_name: r.entityName,
     action: r.action,
     impact: r.impact,
+    // AI-006: non-breaking alias of impact (the grounding "why").
+    reason: r.impact,
     cta: r.cta,
     confidence: r.confidence,
+    // AI-006: business-impact priority (0-100) now visible to the model.
+    opportunity_score: r.opportunityScore,
   };
 }
 
