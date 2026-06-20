@@ -55,7 +55,13 @@ export type RecommendationKind =
   // AI-006 budget reallocation (account-level, cross-campaign).
   | "budget_reallocation"
   // AI-008 objective routing: non-conversion account (funnel N/A).
-  | "objective_not_conversion";
+  | "objective_not_conversion"
+  // AI-009 Phase 2A: traffic-objective diagnostics.
+  | "low_ctr"
+  | "high_cpc"
+  | "best_traffic_campaign"
+  | "worst_traffic_campaign"
+  | "traffic_budget_reallocation";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -200,6 +206,12 @@ const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
   budget_reallocation: 0.7,
   // AI-008 informational routing note (never ranked by this engine).
   objective_not_conversion: 0.1,
+  // AI-009 Phase 2A traffic diagnostics (scored by the traffic engine itself).
+  low_ctr: 0.6,
+  high_cpc: 0.6,
+  best_traffic_campaign: 0.5,
+  worst_traffic_campaign: 0.4,
+  traffic_budget_reallocation: 0.7,
 };
 
 /**

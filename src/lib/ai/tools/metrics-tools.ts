@@ -54,6 +54,7 @@ import {
   type BudgetRecommendation,
 } from "@/lib/ai/budget-recommendations";
 import { hasConversionObjective } from "@/lib/ai/objective-classifier";
+import { deriveTrafficDiagnostics } from "@/lib/ai/traffic-diagnostics";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -726,10 +727,22 @@ function assembleProviderRecs(
     recs.push(diagnosisToRec(pixelDiagnosis, provider));
   }
 
-  // AI-008 Phase 1: on a proven non-conversion account, surface why ecommerce
-  // funnel/pixel diagnostics were skipped (in place of a false pixel rec).
+  // AI-008/AI-009: on a proven non-conversion account, route to objective-aware
+  // diagnostics. Phase 2A: traffic-objective opportunities (CTR/CPC/spend only).
+  // Fall back to the informational note when no objective-aware rec applies.
   if (supportsFunnel && !conversionObjective) {
-    recs.push(objectiveNotConversionRec(provider));
+    const objectiveCampaignsOk =
+      okSource?.status === "ok" ? okSource.metrics?.campaigns : undefined;
+    const currency =
+      okSource?.status === "ok" ? okSource.metrics?.currency ?? "" : "";
+    const trafficRecs = objectiveCampaignsOk
+      ? deriveTrafficDiagnostics(objectiveCampaignsOk, currency, provider)
+      : [];
+    if (trafficRecs.length > 0) {
+      recs.push(...trafficRecs);
+    } else {
+      recs.push(objectiveNotConversionRec(provider));
+    }
   }
 
   // AI-006 budget reallocation — cross-campaign move from account totals. Does
