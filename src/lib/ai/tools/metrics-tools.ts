@@ -637,7 +637,10 @@ function assembleProviderRecs(
 
   let recs: Recommendation[] = [...recsForResult(camp), ...recsForResult(ad)];
 
-  const supportsFunnel = getCapabilities(provider).supportsFunnel;
+  // Defensive lookup (AI-014): a provider without a CAPABILITIES entry (e.g. a
+  // non-ads connector that slipped through) yields undefined here, so treat a
+  // missing descriptor as "no funnel / no creative" rather than crashing.
+  const supportsFunnel = getCapabilities(provider)?.supportsFunnel ?? false;
   const funnelEvents =
     okSource?.status === "ok" ? okSource.metrics?.funnel : undefined;
   const totals = okSource?.status === "ok" ? okSource.metrics?.totals : undefined;

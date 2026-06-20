@@ -28,6 +28,7 @@ import type {
 } from "@/lib/metrics/types";
 import { toTotals } from "@/lib/metrics/derive";
 import { getAdapter } from "@/lib/metrics/registry";
+import { CAPABILITIES } from "@/lib/metrics/capabilities";
 import { getConnectorsByWorkspace } from "@/lib/data/dashboard";
 import { getCached, setCached } from "@/lib/metrics/cache";
 
@@ -149,10 +150,13 @@ export async function fetchWorkspaceMetrics(
 
   // Active connectors only, deduped to one per provider (adapters such as Meta
   // resolve the active connector internally; multiple active rows would
-  // otherwise double-count the same account).
+  // otherwise double-count the same account). Connectors whose provider has no
+  // CAPABILITIES entry (AI-014: e.g. a Google Sheets connector, provider
+  // "google") are skipped so they never enter the metrics pipeline.
   const byProvider = new Map<MetricsProvider, string>();
   for (const c of connectors) {
     if (c.status !== "active") continue;
+    if (!(c.provider in CAPABILITIES)) continue;
     const provider = c.provider as MetricsProvider;
     if (!byProvider.has(provider)) byProvider.set(provider, c.id);
   }
