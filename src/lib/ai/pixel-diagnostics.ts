@@ -56,11 +56,7 @@ export interface PixelDiagnosis {
  */
 const PIXEL_MIN_SPEND = 100;
 
-/* ── Scoring (mirrors AI-007 opportunity scoring) ─────────────────────────── */
-
-const OPP_W_REVENUE = 0.45;
-const OPP_W_SPEND = 0.3;
-const OPP_W_SEVERITY = 0.25;
+/* ── Scoring (AI-007 Phase 2: measured factors, capped below 100) ──────────── */
 
 const CONFIDENCE_WEIGHT: Record<PixelConfidence, number> = {
   high: 1.0,
@@ -68,29 +64,86 @@ const CONFIDENCE_WEIGHT: Record<PixelConfidence, number> = {
   low: 0.5,
 };
 
-const SEVERITY_BY_KIND: Record<PixelDiagnosisKind, number> = {
-  pixel_not_detected: 1.0,
-  purchase_not_tracked: 0.95,
-  purchase_value_missing: 0.9,
-  partial_event_coverage: 0.5,
-  pixel_healthy: 0.1,
-};
+/** Composite factor weights (sum to 1): revenue impact, spend exposure, gap. */
+const W_REVENUE_IMPACT = 0.2;
+const W_SPEND_EXPOSURE = 0.25;
+const W_EVENT_GAP = 0.55;
+
+/** Saturation half-points: factor = x / (x + half) → 0.5 at x = half. */
+const SPEND_HALF = 1000;
+const REVENUE_HALF = 2000;
+
+/**
+ * Maximum attainable score. Below 100 by design so no pixel diagnosis can
+ * auto-max and monopolize ranking — pixel issues compete fairly with scale /
+ * budget / funnel opportunities.
+ */
+const SCORE_CEILING = 88;
+
+/** Funnel-depth weights for the event coverage gap (deeper events weigh more). */
+const EVENT_GAP_WEIGHT = {
+  viewContent: 0.1,
+  addToCart: 0.15,
+  initiateCheckout: 0.25,
+  purchase: 0.5,
+} as const;
+
+/** Value gap weight when purchases fire but carry no revenue (value_missing). */
+const VALUE_GAP_WEIGHT = 0.4;
 
 function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
 }
 
-/** Account-level opportunity score, 0-100. spendShare is 1 (account-wide). */
+/** Spend exposure: spend / (spend + SPEND_HALF), saturating, asymptotic to 1. */
+function spendExposure(spend: number): number {
+  return spend > 0 ? spend / (spend + SPEND_HALF) : 0;
+}
+
+/**
+ * Revenue impact: from measured revenue when present, else a damped spend proxy
+ * (the spend is flying blind, so exposure stands in for revenue at risk).
+ */
+function revenueImpact(totals: MetricTotals): number {
+  return totals.revenue > 0
+    ? totals.revenue / (totals.revenue + REVENUE_HALF)
+    : 0.5 * spendExposure(totals.spend);
+}
+
+/**
+ * Event coverage gap (0..1): funnel-depth-weighted sum of NON-firing standard
+ * events, plus a value gap when purchases fire without revenue. Replaces the old
+ * static per-kind severity table with a measured signal.
+ */
+function eventCoverageGap(
+  kind: PixelDiagnosisKind,
+  funnel: FunnelEvents
+): number {
+  let gap = 0;
+  if (funnel.viewContent === 0) gap += EVENT_GAP_WEIGHT.viewContent;
+  if (funnel.addToCart === 0) gap += EVENT_GAP_WEIGHT.addToCart;
+  if (funnel.initiateCheckout === 0) gap += EVENT_GAP_WEIGHT.initiateCheckout;
+  if (funnel.purchase === 0) gap += EVENT_GAP_WEIGHT.purchase;
+  if (kind === "purchase_value_missing") gap += VALUE_GAP_WEIGHT;
+  return clamp01(gap);
+}
+
+/**
+ * Account-level opportunity score, 0..SCORE_CEILING. Blends revenue impact,
+ * spend exposure, and the measured event coverage gap, dampened by confidence.
+ * No hard-coded inputs — nothing can reach 100.
+ */
 function score(
   kind: PixelDiagnosisKind,
   confidence: PixelConfidence,
-  revenueImpactNorm: number
+  totals: MetricTotals,
+  funnel: FunnelEvents
 ): number {
   const composite =
-    OPP_W_REVENUE * clamp01(revenueImpactNorm) +
-    OPP_W_SPEND * 1 +
-    OPP_W_SEVERITY * SEVERITY_BY_KIND[kind];
-  return Math.round(100 * CONFIDENCE_WEIGHT[confidence] * composite);
+    W_REVENUE_IMPACT * revenueImpact(totals) +
+    W_SPEND_EXPOSURE * spendExposure(totals.spend) +
+    W_EVENT_GAP * eventCoverageGap(kind, funnel);
+  return Math.round(SCORE_CEILING * CONFIDENCE_WEIGHT[confidence] * composite);
 }
 
 /** Confidence from spend volume (clear instrumentation breakage → not "low"). */
@@ -138,7 +191,7 @@ export function derivePixelDiagnostics(
         "No ViewContent, AddToCart, InitiateCheckout, or Purchase events recorded despite active spend — the pixel may be missing or not firing.",
       cta: "Show daily trend",
       confidence,
-      opportunityScore: score("pixel_not_detected", confidence, 1),
+      opportunityScore: score("pixel_not_detected", confidence, totals, funnel),
     };
   }
 
@@ -158,7 +211,7 @@ export function derivePixelDiagnostics(
       )}) but 0 Purchase events — the Purchase event may not be set up.`,
       cta: "Show daily trend",
       confidence,
-      opportunityScore: score("purchase_not_tracked", confidence, 1),
+      opportunityScore: score("purchase_not_tracked", confidence, totals, funnel),
     };
   }
 
@@ -173,7 +226,7 @@ export function derivePixelDiagnostics(
       )} Purchase events fire but report 0 revenue — verify the value and currency parameters are sent.`,
       cta: "Show daily trend",
       confidence,
-      opportunityScore: score("purchase_value_missing", confidence, 1),
+      opportunityScore: score("purchase_value_missing", confidence, totals, funnel),
     };
   }
 
@@ -193,7 +246,7 @@ export function derivePixelDiagnostics(
       )}. Verify they are implemented on the relevant pages.`,
       cta: "Show daily trend",
       confidence,
-      opportunityScore: score("partial_event_coverage", confidence, 0.5),
+      opportunityScore: score("partial_event_coverage", confidence, totals, funnel),
       missingEvents: missing,
     };
   }
@@ -207,6 +260,6 @@ export function derivePixelDiagnostics(
       "All standard events (ViewContent, AddToCart, InitiateCheckout, Purchase) fire and carry revenue.",
     cta: "Show top campaigns",
     confidence,
-    opportunityScore: score("pixel_healthy", confidence, 0),
+    opportunityScore: score("pixel_healthy", confidence, totals, funnel),
   };
 }
