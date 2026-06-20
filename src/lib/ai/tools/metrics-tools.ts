@@ -879,6 +879,11 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
         ...(okSource?.status === "ok" && okSource.metrics
           ? { currency: okSource.metrics.currency }
           : {}),
+        // Surface the upstream error message structurally so one failing
+        // provider is reported (not swallowed) without aborting the others.
+        ...(okSource?.status === "error" && okSource.error
+          ? { message: okSource.error }
+          : {}),
         recommendations: ranked.map(serializeRecommendation),
       };
     });
@@ -931,6 +936,10 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
         windowUsed: okSource?.windowUsed ?? "range",
         ...(okSource?.status === "ok" && okSource.metrics
           ? { currency: okSource.metrics.currency }
+          : {}),
+        // Same structured error surfacing as get_recommendations.
+        ...(okSource?.status === "error" && okSource.error
+          ? { message: okSource.error }
           : {}),
         totals,
         recommendations: recs,

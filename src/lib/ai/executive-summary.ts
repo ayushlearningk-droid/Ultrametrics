@@ -39,6 +39,8 @@ export interface ExecutiveSummary {
   status: string;
   window_used: string;
   currency?: string;
+  /** Upstream provider error message when status === "error" (else omitted). */
+  message?: string;
   headline: SummaryHeadline | null;
   top_opportunity: SummaryOpportunity | null;
   funnel_status: { state: FunnelState; detail?: string };
@@ -50,6 +52,8 @@ export interface ExecutiveSummaryInput {
   status: string;
   windowUsed: string;
   currency?: string;
+  /** Upstream provider error message when status === "error"; surfaced structurally. */
+  message?: string;
   /** Derived totals when status is ok; null otherwise. */
   totals: SummaryHeadline | null;
   /** Provider recommendations, already including any funnel diagnosis. */
@@ -70,7 +74,7 @@ export interface ExecutiveSummaryInput {
 export function composeExecutiveSummary(
   input: ExecutiveSummaryInput
 ): ExecutiveSummary {
-  const { provider, status, windowUsed, currency, totals } = input;
+  const { provider, status, windowUsed, currency, message, totals } = input;
 
   // Top opportunity = highest opportunityScore (defensive re-sort).
   const ranked = [...input.recommendations].sort(
@@ -124,6 +128,7 @@ export function composeExecutiveSummary(
     status,
     window_used: windowUsed,
     ...(currency ? { currency } : {}),
+    ...(message ? { message } : {}),
     headline: totals,
     top_opportunity,
     funnel_status,
