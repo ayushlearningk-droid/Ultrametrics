@@ -27,6 +27,10 @@ import type {
 } from "@/lib/metrics/types";
 import type { ProviderCapabilities } from "@/lib/metrics/capabilities";
 import { MIN_IMPRESSIONS, MIN_SPEND, MIN_CLICKS } from "@/lib/ai/thresholds";
+import {
+  classifyObjective,
+  hasConversionObjective,
+} from "@/lib/ai/objective-classifier";
 
 /* ── Public types ─────────────────────────────────────────────────────────── */
 
@@ -110,6 +114,8 @@ interface Entity {
   id: string;
   name: string;
   totals: MetricTotals;
+  /** Campaign objective (AI-008), present for campaign entities only. */
+  objective?: string;
 }
 
 interface RuleContext {
@@ -126,6 +132,12 @@ interface RuleContext {
    * are not trustworthy until tracking is fixed.
    */
   trackingMode: boolean;
+  /**
+   * AI-008.1B: whether this account has conversion-objective campaigns. When
+   * false (a proven non-conversion account), tracking_issue and the account-level
+   * tracking fallback are suppressed — zero conversions is expected, not a gap.
+   */
+  accountIsConversion: boolean;
   hasRevenue: boolean;
   hasRoas: boolean;
   hasCtr: boolean;
@@ -238,6 +250,7 @@ function collectEntities(metricSet: MetricSet): Entity[] {
       id: c.campaignId,
       name: c.campaignName,
       totals: c.totals,
+      ...(c.objective ? { objective: c.objective } : {}),
     });
   }
   for (const a of metricSet.assets ?? []) {
@@ -273,8 +286,17 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
     entityName: e.name,
   };
 
-  // 1. tracking_issue — absolute (no benchmark / population guard).
+  // AI-008.1B: tracking_issue only makes sense for conversion-objective traffic.
+  // Use the entity's own objective when known (campaign), else the account flag
+  // (ads carry no objective). Non-conversion → zero conversions is expected.
+  const entityIsConversion = e.objective
+    ? classifyObjective(e.objective) === "conversion"
+    : ctx.accountIsConversion;
+
+  // 1. tracking_issue — absolute (no benchmark / population guard), but gated to
+  // conversion objectives (AI-008.1B).
   if (
+    entityIsConversion &&
     ctx.hasRevenue &&
     t.spend >= TRACKING_MIN_SPEND &&
     t.revenue === 0 &&
@@ -484,6 +506,11 @@ export function deriveRecommendations(
   const totals = metricSet.totals;
   const hasRevenue = capabilities.rawMetrics.includes("revenue");
 
+  // AI-008.1B: proven non-conversion accounts never produce tracking diagnostics.
+  // Conservative default (true) when objective data is absent, preserving prior
+  // behavior for accounts without per-campaign objectives.
+  const accountIsConversion = hasConversionObjective(metricSet.campaigns);
+
   // AI-005A: account-wide tracking signal. Gated on revenue capability so a
   // revenue-less provider (e.g. GA4) is never falsely put into Tracking Mode.
   const trackingMode =
@@ -499,6 +526,7 @@ export function deriveRecommendations(
     accountSpend: totals.spend,
     entityCountByLevel,
     trackingMode,
+    accountIsConversion,
     hasRevenue,
     hasRoas: capabilities.derivedMetrics.includes("roas"),
     hasCtr: capabilities.derivedMetrics.includes("ctr"),
@@ -514,7 +542,11 @@ export function deriveRecommendations(
   // AI-005A fallback: in Tracking Mode with no entity-level tracking_issue (e.g.
   // spend spread across many sub-threshold entities), emit one account-level
   // tracking_issue so the warning is never silently dropped.
-  if (trackingMode && !recs.some((r) => r.kind === "tracking_issue")) {
+  if (
+    trackingMode &&
+    accountIsConversion &&
+    !recs.some((r) => r.kind === "tracking_issue")
+  ) {
     const high = totals.spend >= TRACKING_HIGH_SPEND;
     const confidence: Confidence = high ? "high" : "medium";
     recs.push({

@@ -682,6 +682,14 @@ function assembleProviderRecs(
     camp?.status === "ok" ? camp.metrics?.campaigns : undefined;
   const conversionObjective = hasConversionObjective(objectiveCampaigns);
 
+  // AI-008.1A: account-level belt-and-suspenders — a proven non-conversion
+  // account never surfaces tracking_issue (conversion-tracking advice is N/A).
+  // The rule engine (AI-008.1B) already gates this per entity; this guarantees
+  // none slips through at the account level.
+  if (!conversionObjective) {
+    recs = recs.filter((r) => r.kind !== "tracking_issue");
+  }
+
   const funnelDiagnosis =
     funnelEvents && supportsFunnel && conversionObjective
       ? deriveFunnelDiagnosis(funnelEvents)
