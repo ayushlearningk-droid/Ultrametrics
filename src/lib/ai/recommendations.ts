@@ -47,7 +47,9 @@ export type RecommendationKind =
   | "pixel_not_detected"
   | "purchase_not_tracked"
   | "purchase_value_missing"
-  | "partial_event_coverage";
+  | "partial_event_coverage"
+  // AI-006 budget reallocation (account-level, cross-campaign).
+  | "budget_reallocation";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -180,6 +182,8 @@ const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
   purchase_not_tracked: 0.95,
   purchase_value_missing: 0.9,
   partial_event_coverage: 0.5,
+  // AI-006 budget reallocation.
+  budget_reallocation: 0.7,
 };
 
 /**

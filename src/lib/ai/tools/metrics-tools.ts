@@ -49,6 +49,10 @@ import {
   composeExecutiveSummary,
   type SummaryHeadline,
 } from "@/lib/ai/executive-summary";
+import {
+  deriveBudgetRecommendations,
+  type BudgetRecommendation,
+} from "@/lib/ai/budget-recommendations";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -569,6 +573,26 @@ function diagnosisToRec(
   };
 }
 
+/** Map an AI-006 budget reallocation (account-level) into a Recommendation. */
+function budgetToRec(
+  b: BudgetRecommendation,
+  provider: MetricsProvider
+): Recommendation {
+  return {
+    kind: b.kind,
+    provider,
+    level: "account",
+    entityId: "account",
+    entityName: "your account",
+    action: b.action,
+    impact: b.impact,
+    cta: b.cta,
+    confidence: b.confidence,
+    score: b.opportunityScore / 100,
+    opportunityScore: b.opportunityScore,
+  };
+}
+
 /** Rank recommendations by opportunityScore desc, tie-break score, then name. */
 function rankRecs(recs: Recommendation[]): Recommendation[] {
   return [...recs].sort((a, b) =>
@@ -650,6 +674,21 @@ function assembleProviderRecs(
   // Pixel diagnosis participates in ranking.
   if (pixelDiagnosis) {
     recs.push(diagnosisToRec(pixelDiagnosis, provider));
+  }
+
+  // AI-006 budget reallocation — cross-campaign move from account totals. Does
+  // NOT suppress scale/pause/budget_concentration; ranking decides precedence.
+  const campaigns =
+    okSource?.status === "ok" ? okSource.metrics?.campaigns : undefined;
+  if (campaigns && totals) {
+    const budgetRec = deriveBudgetRecommendations(
+      campaigns,
+      totals.roas,
+      okSource?.status === "ok" ? okSource.metrics!.currency : ""
+    );
+    if (budgetRec) {
+      recs.push(budgetToRec(budgetRec, provider));
+    }
   }
 
   return { okSource, recs: rankRecs(recs), pixelDiagnosis, funnelDiagnosis };
