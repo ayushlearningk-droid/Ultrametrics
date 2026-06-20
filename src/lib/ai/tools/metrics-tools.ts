@@ -648,6 +648,24 @@ function assembleProviderRecs(
   const funnelDiagnosis =
     funnelEvents && supportsFunnel ? deriveFunnelDiagnosis(funnelEvents) : null;
 
+  // [AI-015C TEMP DIAGNOSTIC — REMOVE AFTER CAPTURE] log the exact totals +
+  // funnel object fed into derivePixelDiagnostics to verify the false positive.
+  if (provider === "meta_ads") {
+    console.log(
+      "[AI-015C] meta pixel inputs " +
+        JSON.stringify({
+          totals: totals
+            ? {
+                spend: totals.spend,
+                conversions: totals.conversions,
+                revenue: totals.revenue,
+              }
+            : null,
+          funnelEvents: funnelEvents ?? null,
+        })
+    );
+  }
+
   const pixelRaw =
     funnelEvents && totals && supportsFunnel
       ? derivePixelDiagnostics(funnelEvents, totals)

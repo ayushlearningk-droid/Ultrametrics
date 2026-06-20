@@ -243,6 +243,18 @@ export async function getAccountMetrics(
     }>;
   };
 
+  // [AI-015C TEMP DIAGNOSTIC — REMOVE AFTER CAPTURE] dump the raw Meta action
+  // arrays before parsing, to enumerate every action_type/value returned.
+  console.log(
+    "[AI-015C] raw meta actions " +
+      JSON.stringify(
+        (json.data ?? []).map((row) => ({
+          actions: row.actions ?? null,
+          action_values: row.action_values ?? null,
+        }))
+      )
+  );
+
   return (json.data ?? []).map((row) => ({
     ...(row.date_start ? { date_start: row.date_start } : {}),
     ...(row.campaign_id ? { campaign_id: row.campaign_id } : {}),
