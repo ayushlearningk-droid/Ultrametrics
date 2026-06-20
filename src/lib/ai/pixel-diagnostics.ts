@@ -118,11 +118,17 @@ export function derivePixelDiagnostics(
   const confidence = confidenceFromSpend(totals.spend);
 
   // 1. pixel_not_detected — no standard events at all despite active spend.
+  // AI-007 Phase 1: corroborate with account conversions/revenue. If Meta
+  // reports either, conversions ARE being tracked (just under an action_type the
+  // funnel parser doesn't recognize), so "no events" is contradicted — suppress
+  // to avoid a false positive.
   if (
     viewContent === 0 &&
     addToCart === 0 &&
     initiateCheckout === 0 &&
-    purchase === 0
+    purchase === 0 &&
+    totals.conversions === 0 &&
+    totals.revenue === 0
   ) {
     return {
       kind: "pixel_not_detected",
