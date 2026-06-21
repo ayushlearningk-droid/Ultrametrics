@@ -61,7 +61,12 @@ export type RecommendationKind =
   | "high_cpc"
   | "best_traffic_campaign"
   | "worst_traffic_campaign"
-  | "traffic_budget_reallocation";
+  | "traffic_budget_reallocation"
+  // AI-009 Phase 2B: engagement-objective diagnostics.
+  | "low_engagement_rate"
+  | "high_cost_per_engagement"
+  | "best_engagement_campaign"
+  | "worst_engagement_campaign";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -212,6 +217,11 @@ const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
   best_traffic_campaign: 0.5,
   worst_traffic_campaign: 0.4,
   traffic_budget_reallocation: 0.7,
+  // AI-009 Phase 2B engagement diagnostics (scored by the engagement engine).
+  low_engagement_rate: 0.6,
+  high_cost_per_engagement: 0.6,
+  best_engagement_campaign: 0.5,
+  worst_engagement_campaign: 0.4,
 };
 
 /**

@@ -104,6 +104,10 @@ export interface MetaMetricsRow {
   pageView: number;
   /** Campaign objective (AI-008), present at campaign level, e.g. "OUTCOME_TRAFFIC". */
   objective?: string;
+  /** Ad-attributed engagement counts (AI-009B). Canonical = postEngagement. */
+  postEngagement: number;
+  pageEngagement: number;
+  linkClicks: number;
 }
 
 export interface GetAccountMetricsOptions {
@@ -190,6 +194,17 @@ function sumPageView(actions: MetaActionValue[] | undefined): number {
   }
   return 0;
 }
+
+/**
+ * Engagement action types (AI-009B). post_engagement is Meta's canonical total
+ * engagement; page_engagement and link_click are supplementary (and overlap), so
+ * they are parsed separately and never summed into the engagement rate / CPE.
+ */
+const ENGAGEMENT_ACTION_TYPE = {
+  postEngagement: "post_engagement",
+  pageEngagement: "page_engagement",
+  linkClicks: "link_click",
+} as const;
 
 /**
  * Canonical raw metrics fetch for the metrics abstraction layer.
@@ -284,6 +299,15 @@ export async function getAccountMetrics(
     ),
     purchaseEvents: sumActionCount(row.actions, FUNNEL_ACTION_TYPE.purchase),
     pageView: sumPageView(row.actions),
+    postEngagement: sumActionCount(
+      row.actions,
+      ENGAGEMENT_ACTION_TYPE.postEngagement
+    ),
+    pageEngagement: sumActionCount(
+      row.actions,
+      ENGAGEMENT_ACTION_TYPE.pageEngagement
+    ),
+    linkClicks: sumActionCount(row.actions, ENGAGEMENT_ACTION_TYPE.linkClicks),
   }));
 }
 

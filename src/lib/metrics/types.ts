@@ -163,12 +163,26 @@ export interface MetricSeriesPoint extends RawMetricSet {
  * raw + derived ratios for a single campaign. Present only when a fetch was made
  * at level "campaign". No per-campaign series in V1.
  */
+/**
+ * Ad-attributed engagement event counts (AI-009B). `postEngagement` is the
+ * canonical total (Meta post_engagement: reactions/comments/shares/clicks);
+ * pageEngagement/linkClicks are supplementary and overlap with it, so they must
+ * NOT be summed into engagement rate / CPE (double counting).
+ */
+export interface EngagementEvents {
+  postEngagement: number;
+  pageEngagement: number;
+  linkClicks: number;
+}
+
 export interface CampaignBreakdown {
   campaignId: string;
   campaignName: string;
   totals: MetricTotals;
   /** Provider campaign objective (AI-008), e.g. Meta "OUTCOME_TRAFFIC". */
   objective?: string;
+  /** Ad-attributed engagement counts (AI-009B). Present for Meta campaigns. */
+  engagement?: EngagementEvents;
 }
 
 /**
@@ -267,6 +281,8 @@ export interface CampaignRawBreakdown {
   rawTotals: RawMetricSet;
   /** Provider campaign objective (AI-008), passed through unparsed. */
   objective?: string;
+  /** Ad-attributed engagement counts (AI-009B), passed through. */
+  engagement?: EngagementEvents;
 }
 
 /**

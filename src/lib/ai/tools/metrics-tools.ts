@@ -55,6 +55,7 @@ import {
 } from "@/lib/ai/budget-recommendations";
 import { hasConversionObjective } from "@/lib/ai/objective-classifier";
 import { deriveTrafficDiagnostics } from "@/lib/ai/traffic-diagnostics";
+import { deriveEngagementDiagnostics } from "@/lib/ai/engagement-diagnostics";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -735,11 +736,18 @@ function assembleProviderRecs(
       okSource?.status === "ok" ? okSource.metrics?.campaigns : undefined;
     const currency =
       okSource?.status === "ok" ? okSource.metrics?.currency ?? "" : "";
-    const trafficRecs = objectiveCampaignsOk
-      ? deriveTrafficDiagnostics(objectiveCampaignsOk, currency, provider)
+    const objectiveRecs = objectiveCampaignsOk
+      ? [
+          ...deriveTrafficDiagnostics(objectiveCampaignsOk, currency, provider),
+          ...deriveEngagementDiagnostics(
+            objectiveCampaignsOk,
+            currency,
+            provider
+          ),
+        ]
       : [];
-    if (trafficRecs.length > 0) {
-      recs.push(...trafficRecs);
+    if (objectiveRecs.length > 0) {
+      recs.push(...objectiveRecs);
     } else {
       recs.push(objectiveNotConversionRec(provider));
     }

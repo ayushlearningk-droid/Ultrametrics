@@ -62,7 +62,14 @@ function toRaw(r: MetaMetricsRow): RawMetricSet {
 function groupByCampaign(rows: MetaMetricsRow[]): CampaignRawBreakdown[] {
   const byId = new Map<
     string,
-    { name: string; objective?: string; rows: RawMetricSet[] }
+    {
+      name: string;
+      objective?: string;
+      rows: RawMetricSet[];
+      postEngagement: number;
+      pageEngagement: number;
+      linkClicks: number;
+    }
   >();
   for (const r of rows) {
     if (!r.campaign_id) continue;
@@ -70,18 +77,28 @@ function groupByCampaign(rows: MetaMetricsRow[]): CampaignRawBreakdown[] {
       name: r.campaign_name ?? r.campaign_id,
       objective: r.objective,
       rows: [],
+      postEngagement: 0,
+      pageEngagement: 0,
+      linkClicks: 0,
     };
     // First non-empty objective wins (campaign objective is constant per id).
     if (!entry.objective && r.objective) entry.objective = r.objective;
     entry.rows.push(toRaw(r));
+    entry.postEngagement += r.postEngagement;
+    entry.pageEngagement += r.pageEngagement;
+    entry.linkClicks += r.linkClicks;
     byId.set(r.campaign_id, entry);
   }
   return [...byId.entries()].map(
-    ([campaignId, { name, objective, rows: campaignRows }]) => ({
+    ([
+      campaignId,
+      { name, objective, rows: campaignRows, postEngagement, pageEngagement, linkClicks },
+    ]) => ({
       campaignId,
       campaignName: name,
       ...(objective ? { objective } : {}),
       rawTotals: sumRaw(campaignRows),
+      engagement: { postEngagement, pageEngagement, linkClicks },
     })
   );
 }
