@@ -57,6 +57,10 @@ import { hasConversionObjective } from "@/lib/ai/objective-classifier";
 import { deriveTrafficDiagnostics } from "@/lib/ai/traffic-diagnostics";
 import { deriveEngagementDiagnostics } from "@/lib/ai/engagement-diagnostics";
 import { deriveMessagingDiagnostics } from "@/lib/ai/messaging-diagnostics";
+import {
+  enrichSerialized,
+  rankedOpportunities,
+} from "@/lib/ai/intelligence";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -534,7 +538,7 @@ const REC_CAP = 5;
 
 /** Compact view of a recommendation (internal 0-1 `score` stays sort-only). */
 function serializeRecommendation(r: Recommendation) {
-  return {
+  const base = {
     kind: r.kind,
     level: r.level,
     entity_id: r.entityId,
@@ -552,6 +556,9 @@ function serializeRecommendation(r: Recommendation) {
       ? { opportunity_score_breakdown: r.scoreBreakdown }
       : {}),
   };
+  // AI-010A: additively overlay breakdown contributions (#1), evidence
+  // strength (#3), and the "why" (#2). Reads only — score unchanged.
+  return enrichSerialized(base, r);
 }
 
 /** Run the rules for one provider result, or [] when it has no usable metrics. */
@@ -977,6 +984,11 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
           ? { no_actions_this_window: true }
           : {}),
         recommendations: ranked.map(serializeRecommendation),
+        // AI-010A (#6): explicit ranked-opportunities index over the SAME order
+        // as `recommendations` (no re-sorting). Compact, per-provider.
+        ...(ranked.length > 0
+          ? { ranked_opportunities: rankedOpportunities(ranked) }
+          : {}),
       };
     });
 

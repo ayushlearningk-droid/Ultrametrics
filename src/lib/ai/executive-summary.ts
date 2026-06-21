@@ -13,6 +13,15 @@
 import type { Recommendation, RecommendationKind } from "@/lib/ai/recommendations";
 import type { FunnelDiagnosis } from "@/lib/ai/funnel-intelligence";
 import type { PixelDiagnosis } from "@/lib/ai/pixel-diagnostics";
+import {
+  contributions,
+  type FactorContribution,
+} from "@/lib/ai/intelligence/opportunity-breakdown";
+import {
+  evidenceStrength,
+  type EvidenceStrength,
+} from "@/lib/ai/intelligence/evidence-strength";
+import { buildWhy, type Why } from "@/lib/ai/intelligence/rationale";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -30,6 +39,12 @@ export interface SummaryOpportunity {
   impact: string;
   confidence: "high" | "medium" | "low";
   opportunity_score: number;
+  /** AI-010A (#3): evidence strength behind this opportunity. */
+  evidence_strength?: EvidenceStrength;
+  /** AI-010A (#2): structured rationale (present when a breakdown exists). */
+  why?: Why;
+  /** AI-010A (#1): per-factor contributions (present when a breakdown exists). */
+  opportunity_breakdown?: FactorContribution[];
 }
 
 export type FunnelState = "healthy" | "issue" | "insufficient_data";
@@ -43,6 +58,10 @@ export interface ExecutiveSummary {
   message?: string;
   headline: SummaryHeadline | null;
   top_opportunity: SummaryOpportunity | null;
+  /** AI-010A (#5/#6): top-N ranked opportunities (V2). Empty when none. */
+  top_opportunities: SummaryOpportunity[];
+  /** AI-010A: marks the V2 (enriched) summary shape. */
+  summary_version: 2;
   funnel_status: { state: FunnelState; detail?: string };
   watch_outs: string[];
 }
@@ -80,16 +99,31 @@ export function composeExecutiveSummary(
   const ranked = [...input.recommendations].sort(
     (a, b) => b.opportunityScore - a.opportunityScore
   );
-  const top = ranked[0];
-  const top_opportunity: SummaryOpportunity | null = top
-    ? {
-        kind: top.kind,
-        action: top.action,
-        impact: top.impact,
-        confidence: top.confidence,
-        opportunity_score: top.opportunityScore,
-      }
-    : null;
+
+  // AI-010A: enrich each opportunity additively (evidence #3, why #2,
+  // breakdown #1). Reads only — opportunityScore is never recomputed.
+  const toOpportunity = (r: Recommendation): SummaryOpportunity => {
+    const evidence = evidenceStrength(r);
+    const base: SummaryOpportunity = {
+      kind: r.kind,
+      action: r.action,
+      impact: r.impact,
+      confidence: r.confidence,
+      opportunity_score: r.opportunityScore,
+      evidence_strength: evidence,
+    };
+    if (r.scoreBreakdown) {
+      const contribs = contributions(r.scoreBreakdown);
+      base.opportunity_breakdown = contribs;
+      base.why = buildWhy(r, contribs, evidence);
+    }
+    return base;
+  };
+
+  // AI-010A (#5/#6): top-3 ranked opportunities, plus v1 single top for compat.
+  const top_opportunities = ranked.slice(0, 3).map(toOpportunity);
+  const top_opportunity: SummaryOpportunity | null =
+    top_opportunities[0] ?? null;
 
   // Funnel status from the diagnosis (null = below volume floor).
   let funnel_status: ExecutiveSummary["funnel_status"];
@@ -131,6 +165,8 @@ export function composeExecutiveSummary(
     ...(message ? { message } : {}),
     headline: totals,
     top_opportunity,
+    top_opportunities,
+    summary_version: 2,
     funnel_status,
     watch_outs,
   };
