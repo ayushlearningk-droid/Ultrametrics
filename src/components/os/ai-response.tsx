@@ -25,6 +25,7 @@ import {
   Trophy,
   BarChart3,
   ShieldCheck,
+  Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/os/markdown";
@@ -382,12 +383,26 @@ function parseBreakdown(body: string): BreakdownData | null {
   return { why, evidence, factors };
 }
 
-/** Remove the breakdown marker lines so the body isn't double-rendered. */
+/** Parse an optional "Opportunity score: NN/100" (or "Score: NN") line → 0..100. */
+function parseScore(body: string): number | null {
+  const line = markerLine(body, "opportunity score") ?? markerLine(body, "score");
+  if (!line) return null;
+  const m = /(\d+(?:\.\d+)?)/.exec(line);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (Number.isNaN(n)) return null;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/** Remove the marker lines so the body isn't double-rendered as raw markdown. */
 function stripBreakdown(body: string): string {
   return body
     .split("\n")
     .filter(
-      (l) => !/^\s*[-*]?\s*\*{0,2}(why|evidence|breakdown)\*{0,2}\s*:/i.test(l)
+      (l) =>
+        !/^\s*[-*]?\s*\*{0,2}(why|evidence|breakdown|opportunity score)\*{0,2}\s*:/i.test(
+          l
+        )
     )
     .join("\n")
     .trim();
@@ -541,58 +556,7 @@ function InsightCard({
   );
 }
 
-function RecommendationCard({
-  heading,
-  body,
-  onPrompt,
-}: {
-  heading: string | null;
-  body: string;
-  onPrompt?: (text: string) => void;
-}) {
-  const fields = parseRecommendation(body);
-
-  // Fallback: no complete Action/Impact/CTA set → render markdown, never fake fields.
-  if (!fields) {
-    return (
-      <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
-        <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-emerald-200">
-          <Sparkles className="h-4 w-4 text-emerald-300" />
-          {heading ?? "Recommendation"}
-        </div>
-        <Markdown>{body}</Markdown>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
-      <div className="flex items-start gap-2">
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
-        <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold text-foreground">
-            {fields.action}
-          </div>
-          <div className="mt-1 text-[12px] leading-relaxed text-foreground-muted">
-            <span className="font-medium text-emerald-300/90">Impact: </span>
-            {fields.impact}
-          </div>
-          <button
-            type="button"
-            onClick={() => onPrompt?.(fields.cta)}
-            disabled={!onPrompt}
-            className="mt-3 inline-flex items-center gap-1 rounded-lg bg-emerald-400/15 px-3 py-1.5 text-[12px] font-medium text-emerald-200 transition-colors hover:bg-emerald-400/25 disabled:cursor-default disabled:opacity-60"
-          >
-            {fields.cta}
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Opportunity breakdown card (AI-011 Phase 1) ─────────────────────────── */
+/* ── Opportunity card primitives (AI-011 Phase 1 / Opportunity Cards) ─────── */
 
 const EVIDENCE_STYLES: Record<
   EvidenceLevel,
@@ -615,12 +579,67 @@ const EVIDENCE_STYLES: Record<
   },
 };
 
-/** Read-only "why + evidence + factor breakdown" card. Renders only the parts
- *  the model actually provided — any missing field is simply omitted. */
-function BreakdownCard({ data }: { data: BreakdownData }) {
-  const ev = data.evidence ? EVIDENCE_STYLES[data.evidence] : null;
-  const barColor = ev?.bar ?? "bg-brand/70";
+/** Evidence-strength pill (strong/moderate/limited). */
+function EvidenceBadge({ level }: { level: EvidenceLevel }) {
+  const ev = EVIDENCE_STYLES[level];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+        ev.badge
+      )}
+    >
+      <ShieldCheck className="h-3 w-3" />
+      {ev.label}
+    </span>
+  );
+}
 
+/** 0-100 opportunity-score chip. */
+function ScoreChip({ score }: { score: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand">
+      <Gauge className="h-3 w-3" />
+      {score}
+      <span className="font-normal text-brand/70">/100</span>
+    </span>
+  );
+}
+
+/** Horizontal factor-contribution bars, tinted by evidence level. */
+function FactorBars({
+  factors,
+  level,
+}: {
+  factors: BreakdownFactor[];
+  level: EvidenceLevel | null;
+}) {
+  const barColor = level ? EVIDENCE_STYLES[level].bar : "bg-brand/70";
+  return (
+    <div className="space-y-2">
+      {factors.map((f, i) => (
+        <div key={i} className="space-y-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="capitalize text-foreground-muted">{f.label}</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {Math.round(f.percent)}%
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className={cn("h-full rounded-full", barColor)}
+              style={{ width: `${f.percent}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Standalone "why + evidence + factor breakdown" card (non-recommendation
+ *  sections, e.g. opportunity insights). Renders only the provided parts. */
+function BreakdownCard({ data }: { data: BreakdownData }) {
   return (
     <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -628,47 +647,115 @@ function BreakdownCard({ data }: { data: BreakdownData }) {
           <BarChart3 className="h-3.5 w-3.5 text-brand" />
           Why this ranks here
         </div>
-        {ev && (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-              ev.badge
-            )}
-          >
-            <ShieldCheck className="h-3 w-3" />
-            {ev.label}
-          </span>
-        )}
+        {data.evidence && <EvidenceBadge level={data.evidence} />}
       </div>
-
       {data.why && (
         <p className="mb-3 text-[13px] leading-relaxed text-foreground/90">
           {data.why}
         </p>
       )}
-
       {data.factors.length > 0 && (
-        <div className="space-y-2">
-          {data.factors.map((f, i) => (
-            <div key={i} className="space-y-1">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="capitalize text-foreground-muted">
-                  {f.label}
-                </span>
-                <span className="font-semibold tabular-nums text-foreground">
-                  {Math.round(f.percent)}%
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                <div
-                  className={cn("h-full rounded-full", barColor)}
-                  style={{ width: `${f.percent}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+        <FactorBars factors={data.factors} level={data.evidence} />
       )}
+    </div>
+  );
+}
+
+/**
+ * Visual Opportunity Card — the unified recommendation surface. Header shows the
+ * score chip + evidence badge; body shows the action title, impact, factor
+ * breakdown bars, an optional "why", and the CTA. Degrades gracefully: when the
+ * model didn't emit Action/Impact/CTA, falls back to markdown (never fabricates
+ * a field); each header chip is shown only when its value is present.
+ */
+function OpportunityCard({
+  heading,
+  fields,
+  score,
+  breakdown,
+  body,
+  onPrompt,
+}: {
+  heading: string | null;
+  fields: RecommendationFields | null;
+  score: number | null;
+  breakdown: BreakdownData | null;
+  /** Marker-stripped body, used only for the markdown fallback. */
+  body: string;
+  onPrompt?: (text: string) => void;
+}) {
+  const hasHeaderMeta = score !== null || !!breakdown?.evidence;
+
+  const header = hasHeaderMeta ? (
+    <div className="mb-2.5 flex items-center gap-2">
+      {score !== null && <ScoreChip score={score} />}
+      {breakdown?.evidence && <EvidenceBadge level={breakdown.evidence} />}
+    </div>
+  ) : null;
+
+  // Fallback — no complete Action/Impact/CTA: keep the chips, render markdown.
+  if (!fields) {
+    return (
+      <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
+        {header}
+        <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-emerald-200">
+          <Sparkles className="h-4 w-4 text-emerald-300" />
+          {heading ?? "Recommendation"}
+        </div>
+        <Markdown>{body}</Markdown>
+        {breakdown && (breakdown.why || breakdown.factors.length > 0) && (
+          <div className="mt-3 space-y-3">
+            {breakdown.why && (
+              <p className="text-[13px] leading-relaxed text-foreground/90">
+                {breakdown.why}
+              </p>
+            )}
+            {breakdown.factors.length > 0 && (
+              <FactorBars factors={breakdown.factors} level={breakdown.evidence} />
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
+      <div className="flex items-start gap-2">
+        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+        <div className="min-w-0 flex-1">
+          {header}
+          <div className="text-[14px] font-semibold text-foreground">
+            {fields.action}
+          </div>
+          <div className="mt-1 text-[12px] leading-relaxed text-foreground-muted">
+            <span className="font-medium text-emerald-300/90">Impact: </span>
+            {fields.impact}
+          </div>
+
+          {breakdown?.factors.length ? (
+            <div className="mt-3 border-t border-white/[0.06] pt-3">
+              <FactorBars factors={breakdown.factors} level={breakdown.evidence} />
+            </div>
+          ) : null}
+
+          {breakdown?.why && (
+            <p className="mt-2.5 text-[12px] leading-relaxed text-foreground/80">
+              {breakdown.why}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onPrompt?.(fields.cta)}
+            disabled={!onPrompt}
+            className="mt-3 inline-flex items-center gap-1 rounded-lg bg-emerald-400/15 px-3 py-1.5 text-[12px] font-medium text-emerald-200 transition-colors hover:bg-emerald-400/25 disabled:cursor-default disabled:opacity-60"
+          >
+            {fields.cta}
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -785,6 +872,24 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
         const view = bd ? { ...section, body: stripBreakdown(section.body) } : section;
         const { kind, metrics, statuses, ranking } = classify(view);
 
+        // Recommendations render as the unified visual OpportunityCard, which
+        // owns the score chip, evidence badge, breakdown bars, and CTA. No
+        // separate BreakdownCard is appended for this branch.
+        if (kind === "recommendation") {
+          return (
+            <div key={i}>
+              <OpportunityCard
+                heading={view.heading}
+                fields={parseRecommendation(section.body)}
+                score={parseScore(section.body)}
+                breakdown={bd}
+                body={view.body}
+                onPrompt={onPrompt}
+              />
+            </div>
+          );
+        }
+
         const primary = (() => {
           if (kind === "ranking" && ranking) {
             return <LeaderboardCard heading={view.heading} table={ranking} />;
@@ -794,15 +899,6 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
           }
           if (kind === "status") {
             return <StatusCards heading={view.heading} statuses={statuses} />;
-          }
-          if (kind === "recommendation") {
-            return (
-              <RecommendationCard
-                heading={view.heading}
-                body={view.body}
-                onPrompt={onPrompt}
-              />
-            );
           }
           if (kind === "diagnostic" || kind === "opportunity" || kind === "risk") {
             return <InsightCard variant={kind} heading={view.heading} body={view.body} />;
