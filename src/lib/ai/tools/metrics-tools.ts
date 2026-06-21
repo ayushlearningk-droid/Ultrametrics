@@ -547,6 +547,10 @@ function serializeRecommendation(r: Recommendation) {
     confidence: r.confidence,
     // AI-006: business-impact priority (0-100) now visible to the model.
     opportunity_score: r.opportunityScore,
+    // AI-010 Phase 1: factor decomposition behind the score (when present).
+    ...(r.scoreBreakdown
+      ? { opportunity_score_breakdown: r.scoreBreakdown }
+      : {}),
   };
 }
 

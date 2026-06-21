@@ -20,32 +20,40 @@ import type { CampaignBreakdown, MetricsProvider } from "@/lib/metrics/types";
 import type { Recommendation, Confidence } from "@/lib/ai/recommendations";
 import { classifyObjective } from "@/lib/ai/objective-classifier";
 import { MIN_IMPRESSIONS } from "@/lib/ai/thresholds";
+import {
+  computeOpportunityScore,
+  OBJECTIVE_SCORING,
+  type OpportunityBreakdown,
+} from "@/lib/ai/scoring/opportunity-score";
 
 /* ── Thresholds ───────────────────────────────────────────────────────────── */
 
 /** Need at least this many messaging campaigns to compare best vs worst. */
 const MIN_MESSAGING_CAMPAIGNS = 2;
 
-/* ── Scoring (capped < 100, mirrors the AI-007 contract) ──────────────────── */
+/* ── Scoring (shared module, objective profile: ceiling 85, no revenue) ─────── */
 
-const SCORE_CEILING = 85;
-const CONFIDENCE_WEIGHT: Record<Confidence, number> = {
-  high: 1.0,
-  medium: 0.75,
-  low: 0.5,
-};
-
-function clamp01(x: number): number {
-  return Math.max(0, Math.min(1, x));
-}
-
-function score(
+/**
+ * opportunityScore + breakdown via the shared scoring module (AI-010 Phase 1).
+ * Identical to the prior local formula:
+ * round(85 · confidenceWeight · (0.5·spend + 0.5·sev)).
+ */
+function opp(
   severity: number,
   spendShare: number,
   confidence: Confidence
-): number {
-  const composite = 0.5 * clamp01(spendShare) + 0.5 * clamp01(severity);
-  return Math.round(SCORE_CEILING * CONFIDENCE_WEIGHT[confidence] * composite);
+): { opportunityScore: number; scoreBreakdown: OpportunityBreakdown } {
+  const o = computeOpportunityScore({
+    ceiling: OBJECTIVE_SCORING.ceiling,
+    weights: OBJECTIVE_SCORING.weights,
+    confidence,
+    spendShare,
+    severity,
+  });
+  return {
+    opportunityScore: o.score,
+    scoreBreakdown: { factors: o.factors, ceiling: o.ceiling },
+  };
 }
 
 function money(value: number, currency: string): string {
@@ -132,7 +140,7 @@ export function deriveMessagingDiagnostics(
       cta: `Show "${best.campaignName}" daily trend`,
       confidence: confOf(best),
       score: 0.6,
-      opportunityScore: score(0.5, shareOf(best), confOf(best)),
+      ...opp(0.5, shareOf(best), confOf(best)),
     });
 
     recs.push({
@@ -147,7 +155,7 @@ export function deriveMessagingDiagnostics(
       cta: `Compare "${worst.campaignName}" to top messaging campaigns`,
       confidence: confOf(worst),
       score: 0.5,
-      opportunityScore: score(0.4, shareOf(worst), confOf(worst)),
+      ...opp(0.4, shareOf(worst), confOf(worst)),
     });
   }
 

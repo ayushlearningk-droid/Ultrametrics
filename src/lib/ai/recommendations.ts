@@ -31,6 +31,12 @@ import {
   classifyObjective,
   hasConversionObjective,
 } from "@/lib/ai/objective-classifier";
+import {
+  computeOpportunityScore,
+  CONVERSION_SCORING,
+  type Confidence,
+  type OpportunityBreakdown,
+} from "@/lib/ai/scoring/opportunity-score";
 
 /* ── Public types ─────────────────────────────────────────────────────────── */
 
@@ -71,7 +77,7 @@ export type RecommendationKind =
   | "best_messaging_campaign"
   | "worst_messaging_campaign";
 
-export type Confidence = "high" | "medium" | "low";
+export type { Confidence } from "@/lib/ai/scoring/opportunity-score";
 
 export interface Recommendation {
   kind: RecommendationKind;
@@ -90,6 +96,8 @@ export interface Recommendation {
   score: number;
   /** AI-007 business-impact priority, 0-100. Primary opportunity sort key. */
   opportunityScore: number;
+  /** AI-010 Phase 1: factor decomposition behind opportunityScore (optional). */
+  scoreBreakdown?: OpportunityBreakdown;
 }
 
 /* ── Rule constants ───────────────────────────────────────────────────────── */
@@ -179,19 +187,7 @@ function capMedium(c: Confidence): Confidence {
   return c === "high" ? "medium" : c;
 }
 
-/* ── Opportunity scoring (AI-007) ─────────────────────────────────────────── */
-
-/** Composite weights — sum to 1. */
-const OPP_W_REVENUE = 0.45;
-const OPP_W_SPEND = 0.3;
-const OPP_W_SEVERITY = 0.25;
-
-/** Confidence dampening (not zeroing). */
-const CONFIDENCE_WEIGHT: Record<Confidence, number> = {
-  high: 1.0,
-  medium: 0.75,
-  low: 0.5,
-};
+/* ── Opportunity scoring (AI-007, unified in AI-010 Phase 1) ───────────────── */
 
 /** Urgency by recommendation kind. */
 const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
@@ -231,27 +227,35 @@ const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
 };
 
 /**
- * Business-impact priority, 0-100 (AI-007). Blends a kind-specific revenue-impact
- * proxy, budget exposure (spend share), and per-kind severity, then dampens by
- * confidence:
+ * Business-impact priority, 0-100 (AI-007), via the shared scoring module
+ * (AI-010 Phase 1). Blends a kind-specific revenue-impact proxy, budget exposure
+ * (spend share), and per-kind severity, then dampens by confidence:
  *
  *   opportunityScore = round( 100 · confidenceWeight ·
  *     ( 0.45·revenueImpactNorm + 0.30·spendShare + 0.25·severity ) )
  *
- * All factors are 0..1; revenueImpactNorm/spendShare are clamped by the caller's
- * inputs. This is a PRIORITY score, not a dollar forecast.
+ * Returns both the score (→ opportunityScore) and its decomposition (→
+ * scoreBreakdown), spread into the recommendation. This is a PRIORITY score,
+ * not a dollar forecast.
  */
-function computeOpportunityScore(
+function opp(
   kind: RecommendationKind,
   confidence: Confidence,
   spendShare: number,
   revenueImpactNorm: number
-): number {
-  const composite =
-    OPP_W_REVENUE * clamp01(revenueImpactNorm) +
-    OPP_W_SPEND * clamp01(spendShare) +
-    OPP_W_SEVERITY * SEVERITY_BY_KIND[kind];
-  return Math.round(100 * CONFIDENCE_WEIGHT[confidence] * composite);
+): { opportunityScore: number; scoreBreakdown: OpportunityBreakdown } {
+  const o = computeOpportunityScore({
+    ceiling: CONVERSION_SCORING.ceiling,
+    weights: CONVERSION_SCORING.weights,
+    confidence,
+    spendShare,
+    severity: SEVERITY_BY_KIND[kind],
+    revenueImpact: revenueImpactNorm,
+  });
+  return {
+    opportunityScore: o.score,
+    scoreBreakdown: { factors: o.factors, ceiling: o.ceiling },
+  };
 }
 
 function money(value: number, currency: string): string {
@@ -344,12 +348,7 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
       confidence,
       score: high ? 0.8 : 0.5,
       // All this spend is unmeasured → revenue impact tracks budget exposure.
-      opportunityScore: computeOpportunityScore(
-        "tracking_issue",
-        confidence,
-        share,
-        share
-      ),
+      ...opp("tracking_issue", confidence, share, share),
     };
   }
 
@@ -379,7 +378,7 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         confidence: conf,
         score,
         // Recoverable waste tracks budget exposure.
-        opportunityScore: computeOpportunityScore("pause", conf, share, share),
+        ...opp("pause", conf, share, share),
       };
     }
   }
@@ -409,12 +408,7 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         confidence: conf,
         score,
         // Upside scaled by ROAS headroom above benchmark × budget size.
-        opportunityScore: computeOpportunityScore(
-          "scale",
-          conf,
-          share,
-          clamp01(ev) * share
-        ),
+        ...opp("scale", conf, share, clamp01(ev) * share),
       };
     }
   }
@@ -441,12 +435,7 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         confidence: conf,
         score,
         // Impact scaled by CTR shortfall × budget size.
-        opportunityScore: computeOpportunityScore(
-          "creative_refresh",
-          conf,
-          share,
-          clamp01(ev) * share
-        ),
+        ...opp("creative_refresh", conf, share, clamp01(ev) * share),
       };
     }
   }
@@ -468,7 +457,7 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         confidence: capMedium(bucket(score)),
         score,
         // Mis-weighted budget × ROAS shortfall.
-        opportunityScore: computeOpportunityScore(
+        ...opp(
           "budget_concentration",
           capMedium(bucket(score)),
           share,
@@ -497,12 +486,7 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         confidence: conf,
         score,
         // Cost overspend scaled by CPC excess × budget size.
-        opportunityScore: computeOpportunityScore(
-          "bid_review",
-          conf,
-          share,
-          clamp01(ev) * share
-        ),
+        ...opp("bid_review", conf, share, clamp01(ev) * share),
       };
     }
   }
@@ -592,12 +576,7 @@ export function deriveRecommendations(
       confidence,
       score: high ? 0.8 : 0.5,
       // Account-wide: full budget exposure (spendShare = revenueImpact = 1).
-      opportunityScore: computeOpportunityScore(
-        "tracking_issue",
-        confidence,
-        1,
-        1
-      ),
+      ...opp("tracking_issue", confidence, 1, 1),
     });
   }
 

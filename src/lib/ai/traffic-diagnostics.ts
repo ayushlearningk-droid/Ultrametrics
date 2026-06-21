@@ -18,6 +18,11 @@ import type { CampaignBreakdown, MetricsProvider } from "@/lib/metrics/types";
 import type { Recommendation, Confidence } from "@/lib/ai/recommendations";
 import { classifyObjective } from "@/lib/ai/objective-classifier";
 import { MIN_IMPRESSIONS, MIN_CLICKS } from "@/lib/ai/thresholds";
+import {
+  computeOpportunityScore,
+  OBJECTIVE_SCORING,
+  type OpportunityBreakdown,
+} from "@/lib/ai/scoring/opportunity-score";
 
 /* ── Thresholds ───────────────────────────────────────────────────────────── */
 
@@ -33,27 +38,29 @@ const HIGH_CPC_RATIO = 2.0;
 /** Share of the donor's spend to suggest reallocating. */
 const REALLOCATION_FRACTION = 0.25;
 
-/* ── Scoring (capped < 100, mirrors the AI-007 contract) ──────────────────── */
+/* ── Scoring (shared module, objective profile: ceiling 85, no revenue) ─────── */
 
-const SCORE_CEILING = 85;
-const CONFIDENCE_WEIGHT: Record<Confidence, number> = {
-  high: 1.0,
-  medium: 0.75,
-  low: 0.5,
-};
-
-function clamp01(x: number): number {
-  return Math.max(0, Math.min(1, x));
-}
-
-/** opportunityScore: blend spend exposure and per-kind severity, dampened by confidence. */
-function score(
+/**
+ * opportunityScore + breakdown via the shared scoring module (AI-010 Phase 1).
+ * Blends spend exposure and per-kind severity, dampened by confidence. Identical
+ * to the prior local formula: round(85 · confidenceWeight · (0.5·spend + 0.5·sev)).
+ */
+function opp(
   severity: number,
   spendShare: number,
   confidence: Confidence
-): number {
-  const composite = 0.5 * clamp01(spendShare) + 0.5 * clamp01(severity);
-  return Math.round(SCORE_CEILING * CONFIDENCE_WEIGHT[confidence] * composite);
+): { opportunityScore: number; scoreBreakdown: OpportunityBreakdown } {
+  const o = computeOpportunityScore({
+    ceiling: OBJECTIVE_SCORING.ceiling,
+    weights: OBJECTIVE_SCORING.weights,
+    confidence,
+    spendShare,
+    severity,
+  });
+  return {
+    opportunityScore: o.score,
+    scoreBreakdown: { factors: o.factors, ceiling: o.ceiling },
+  };
 }
 
 function money(value: number, currency: string): string {
@@ -124,7 +131,7 @@ export function deriveTrafficDiagnostics(
       cta: `Show "${best.campaignName}" daily trend`,
       confidence: confOf(best),
       score: 0.6,
-      opportunityScore: score(0.5, shareOf(best), confOf(best)),
+      ...opp(0.5, shareOf(best), confOf(best)),
     });
 
     recs.push({
@@ -137,7 +144,7 @@ export function deriveTrafficDiagnostics(
       cta: `Compare "${worst.campaignName}" to top traffic campaigns`,
       confidence: confOf(worst),
       score: 0.5,
-      opportunityScore: score(0.4, shareOf(worst), confOf(worst)),
+      ...opp(0.4, shareOf(worst), confOf(worst)),
     });
 
     // low_ctr — worst campaign well below the traffic benchmark.
@@ -152,7 +159,7 @@ export function deriveTrafficDiagnostics(
         cta: `Show best-performing traffic ads`,
         confidence: confOf(worst),
         score: 0.6,
-        opportunityScore: score(0.6, shareOf(worst), confOf(worst)),
+        ...opp(0.6, shareOf(worst), confOf(worst)),
       });
     }
   }
@@ -174,7 +181,7 @@ export function deriveTrafficDiagnostics(
         cta: `Show "${topCpc.campaignName}" breakdown`,
         confidence: topCpc.totals.clicks >= 2 * MIN_CLICKS ? "high" : "medium",
         score: 0.6,
-        opportunityScore: score(
+        ...opp(
           0.6,
           shareOf(topCpc),
           topCpc.totals.clicks >= 2 * MIN_CLICKS ? "high" : "medium"
@@ -206,7 +213,7 @@ export function deriveTrafficDiagnostics(
       cta: `Compare "${worst.campaignName}" and "${best.campaignName}"`,
       confidence: conf,
       score: 0.7,
-      opportunityScore: score(0.7, shareOf(worst), conf),
+      ...opp(0.7, shareOf(worst), conf),
     });
   }
 
