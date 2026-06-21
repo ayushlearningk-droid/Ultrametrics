@@ -66,7 +66,10 @@ export type RecommendationKind =
   | "low_engagement_rate"
   | "high_cost_per_engagement"
   | "best_engagement_campaign"
-  | "worst_engagement_campaign";
+  | "worst_engagement_campaign"
+  // AI-009 Phase 2C: messaging-objective diagnostics.
+  | "best_messaging_campaign"
+  | "worst_messaging_campaign";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -222,6 +225,9 @@ const SEVERITY_BY_KIND: Record<RecommendationKind, number> = {
   high_cost_per_engagement: 0.6,
   best_engagement_campaign: 0.5,
   worst_engagement_campaign: 0.4,
+  // AI-009 Phase 2C messaging diagnostics (scored by the messaging engine).
+  best_messaging_campaign: 0.5,
+  worst_messaging_campaign: 0.4,
 };
 
 /**

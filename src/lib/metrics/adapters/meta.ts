@@ -69,6 +69,7 @@ function groupByCampaign(rows: MetaMetricsRow[]): CampaignRawBreakdown[] {
       postEngagement: number;
       pageEngagement: number;
       linkClicks: number;
+      messagingConversations: number;
     }
   >();
   for (const r of rows) {
@@ -80,6 +81,7 @@ function groupByCampaign(rows: MetaMetricsRow[]): CampaignRawBreakdown[] {
       postEngagement: 0,
       pageEngagement: 0,
       linkClicks: 0,
+      messagingConversations: 0,
     };
     // First non-empty objective wins (campaign objective is constant per id).
     if (!entry.objective && r.objective) entry.objective = r.objective;
@@ -87,18 +89,28 @@ function groupByCampaign(rows: MetaMetricsRow[]): CampaignRawBreakdown[] {
     entry.postEngagement += r.postEngagement;
     entry.pageEngagement += r.pageEngagement;
     entry.linkClicks += r.linkClicks;
+    entry.messagingConversations += r.messagingConversations;
     byId.set(r.campaign_id, entry);
   }
   return [...byId.entries()].map(
     ([
       campaignId,
-      { name, objective, rows: campaignRows, postEngagement, pageEngagement, linkClicks },
+      {
+        name,
+        objective,
+        rows: campaignRows,
+        postEngagement,
+        pageEngagement,
+        linkClicks,
+        messagingConversations,
+      },
     ]) => ({
       campaignId,
       campaignName: name,
       ...(objective ? { objective } : {}),
       rawTotals: sumRaw(campaignRows),
       engagement: { postEngagement, pageEngagement, linkClicks },
+      messaging: { conversations: messagingConversations },
     })
   );
 }

@@ -56,6 +56,7 @@ import {
 import { hasConversionObjective } from "@/lib/ai/objective-classifier";
 import { deriveTrafficDiagnostics } from "@/lib/ai/traffic-diagnostics";
 import { deriveEngagementDiagnostics } from "@/lib/ai/engagement-diagnostics";
+import { deriveMessagingDiagnostics } from "@/lib/ai/messaging-diagnostics";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -740,6 +741,11 @@ function assembleProviderRecs(
       ? [
           ...deriveTrafficDiagnostics(objectiveCampaignsOk, currency, provider),
           ...deriveEngagementDiagnostics(
+            objectiveCampaignsOk,
+            currency,
+            provider
+          ),
+          ...deriveMessagingDiagnostics(
             objectiveCampaignsOk,
             currency,
             provider

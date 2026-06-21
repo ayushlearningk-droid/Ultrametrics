@@ -175,6 +175,14 @@ export interface EngagementEvents {
   linkClicks: number;
 }
 
+/**
+ * Ad-attributed messaging counts (AI-009C, Phase 1). `conversations` is Meta's
+ * canonical messaging optimization event (messaging_conversation_started_7d).
+ */
+export interface MessagingEvents {
+  conversations: number;
+}
+
 export interface CampaignBreakdown {
   campaignId: string;
   campaignName: string;
@@ -183,6 +191,8 @@ export interface CampaignBreakdown {
   objective?: string;
   /** Ad-attributed engagement counts (AI-009B). Present for Meta campaigns. */
   engagement?: EngagementEvents;
+  /** Ad-attributed messaging counts (AI-009C). Present for Meta campaigns. */
+  messaging?: MessagingEvents;
 }
 
 /**
@@ -283,6 +293,8 @@ export interface CampaignRawBreakdown {
   objective?: string;
   /** Ad-attributed engagement counts (AI-009B), passed through. */
   engagement?: EngagementEvents;
+  /** Ad-attributed messaging counts (AI-009C), passed through. */
+  messaging?: MessagingEvents;
 }
 
 /**

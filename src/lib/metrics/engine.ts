@@ -80,6 +80,7 @@ function toMetricSet(raw: RawMetricResult): MetricSet {
       campaignName: c.campaignName,
       ...(c.objective ? { objective: c.objective } : {}),
       ...(c.engagement ? { engagement: c.engagement } : {}),
+      ...(c.messaging ? { messaging: c.messaging } : {}),
       totals: toTotals(c.rawTotals),
     })),
     assets: raw.assets?.map((a) => ({

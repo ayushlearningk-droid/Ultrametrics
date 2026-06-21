@@ -108,6 +108,11 @@ export interface MetaMetricsRow {
   postEngagement: number;
   pageEngagement: number;
   linkClicks: number;
+  /**
+   * Ad-attributed messaging conversations started (AI-009C, Phase 1). Canonical
+   * key = onsite_conversion.messaging_conversation_started_7d. 0 when absent.
+   */
+  messagingConversations: number;
 }
 
 export interface GetAccountMetricsOptions {
@@ -204,6 +209,16 @@ const ENGAGEMENT_ACTION_TYPE = {
   postEngagement: "post_engagement",
   pageEngagement: "page_engagement",
   linkClicks: "link_click",
+} as const;
+
+/**
+ * Messaging action types (AI-009C, Phase 1). The 7-day-attributed conversations-
+ * started key is Meta's canonical optimization event for MESSAGES campaigns —
+ * the messaging analogue of post_engagement. Supplementary keys (total_messaging
+ * _connection) overlap it and are intentionally NOT parsed here (no double count).
+ */
+const MESSAGING_ACTION_TYPE = {
+  conversations: "onsite_conversion.messaging_conversation_started_7d",
 } as const;
 
 /**
@@ -308,6 +323,10 @@ export async function getAccountMetrics(
       ENGAGEMENT_ACTION_TYPE.pageEngagement
     ),
     linkClicks: sumActionCount(row.actions, ENGAGEMENT_ACTION_TYPE.linkClicks),
+    messagingConversations: sumActionCount(
+      row.actions,
+      MESSAGING_ACTION_TYPE.conversations
+    ),
   }));
 }
 
