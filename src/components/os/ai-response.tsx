@@ -23,6 +23,8 @@ import {
   ShieldAlert,
   ArrowUpRight,
   Trophy,
+  BarChart3,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/os/markdown";
@@ -317,6 +319,80 @@ function parseRecommendation(body: string): RecommendationFields | null {
   return null;
 }
 
+/* ── Opportunity breakdown (AI-011 Phase 1) ──────────────────────────────────
+ * Parse the optional "Why:" / "Evidence:" / "Breakdown:" lines the model emits
+ * (AI-010A relay). Pure presentation: these numbers are grounded in the tool
+ * result, never invented here. Returns null when no marker is present so every
+ * other section degrades to the existing rendering. */
+
+type EvidenceLevel = "strong" | "moderate" | "limited";
+
+interface BreakdownFactor {
+  label: string;
+  /** 0..100 share for the bar width. */
+  percent: number;
+}
+
+interface BreakdownData {
+  why: string | null;
+  evidence: EvidenceLevel | null;
+  factors: BreakdownFactor[];
+}
+
+/** Match a single "marker:" line (optionally bulleted/bold), case-insensitive. */
+function markerLine(body: string, name: string): string | null {
+  const re = new RegExp(
+    `^\\s*[-*]?\\s*\\*{0,2}${name}\\*{0,2}\\s*:\\s*(.+)$`,
+    "im"
+  );
+  const m = re.exec(body);
+  return m ? clean(m[1]) : null;
+}
+
+/** Parse "label 45%, label 0.30, …" into bar-ready factors (0..100). */
+function parseFactors(line: string | null): BreakdownFactor[] {
+  if (!line) return [];
+  const out: BreakdownFactor[] = [];
+  for (const part of line.split(/[,;]/)) {
+    const m = /^(.+?)\s+(\d+(?:\.\d+)?)\s*(%?)$/.exec(part.trim());
+    if (!m) continue;
+    const label = clean(m[1]);
+    let n = parseFloat(m[2]);
+    if (!m[3] && n <= 1) n *= 100; // bare fraction → percent
+    if (!label || Number.isNaN(n)) continue;
+    out.push({ label, percent: Math.max(0, Math.min(100, n)) });
+  }
+  return out;
+}
+
+function parseBreakdown(body: string): BreakdownData | null {
+  const why = markerLine(body, "why");
+  const evidenceRaw = markerLine(body, "evidence");
+  const factors = parseFactors(markerLine(body, "breakdown"));
+
+  let evidence: EvidenceLevel | null = null;
+  if (evidenceRaw) {
+    const e = evidenceRaw.toLowerCase();
+    if (e.includes("strong")) evidence = "strong";
+    else if (e.includes("moderate")) evidence = "moderate";
+    else if (e.includes("limited") || e.includes("weak")) evidence = "limited";
+  }
+
+  if (!why && !evidence && factors.length === 0) return null;
+  return { why, evidence, factors };
+}
+
+/** Remove the breakdown marker lines so the body isn't double-rendered. */
+function stripBreakdown(body: string): string {
+  return body
+    .split("\n")
+    .filter(
+      (l) => !/^\s*[-*]?\s*\*{0,2}(why|evidence|breakdown)\*{0,2}\s*:/i.test(l)
+    )
+    .join("\n")
+    .trim();
+}
+
 /* ── Card primitives ─────────────────────────────────────────────────────── */
 
 function MetricCards({ heading, metrics }: { heading: string | null; metrics: Metric[] }) {
@@ -516,6 +592,87 @@ function RecommendationCard({
   );
 }
 
+/* ── Opportunity breakdown card (AI-011 Phase 1) ─────────────────────────── */
+
+const EVIDENCE_STYLES: Record<
+  EvidenceLevel,
+  { label: string; badge: string; bar: string }
+> = {
+  strong: {
+    label: "Strong evidence",
+    badge: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+    bar: "bg-emerald-400/70",
+  },
+  moderate: {
+    label: "Moderate evidence",
+    badge: "border-amber-400/30 bg-amber-400/10 text-amber-200",
+    bar: "bg-amber-400/70",
+  },
+  limited: {
+    label: "Limited evidence",
+    badge: "border-slate-400/30 bg-slate-400/10 text-slate-200",
+    bar: "bg-slate-400/70",
+  },
+};
+
+/** Read-only "why + evidence + factor breakdown" card. Renders only the parts
+ *  the model actually provided — any missing field is simply omitted. */
+function BreakdownCard({ data }: { data: BreakdownData }) {
+  const ev = data.evidence ? EVIDENCE_STYLES[data.evidence] : null;
+  const barColor = ev?.bar ?? "bg-brand/70";
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+          <BarChart3 className="h-3.5 w-3.5 text-brand" />
+          Why this ranks here
+        </div>
+        {ev && (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+              ev.badge
+            )}
+          >
+            <ShieldCheck className="h-3 w-3" />
+            {ev.label}
+          </span>
+        )}
+      </div>
+
+      {data.why && (
+        <p className="mb-3 text-[13px] leading-relaxed text-foreground/90">
+          {data.why}
+        </p>
+      )}
+
+      {data.factors.length > 0 && (
+        <div className="space-y-2">
+          {data.factors.map((f, i) => (
+            <div key={i} className="space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="capitalize text-foreground-muted">
+                  {f.label}
+                </span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {Math.round(f.percent)}%
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className={cn("h-full rounded-full", barColor)}
+                  style={{ width: `${f.percent}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TONE_STYLES: Record<
   StatusTone,
   { dot: string; label: string }
@@ -601,9 +758,20 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
   // No headings → nothing to structure; render straight markdown — unless the
   // whole answer is a ranking table, which still deserves a leaderboard card.
   if (sections.length <= 1 && sections[0]?.heading === null) {
-    const ranking = sections[0] ? detectRankingTable(sections[0].body) : null;
+    const onlyBody = sections[0]?.body ?? content;
+    const ranking = sections[0] ? detectRankingTable(onlyBody) : null;
     if (ranking) {
       return <LeaderboardCard heading={null} table={ranking} />;
+    }
+    // AI-011: surface a breakdown card even on an unstructured answer.
+    const bd = parseBreakdown(onlyBody);
+    if (bd) {
+      return (
+        <div className="space-y-3">
+          <Markdown>{stripBreakdown(onlyBody)}</Markdown>
+          <BreakdownCard data={bd} />
+        </div>
+      );
     }
     return <Markdown>{content}</Markdown>;
   }
@@ -611,37 +779,44 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
   return (
     <div className="space-y-4">
       {sections.map((section, i) => {
-        const { kind, metrics, statuses, ranking } = classify(section);
-        if (kind === "ranking" && ranking) {
-          return <LeaderboardCard key={i} heading={section.heading} table={ranking} />;
-        }
-        if (kind === "metric") {
-          return <MetricCards key={i} heading={section.heading} metrics={metrics} />;
-        }
-        if (kind === "status") {
-          return <StatusCards key={i} heading={section.heading} statuses={statuses} />;
-        }
-        if (kind === "recommendation") {
-          return (
-            <RecommendationCard
-              key={i}
-              heading={section.heading}
-              body={section.body}
-              onPrompt={onPrompt}
-            />
-          );
-        }
-        if (kind === "diagnostic" || kind === "opportunity" || kind === "risk") {
-          return (
-            <InsightCard
-              key={i}
-              variant={kind}
-              heading={section.heading}
-              body={section.body}
-            />
-          );
-        }
-        return <Markdown key={i}>{reconstruct(section)}</Markdown>;
+        // AI-011: pull optional Why/Evidence/Breakdown out of the body and strip
+        // those marker lines so they aren't double-rendered as raw markdown.
+        const bd = parseBreakdown(section.body);
+        const view = bd ? { ...section, body: stripBreakdown(section.body) } : section;
+        const { kind, metrics, statuses, ranking } = classify(view);
+
+        const primary = (() => {
+          if (kind === "ranking" && ranking) {
+            return <LeaderboardCard heading={view.heading} table={ranking} />;
+          }
+          if (kind === "metric") {
+            return <MetricCards heading={view.heading} metrics={metrics} />;
+          }
+          if (kind === "status") {
+            return <StatusCards heading={view.heading} statuses={statuses} />;
+          }
+          if (kind === "recommendation") {
+            return (
+              <RecommendationCard
+                heading={view.heading}
+                body={view.body}
+                onPrompt={onPrompt}
+              />
+            );
+          }
+          if (kind === "diagnostic" || kind === "opportunity" || kind === "risk") {
+            return <InsightCard variant={kind} heading={view.heading} body={view.body} />;
+          }
+          return <Markdown>{reconstruct(view)}</Markdown>;
+        })();
+
+        if (!bd) return <div key={i}>{primary}</div>;
+        return (
+          <div key={i} className="space-y-3">
+            {primary}
+            <BreakdownCard data={bd} />
+          </div>
+        );
       })}
     </div>
   );
