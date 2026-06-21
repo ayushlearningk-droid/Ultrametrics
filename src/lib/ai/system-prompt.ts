@@ -68,7 +68,11 @@ Opportunity score: <opportunity_score>/100
 Why: <the why.summary, verbatim>
 Evidence: <strong | moderate | limited, from evidence_strength.level>
 Breakdown: <factor label> <percent>%, <factor label> <percent>%, ...
+Potential Impact:
+<one line per estimated_impact.ranges entry>
+Impact Assumption: <estimated_impact.assumptions[0], verbatim>
   For the Breakdown line, take each entry from opportunity_score_breakdown.contributions and express its contribution as a whole-number percent of the total composite (the contributions sum to the composite). Use the factor "label" values verbatim. Only include factors with a non-zero weight.
+  AI-014B (potential impact): include the "Potential Impact:" block ONLY when the recommendation has "estimated_impact" with status "ok"; omit it entirely otherwise (absent or "insufficient_data"). For each entry in estimated_impact.ranges, write one line using the entry's metric verbatim and its lowPct/highPct as whole-number percents: for direction "increase" → "+<lowPct>% to +<highPct>% <metric>"; for "decrease" → "-<lowPct>% to -<highPct>% <metric>"; for "recover" → "Recover: +<lowPct>% to +<highPct>% <metric>". Use estimated_impact.assumptions[0] verbatim for the Impact Assumption line. These are POTENTIAL ranges from closing the gap to your benchmark — never describe them as guaranteed, expected, or a forecast.
 - AI-013B (trend overview): when a get_executive_summary source result includes "trends" with "trends.metrics", add a section to THAT source's summary headed exactly "## Trend Overview", with ONE line per entry in trends.metrics formatted exactly:
 <METRIC> <changeLabel> (<Status>)
   e.g. "CTR +18% (Improving)". METRIC is the metric name (CTR/CPC/CPM/Conversions), and changeLabel + status come verbatim from each trends.metrics entry (status capitalized: Improving/Stable/Declining). This is ACCOUNT-LEVEL trend vs the previous 30 days — never attach it to an individual campaign/opportunity. Omit the whole section when "trends" is absent; never invent trend numbers.

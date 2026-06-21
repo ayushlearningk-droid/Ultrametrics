@@ -27,6 +27,8 @@ import {
   Gauge,
   TrendingDown,
   Minus,
+  RotateCcw,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/os/markdown";
@@ -468,6 +470,83 @@ function stripBreakdown(body: string): string {
     .trim();
 }
 
+/* ── Potential Impact parsing (AI-014B) ──────────────────────────────────────
+ * Surfaces the per-opportunity `estimated_impact` (AI-014A) the model relays as
+ * a "Potential Impact:" block. Read-only / not-guaranteed: ranges only, never a
+ * single number, never a promise. Pure presentation — numbers are grounded in
+ * the tool result, never invented. Returns null when absent (graceful fallback). */
+
+type ImpactDirection = "increase" | "decrease" | "recover";
+
+interface ImpactRangeUI {
+  metric: string;
+  direction: ImpactDirection;
+  /** Absolute magnitudes; the arrow carries the direction. */
+  low: number;
+  high: number;
+}
+
+interface ImpactData {
+  ranges: ImpactRangeUI[];
+  assumption: string | null;
+}
+
+const IMPACT_HEADER_RE = /^\s*[-*]?\s*\*{0,2}Potential Impact\*{0,2}\s*:/i;
+const IMPACT_LINE_RE =
+  /^\s*[-*]?\s*(?:Recover:\s*)?[+-]?\d+%\s*to\s*[+-]?\d+%\s*[A-Za-z][A-Za-z ]*\s*$/i;
+const ASSUMPTION_LINE_RE =
+  /^\s*[-*]?\s*\*{0,2}Impact Assumption\*{0,2}\s*:/i;
+// Capturing form of IMPACT_LINE_RE for extracting the parts of one entry.
+const IMPACT_ENTRY_RE =
+  /(Recover:\s*)?([+-]?\d+)%\s*to\s*([+-]?\d+)%\s*([A-Za-z][A-Za-z ]*?)\s*$/i;
+
+/** Parse the "Potential Impact:" block. Returns null unless the header exists
+ *  AND at least one range line parses. */
+function parseImpact(body: string): ImpactData | null {
+  if (!IMPACT_HEADER_RE.test(body)) return null;
+  const ranges: ImpactRangeUI[] = [];
+  for (const raw of body.split("\n")) {
+    const m = IMPACT_ENTRY_RE.exec(raw.replace(/^\s*[-*]?\s*/, ""));
+    if (!m) continue;
+    const direction: ImpactDirection = m[1]
+      ? "recover"
+      : m[2].startsWith("-")
+        ? "decrease"
+        : "increase";
+    ranges.push({
+      metric: clean(m[4]),
+      direction,
+      low: Math.abs(parseInt(m[2], 10)),
+      high: Math.abs(parseInt(m[3], 10)),
+    });
+  }
+  if (ranges.length === 0) return null;
+  return { ranges, assumption: markerLine(body, "impact assumption") };
+}
+
+/** Remove the contiguous "Potential Impact:" block (header + range lines +
+ *  assumption line) without touching surrounding recommendation text. */
+function stripImpactBlock(body: string): string {
+  const lines = body.split("\n");
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (IMPACT_HEADER_RE.test(lines[i])) {
+      i++; // drop the header
+      while (
+        i < lines.length &&
+        (IMPACT_LINE_RE.test(lines[i]) || ASSUMPTION_LINE_RE.test(lines[i]))
+      ) {
+        i++; // drop each contiguous block line
+      }
+      continue;
+    }
+    out.push(lines[i]);
+    i++;
+  }
+  return out.join("\n").trim();
+}
+
 /* ── Card primitives ─────────────────────────────────────────────────────── */
 
 function MetricCards({ heading, metrics }: { heading: string | null; metrics: Metric[] }) {
@@ -741,12 +820,67 @@ function BreakdownCard({ data }: { data: BreakdownData }) {
   );
 }
 
+/** Read-only "Potential Impact" estimate (AI-014B). Ranges only, evidence tier,
+ *  and an always-present not-guaranteed caveat. Beneficial by construction, so
+ *  every direction is shown in the positive (emerald) tone. */
+const IMPACT_ICON: Record<ImpactDirection, typeof TrendingUp> = {
+  increase: TrendingUp,
+  decrease: TrendingDown,
+  recover: RotateCcw,
+};
+
+function PotentialImpact({
+  data,
+  evidence,
+}: {
+  data: ImpactData;
+  evidence: EvidenceLevel | null;
+}) {
+  return (
+    <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+        <Gauge className="h-3.5 w-3.5 text-brand" />
+        Potential Impact
+        <span className="font-normal normal-case tracking-normal text-foreground-muted/80">
+          (estimate{evidence ? ` · ${evidence} evidence` : ""})
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {data.ranges.map((r, i) => {
+          const Icon = IMPACT_ICON[r.direction];
+          const sign = r.direction === "decrease" ? "−" : "+";
+          return (
+            <div key={i} className="flex items-center justify-between text-[12px]">
+              <span className="flex items-center gap-1.5 capitalize text-foreground/90">
+                <Icon className="h-3.5 w-3.5 text-emerald-300" />
+                {r.metric}
+              </span>
+              <span className="font-semibold tabular-nums text-foreground">
+                {sign}
+                {r.low}% … {sign}
+                {r.high}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+        <Info className="mt-px h-3 w-3 shrink-0" />
+        <span>
+          {data.assumption ? `${data.assumption} · ` : ""}Potential outcome — not
+          guaranteed.
+        </span>
+      </p>
+    </div>
+  );
+}
+
 /**
  * Visual Opportunity Card — the unified recommendation surface. Header shows the
  * score chip + evidence badge; body shows the action title, impact, factor
- * breakdown bars, an optional "why", and the CTA. Degrades gracefully: when the
- * model didn't emit Action/Impact/CTA, falls back to markdown (never fabricates
- * a field); each header chip is shown only when its value is present.
+ * breakdown bars, an optional "why", a potential-impact estimate, and the CTA.
+ * Degrades gracefully: when the model didn't emit Action/Impact/CTA, falls back
+ * to markdown (never fabricates a field); each part is shown only when present.
  */
 function OpportunityCard({
   heading,
@@ -754,6 +888,7 @@ function OpportunityCard({
   fields,
   score,
   breakdown,
+  impact,
   body,
   onPrompt,
 }: {
@@ -763,6 +898,8 @@ function OpportunityCard({
   fields: RecommendationFields | null;
   score: number | null;
   breakdown: BreakdownData | null;
+  /** AI-014B: parsed Potential Impact block (null when absent). */
+  impact: ImpactData | null;
   /** Marker-stripped body, used only for the markdown fallback. */
   body: string;
   onPrompt?: (text: string) => void;
@@ -815,6 +952,9 @@ function OpportunityCard({
             {breakdown.why}
           </p>
         )}
+
+        {/* AI-014B: read-only potential-impact estimate (ranges + caveat). */}
+        {impact && <PotentialImpact data={impact} evidence={evidence} />}
       </div>
 
       {/* ── Footer: CTA always a button ── */}
@@ -1016,6 +1156,10 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
         // CTA. No separate BreakdownCard is appended for this branch.
         if (kind === "recommendation") {
           recRank += 1;
+          // AI-014B: parse the Potential Impact block and strip it from the
+          // markdown fallback body so it never double-renders.
+          const impact = parseImpact(section.body);
+          const cardBody = impact ? stripImpactBlock(view.body) : view.body;
           return (
             <div key={i}>
               <OpportunityCard
@@ -1024,7 +1168,8 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
                 fields={parseRecommendation(section.body)}
                 score={parseScore(section.body)}
                 breakdown={bd}
-                body={view.body}
+                impact={impact}
+                body={cardBody}
                 onPrompt={onPrompt}
               />
             </div>
