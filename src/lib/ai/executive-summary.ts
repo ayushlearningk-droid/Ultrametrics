@@ -22,6 +22,7 @@ import {
   type EvidenceStrength,
 } from "@/lib/ai/intelligence/evidence-strength";
 import { buildWhy, type Why } from "@/lib/ai/intelligence/rationale";
+import type { TrendContext } from "@/lib/ai/trend/trend-analysis";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -62,6 +63,8 @@ export interface ExecutiveSummary {
   top_opportunities: SummaryOpportunity[];
   /** AI-010A: marks the V2 (enriched) summary shape. */
   summary_version: 2;
+  /** AI-013A: account-level trend vs the previous 30 days (omitted if absent). */
+  trends?: TrendContext;
   funnel_status: { state: FunnelState; detail?: string };
   watch_outs: string[];
 }
@@ -81,6 +84,8 @@ export interface ExecutiveSummaryInput {
   funnelDiagnosis: FunnelDiagnosis | null;
   /** Pixel diagnosis when it fires (never pixel_healthy); supersedes tracking. */
   pixelDiagnosis?: PixelDiagnosis | null;
+  /** AI-013A: account-level trend context (vs previous 30 days), when computed. */
+  trends?: TrendContext | null;
 }
 
 /* ── Composer ─────────────────────────────────────────────────────────────── */
@@ -167,6 +172,7 @@ export function composeExecutiveSummary(
     top_opportunity,
     top_opportunities,
     summary_version: 2,
+    ...(input.trends ? { trends: input.trends } : {}),
     funnel_status,
     watch_outs,
   };

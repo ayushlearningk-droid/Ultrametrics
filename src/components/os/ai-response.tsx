@@ -25,6 +25,8 @@ import {
   BarChart3,
   ShieldCheck,
   Gauge,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/os/markdown";
@@ -243,11 +245,14 @@ const OPPORTUNITY_RE = /\b(opportunit|growth|upside|potential)\b/i;
 const RISK_RE = /\b(risk|issue|warning|concern)\b/i;
 const STATUS_HEADING_RE =
   /\b(status|connector|source|connected|platform)\b/i;
+// AI-013B: an account-level "Trend Overview" section heading.
+const TREND_RE = /\btrend\b/i;
 
 type Kind =
   | "metric"
   | "ranking"
   | "status"
+  | "trend"
   | "recommendation"
   | "diagnostic"
   | "opportunity"
@@ -267,6 +272,11 @@ function classify(section: Section): {
 
   if (STATUS_HEADING_RE.test(heading) && statuses.length > 0) {
     return { kind: "status", metrics, statuses, ranking };
+  }
+  // AI-013B: a "Trend Overview" heading routes to the trend card before the
+  // generic metric card (its CTR/CPC/CPM lines would otherwise read as metrics).
+  if (TREND_RE.test(heading)) {
+    return { kind: "trend", metrics, statuses, ranking };
   }
   // Ranking (entity×metric table) is checked before the generic metric card so
   // a leaderboard never collapses into a 2-up metric grid.
@@ -317,6 +327,47 @@ function parseRecommendation(body: string): RecommendationFields | null {
   // Structured card only when ALL THREE exist — never fabricate a field.
   if (action && impact && cta) return { action, impact, cta };
   return null;
+}
+
+/* ── Trend Overview parsing (AI-013B) ────────────────────────────────────────
+ * Parse the account-level trend lines the model relays from AI-013A's
+ * trends.metrics (executive summary). Each entry is "<metric> <±N%> <status>",
+ * e.g. "CTR +18% (Improving)". Pure presentation — numbers are grounded in the
+ * tool result, never invented. Returns [] when nothing matches (graceful
+ * fallback to plain markdown). */
+
+type TrendStatus = "improving" | "stable" | "declining";
+
+interface TrendEntry {
+  metric: string;
+  changeLabel: string;
+  /** True when the change is a positive number (drives the arrow direction). */
+  up: boolean;
+  status: TrendStatus;
+}
+
+const TREND_TOKEN_RE =
+  /\b(CTR|CPC|CPM|CPA|ROAS|Conversions?)\b[\s:=–-]*([+-]\s?\d+(?:\.\d+)?\s?%)\s*\(?\s*(Improving|Stable|Declining)\s*\)?/gi;
+
+function normalizeMetric(raw: string): string {
+  const u = raw.toUpperCase();
+  return u.startsWith("CONV") ? "Conversions" : u;
+}
+
+function parseTrendEntries(text: string): TrendEntry[] {
+  const out: TrendEntry[] = [];
+  TREND_TOKEN_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = TREND_TOKEN_RE.exec(text)) !== null) {
+    const changeLabel = m[2].replace(/\s+/g, "");
+    out.push({
+      metric: normalizeMetric(m[1]),
+      changeLabel,
+      up: changeLabel.startsWith("+"),
+      status: m[3].toLowerCase() as TrendStatus,
+    });
+  }
+  return out;
 }
 
 /* ── Opportunity breakdown (AI-011 Phase 1) ──────────────────────────────────
@@ -784,6 +835,66 @@ function OpportunityCard({
   );
 }
 
+/* ── Trend Overview card (AI-013B) ───────────────────────────────────────── */
+
+const TREND_STATUS_STYLES: Record<
+  TrendStatus,
+  { text: string; label: string }
+> = {
+  improving: { text: "text-emerald-300", label: "Improving" },
+  declining: { text: "text-red-300", label: "Declining" },
+  stable: { text: "text-slate-300", label: "Stable" },
+};
+
+/** Account-level trend overview (vs previous 30 days). Arrow = direction of
+ *  change; colour = status (so a CPC drop reads green "Improving"). */
+function TrendOverview({
+  heading,
+  entries,
+}: {
+  heading: string | null;
+  entries: TrendEntry[];
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+      <div className="mb-2.5 flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+        <TrendingUp className="h-3.5 w-3.5 text-brand" />
+        {heading ?? "Trend Overview"}
+      </div>
+      <div className="space-y-1.5">
+        {entries.map((e, i) => {
+          const s = TREND_STATUS_STYLES[e.status];
+          const Arrow =
+            e.changeLabel === "0%" || e.changeLabel === "+0%"
+              ? Minus
+              : e.up
+                ? TrendingUp
+                : TrendingDown;
+          return (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2"
+            >
+              <span className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+                <Arrow className={cn("h-3.5 w-3.5", s.text)} />
+                {e.metric}
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-[13px] font-semibold tabular-nums text-foreground">
+                  {e.changeLabel}
+                </span>
+                <span className={cn("text-[11px] font-medium", s.text)}>
+                  {s.label}
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const TONE_STYLES: Record<
   StatusTone,
   { dot: string; label: string }
@@ -929,6 +1040,16 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
           }
           if (kind === "status") {
             return <StatusCards heading={view.heading} statuses={statuses} />;
+          }
+          // AI-013B: account-level Trend Overview. Falls back to markdown when no
+          // trend lines parse (graceful degradation, no fabricated trends).
+          if (kind === "trend") {
+            const entries = parseTrendEntries(view.body);
+            return entries.length > 0 ? (
+              <TrendOverview heading={view.heading} entries={entries} />
+            ) : (
+              <Markdown>{reconstruct(view)}</Markdown>
+            );
           }
           if (kind === "diagnostic" || kind === "opportunity" || kind === "risk") {
             return <InsightCard variant={kind} heading={view.heading} body={view.body} />;

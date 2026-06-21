@@ -61,6 +61,11 @@ import {
   enrichSerialized,
   rankedOpportunities,
 } from "@/lib/ai/intelligence";
+import {
+  analyzeAccountTrend,
+  type TrendContext,
+  type TrendMetric,
+} from "@/lib/ai/trend/trend-analysis";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -195,6 +200,72 @@ function last180(todayISO: string): MetricsDateRange {
   const d = new Date(`${todayISO}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - 180);
   return { since: d.toISOString().slice(0, 10), until: todayISO };
+}
+
+/* ── Account-level trend windows (AI-013A) ────────────────────────────────── */
+
+/** Fixed 30-day lookback (AI-013A scope: not configurable). */
+const TREND_LOOKBACK_DAYS = 30;
+
+/** Shift an ISO date back by `days` (UTC). */
+function shiftISO(todayISO: string, days: number): string {
+  const d = new Date(`${todayISO}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * The current vs previous 30-day windows for trend. current = [today-30, today];
+ * previous = [today-60, today-30] (adjacent, equal length, non-overlapping).
+ */
+function trendWindows(todayISO: string): {
+  current: MetricsDateRange;
+  previous: MetricsDateRange;
+} {
+  const mid = shiftISO(todayISO, TREND_LOOKBACK_DAYS);
+  const start = shiftISO(todayISO, TREND_LOOKBACK_DAYS * 2);
+  return {
+    current: { since: mid, until: todayISO },
+    previous: { since: start, until: mid },
+  };
+}
+
+/** Capability-gated metric list for a provider's account trend. */
+function trendMetricsFor(provider: MetricsProvider): TrendMetric[] {
+  const cap = getCapabilities(provider);
+  const out: TrendMetric[] = [];
+  if (cap?.derivedMetrics.includes("ctr")) out.push("ctr");
+  if (cap?.derivedMetrics.includes("cpc")) out.push("cpc");
+  if (cap?.derivedMetrics.includes("cpm")) out.push("cpm");
+  if (cap?.rawMetrics.includes("conversions")) out.push("conversions");
+  return out;
+}
+
+/**
+ * Build the account-level TrendContext for one provider from its current and
+ * previous 30-day results. Returns a non-comparable context unless BOTH windows
+ * are status "ok" AND used the explicit range window (a lifetime-fallback window
+ * is not comparable to a 30-day window).
+ */
+function buildAccountTrend(
+  provider: MetricsProvider,
+  cur: ProviderMetricsResult | undefined,
+  prev: ProviderMetricsResult | undefined
+): TrendContext {
+  const comparable =
+    cur?.status === "ok" &&
+    prev?.status === "ok" &&
+    cur.windowUsed === "range" &&
+    prev.windowUsed === "range";
+  return analyzeAccountTrend(
+    cur?.metrics?.totals ?? null,
+    prev?.metrics?.totals ?? null,
+    {
+      lookbackDays: TREND_LOOKBACK_DAYS,
+      comparable: !!comparable,
+      metrics: trendMetricsFor(provider),
+    }
+  );
 }
 
 /**
@@ -997,9 +1068,13 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
 
   async get_executive_summary(input, ctx) {
     const base = buildQuery(input, ctx.todayISO);
+    // AI-013A: account-level trend uses its OWN fixed 30-day current vs previous
+    // windows, independent of the summary's headline window.
+    const tw = trendWindows(ctx.todayISO);
     // Same two-level fetch as get_recommendations (campaign + ad), reused to
-    // build per-provider recs, funnel diagnosis, and headline totals.
-    const [campRes, adRes] = await Promise.all([
+    // build per-provider recs, funnel diagnosis, and headline totals; plus the
+    // two account-level trend windows. All run in parallel.
+    const [campRes, adRes, trendCurRes, trendPrevRes] = await Promise.all([
       getMetricsWithFallback(ctx.workspaceId, {
         ...base,
         level: "campaign",
@@ -1009,6 +1084,18 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
         ...base,
         level: "ad",
         granularity: "total",
+      }),
+      getMetricsWithFallback(ctx.workspaceId, {
+        dateRange: tw.current,
+        granularity: "total",
+        level: "account",
+        mode: "range",
+      }),
+      getMetricsWithFallback(ctx.workspaceId, {
+        dateRange: tw.previous,
+        granularity: "total",
+        level: "account",
+        mode: "range",
       }),
     ]);
 
@@ -1023,6 +1110,14 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
       // Shared assembly — same precedence as get_recommendations.
       const { okSource, recs, pixelDiagnosis, funnelDiagnosis } =
         assembleProviderRecs(camp, ad, provider);
+
+      // AI-013A: account-level trend vs the previous 30 days (comparability- and
+      // volume-guarded; non-comparable windows yield an empty trend context).
+      const trends = buildAccountTrend(
+        provider,
+        trendCurRes.providers.find((p) => p.provider === provider),
+        trendPrevRes.providers.find((p) => p.provider === provider)
+      );
 
       const totals: SummaryHeadline | null =
         okSource?.status === "ok" && okSource.metrics
@@ -1049,6 +1144,8 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
         recommendations: recs,
         funnelDiagnosis,
         pixelDiagnosis,
+        // AI-013A: only attach when the windows were comparable (else omitted).
+        ...(trends.comparable ? { trends } : {}),
       });
     });
 

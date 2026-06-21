@@ -69,6 +69,9 @@ Why: <the why.summary, verbatim>
 Evidence: <strong | moderate | limited, from evidence_strength.level>
 Breakdown: <factor label> <percent>%, <factor label> <percent>%, ...
   For the Breakdown line, take each entry from opportunity_score_breakdown.contributions and express its contribution as a whole-number percent of the total composite (the contributions sum to the composite). Use the factor "label" values verbatim. Only include factors with a non-zero weight.
+- AI-013B (trend overview): when a get_executive_summary source result includes "trends" with "trends.metrics", add a section to THAT source's summary headed exactly "## Trend Overview", with ONE line per entry in trends.metrics formatted exactly:
+<METRIC> <changeLabel> (<Status>)
+  e.g. "CTR +18% (Improving)". METRIC is the metric name (CTR/CPC/CPM/Conversions), and changeLabel + status come verbatim from each trends.metrics entry (status capitalized: Improving/Stable/Declining). This is ACCOUNT-LEVEL trend vs the previous 30 days — never attach it to an individual campaign/opportunity. Omit the whole section when "trends" is absent; never invent trend numbers.
 
 WORKSPACE CONTEXT:
 - Workspace: ${ctx.workspaceName}
