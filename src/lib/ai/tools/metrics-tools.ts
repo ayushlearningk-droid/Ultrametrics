@@ -66,6 +66,7 @@ import {
   type TrendContext,
   type TrendMetric,
 } from "@/lib/ai/trend/trend-analysis";
+import { buildImpactEstimate } from "@/lib/ai/impact";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -609,6 +610,8 @@ const REC_CAP = 5;
 
 /** Compact view of a recommendation (internal 0-1 `score` stays sort-only). */
 function serializeRecommendation(r: Recommendation) {
+  // AI-014A.3: null unless the rule exposed an effect (AI-014A.1).
+  const impact = buildImpactEstimate(r);
   const base = {
     kind: r.kind,
     level: r.level,
@@ -626,6 +629,9 @@ function serializeRecommendation(r: Recommendation) {
     ...(r.scoreBreakdown
       ? { opportunity_score_breakdown: r.scoreBreakdown }
       : {}),
+    // AI-014A.3: bounded, read-only impact estimate — only when the rule
+    // exposed an effect (AI-014A.1). Omitted otherwise. Never affects score.
+    ...(impact ? { estimated_impact: impact } : {}),
   };
   // AI-010A: additively overlay breakdown contributions (#1), evidence
   // strength (#3), and the "why" (#2). Reads only — score unchanged.
