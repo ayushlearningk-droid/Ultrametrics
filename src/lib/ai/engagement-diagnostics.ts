@@ -177,6 +177,16 @@ export function deriveEngagementDiagnostics(
       confidence: confOf(worst),
       score: 0.5,
       ...opp(0.4, shareOf(worst), confOf(worst)),
+      // AI-014A.4 Phase 1: reuse the engagement-rate gap model (same `worst`
+      // campaign as low_engagement_rate). Estimator gates on a positive gap, so
+      // a worst-but-not-below-benchmark case yields insufficient_data (internal).
+      effect: {
+        metric: "engagement_rate",
+        impressions: worst.totals.impressions,
+        engagements: eng(worst),
+        current: engRate(worst),
+        benchmark: benchmarkRate,
+      } satisfies RecEffect,
     });
 
     // low_engagement_rate — worst well below the engagement benchmark.
