@@ -17,7 +17,11 @@
  */
 
 import type { CampaignBreakdown, MetricsProvider } from "@/lib/metrics/types";
-import type { Recommendation, Confidence } from "@/lib/ai/recommendations";
+import type {
+  Recommendation,
+  Confidence,
+  RecEffect,
+} from "@/lib/ai/recommendations";
 import { classifyObjective } from "@/lib/ai/objective-classifier";
 import { MIN_IMPRESSIONS } from "@/lib/ai/thresholds";
 import {
@@ -190,6 +194,14 @@ export function deriveEngagementDiagnostics(
         confidence: confOf(worst),
         score: 0.6,
         ...opp(0.6, shareOf(worst), confOf(worst)),
+        // AI-014A.1: engagement-rate gap vs benchmark + volume basis (internal).
+        effect: {
+          metric: "engagement_rate",
+          impressions: worst.totals.impressions,
+          engagements: eng(worst),
+          current: engRate(worst),
+          benchmark: benchmarkRate,
+        } satisfies RecEffect,
       });
     }
   }
@@ -212,6 +224,14 @@ export function deriveEngagementDiagnostics(
         confidence: conf,
         score: 0.6,
         ...opp(0.6, shareOf(topCpe), conf),
+        // AI-014A.1: CPE gap vs benchmark + volume basis (internal).
+        effect: {
+          metric: "cpe",
+          engagements: eng(topCpe),
+          spend: topCpe.totals.spend,
+          current: cpe(topCpe),
+          benchmark: benchmarkCPE,
+        } satisfies RecEffect,
       });
     }
   }

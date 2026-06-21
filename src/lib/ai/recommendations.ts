@@ -79,6 +79,46 @@ export type RecommendationKind =
 
 export type { Confidence } from "@/lib/ai/scoring/opportunity-score";
 
+/**
+ * AI-014A.1 — engine-exposed effect inputs for impact estimation.
+ *
+ * Each variant carries ONLY values already computed at the rule site (the gap
+ * vs benchmark + the volume basis), so a later impact-estimation module can turn
+ * them into bounded, read-only "potential impact" ranges without re-deriving any
+ * gap. INTERNAL-ONLY in A.1: never serialized, never surfaced — no serializer,
+ * tool, prompt, or UI reads it yet.
+ */
+export type RecEffect =
+  | {
+      metric: "ctr";
+      impressions: number;
+      clicks: number;
+      current: number;
+      benchmark: number;
+    }
+  | {
+      metric: "cpc";
+      clicks: number;
+      spend: number;
+      current: number;
+      benchmark: number;
+    }
+  | {
+      metric: "engagement_rate";
+      impressions: number;
+      engagements: number;
+      current: number;
+      benchmark: number;
+    }
+  | {
+      metric: "cpe";
+      engagements: number;
+      spend: number;
+      current: number;
+      benchmark: number;
+    }
+  | { metric: "recoverable_spend"; spend: number; fraction: number };
+
 export interface Recommendation {
   kind: RecommendationKind;
   provider: MetricsProvider;
@@ -98,6 +138,8 @@ export interface Recommendation {
   opportunityScore: number;
   /** AI-010 Phase 1: factor decomposition behind opportunityScore (optional). */
   scoreBreakdown?: OpportunityBreakdown;
+  /** AI-014A.1: engine-exposed effect inputs for impact estimation (internal). */
+  effect?: RecEffect;
 }
 
 /* ── Rule constants ───────────────────────────────────────────────────────── */
@@ -379,6 +421,8 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         score,
         // Recoverable waste tracks budget exposure.
         ...opp("pause", conf, share, share),
+        // AI-014A.1: full spend is the recoverable basis (internal).
+        effect: { metric: "recoverable_spend", spend: t.spend, fraction: 1 },
       };
     }
   }
@@ -436,6 +480,14 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         score,
         // Impact scaled by CTR shortfall × budget size.
         ...opp("creative_refresh", conf, share, clamp01(ev) * share),
+        // AI-014A.1: CTR gap vs benchmark + volume basis (internal).
+        effect: {
+          metric: "ctr",
+          impressions: t.impressions,
+          clicks: t.clicks,
+          current: t.ctr,
+          benchmark: b.ctr,
+        },
       };
     }
   }
@@ -463,6 +515,8 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
           share,
           clamp01(ev) * share
         ),
+        // AI-014A.1: over-concentrated spend is the recoverable basis (internal).
+        effect: { metric: "recoverable_spend", spend: t.spend, fraction: 1 },
       };
     }
   }
@@ -487,6 +541,14 @@ function evaluateEntity(e: Entity, ctx: RuleContext): Recommendation | null {
         score,
         // Cost overspend scaled by CPC excess × budget size.
         ...opp("bid_review", conf, share, clamp01(ev) * share),
+        // AI-014A.1: CPC gap vs benchmark + volume basis (internal).
+        effect: {
+          metric: "cpc",
+          clicks: t.clicks,
+          spend: t.spend,
+          current: t.cpc,
+          benchmark: b.cpc,
+        },
       };
     }
   }

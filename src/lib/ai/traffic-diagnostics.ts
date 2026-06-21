@@ -15,7 +15,11 @@
  */
 
 import type { CampaignBreakdown, MetricsProvider } from "@/lib/metrics/types";
-import type { Recommendation, Confidence } from "@/lib/ai/recommendations";
+import type {
+  Recommendation,
+  Confidence,
+  RecEffect,
+} from "@/lib/ai/recommendations";
 import { classifyObjective } from "@/lib/ai/objective-classifier";
 import { MIN_IMPRESSIONS, MIN_CLICKS } from "@/lib/ai/thresholds";
 import {
@@ -214,6 +218,12 @@ export function deriveTrafficDiagnostics(
       confidence: conf,
       score: 0.7,
       ...opp(0.7, shareOf(worst), conf),
+      // AI-014A.1: reallocatable donor spend (25% fraction) — internal.
+      effect: {
+        metric: "recoverable_spend",
+        spend: worst.totals.spend,
+        fraction: REALLOCATION_FRACTION,
+      } satisfies RecEffect,
     });
   }
 
