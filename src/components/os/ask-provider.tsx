@@ -33,8 +33,15 @@ interface AskContextValue extends UseAskUltrametrics {
 
 const AskContext = createContext<AskContextValue | null>(null);
 
-export function AskProvider({ children }: { children: React.ReactNode }) {
-  const ask = useAskUltrametrics();
+export function AskProvider({
+  children,
+  workspaceId,
+}: {
+  children: React.ReactNode;
+  /** U1 Step 5: scopes conversation hydration/persistence + switch reset. */
+  workspaceId: string | null;
+}) {
+  const ask = useAskUltrametrics(workspaceId);
   const [isOpen, setIsOpen] = useState(false);
 
   const open = useCallback(() => setIsOpen(true), []);

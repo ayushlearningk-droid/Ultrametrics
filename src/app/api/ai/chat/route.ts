@@ -32,12 +32,15 @@ import {
   releaseConcurrencySlot,
   logUsage,
 } from "@/lib/ai/limits";
+import { appendMessage } from "@/lib/data/conversations";
 
 export const runtime = "nodejs";
 
 interface ChatRequestBody {
   messages?: unknown;
   escalated?: unknown;
+  /** Sprint 1: optional target conversation for persistence (back-compat). */
+  conversationId?: unknown;
 }
 
 /** Validate + narrow the client-supplied conversation history. */
@@ -154,9 +157,35 @@ export async function POST(request: Request) {
   const approxInputTokens = Math.ceil(JSON.stringify(messages).length / 4);
 
   const userId = access.userId;
+
+  // Sprint 1 persistence (best-effort, never blocks the chat). When the client
+  // supplies a conversationId it owns (RLS-enforced), persist the user turn
+  // before streaming; the assistant turn is persisted on the `done` event.
+  const conversationId =
+    typeof body.conversationId === "string" && body.conversationId
+      ? body.conversationId
+      : null;
+  if (conversationId) {
+    try {
+      await appendMessage({
+        conversationId,
+        role: "user",
+        content: lastUser,
+      });
+    } catch (err) {
+      console.warn(
+        `[ai.persist] failed to store user message (conversation=${conversationId}): ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
+  }
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const encoder = new TextEncoder();
+      // Sprint 1: accumulate the streamed assistant text to persist on `done`.
+      let assistantBuffer = "";
       try {
         for await (const event of streamWorkspaceChat({
           ctx,
@@ -170,6 +199,9 @@ export async function POST(request: Request) {
           },
         })) {
           controller.enqueue(encoder.encode(sseEncode(event)));
+          if (event.type === "text") {
+            assistantBuffer += event.delta;
+          }
           if (event.type === "done") {
             logUsage({
               workspaceId,
@@ -182,6 +214,29 @@ export async function POST(request: Request) {
               toolRounds: event.toolRounds,
               stopReason: event.stopReason,
             });
+            // Persist the assistant turn (best-effort; never aborts the stream).
+            if (conversationId && assistantBuffer) {
+              try {
+                await appendMessage({
+                  conversationId,
+                  role: "assistant",
+                  content: assistantBuffer,
+                  metadata: {
+                    model: event.model,
+                    escalated: event.escalated,
+                    inputTokens: event.usage.inputTokens,
+                    outputTokens: event.usage.outputTokens,
+                    stopReason: event.stopReason,
+                  },
+                });
+              } catch (err) {
+                console.warn(
+                  `[ai.persist] failed to store assistant message (conversation=${conversationId}): ${
+                    err instanceof Error ? err.message : String(err)
+                  }`
+                );
+              }
+            }
           }
         }
       } catch (err) {

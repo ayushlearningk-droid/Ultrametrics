@@ -24,6 +24,8 @@ export type SubscriptionStatus =
   | "unpaid"
   | "paused";
 
+export type AiMessageRole = "user" | "assistant";
+
 export type Database = {
   public: {
     Tables: {
@@ -345,6 +347,69 @@ export type Database = {
           updated_at?: string;
         };
       };
+      ai_conversations: {
+        Relationships: [];
+        Row: {
+          id: string;
+          workspace_id: string;
+          user_id: string;
+          title: string;
+          title_generated: boolean;
+          last_message_preview: string | null;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          user_id: string;
+          title?: string;
+          title_generated?: boolean;
+          last_message_preview?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          user_id?: string;
+          title?: string;
+          title_generated?: boolean;
+          last_message_preview?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      ai_messages: {
+        Relationships: [];
+        Row: {
+          id: string;
+          conversation_id: string;
+          role: AiMessageRole;
+          content: string;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          role: AiMessageRole;
+          content: string;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          role?: AiMessageRole;
+          content?: string;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -365,3 +430,6 @@ export type WorkspaceSyncSchedule =
 export type SyncJob = Database["public"]["Tables"]["sync_jobs"]["Row"];
 export type Subscription =
   Database["public"]["Tables"]["subscriptions"]["Row"];
+export type AiConversation =
+  Database["public"]["Tables"]["ai_conversations"]["Row"];
+export type AiMessage = Database["public"]["Tables"]["ai_messages"]["Row"];

@@ -42,7 +42,7 @@ export function DashboardShell({
   }, []);
 
   return (
-    <AskProvider>
+    <AskProvider workspaceId={currentWorkspaceId}>
     <div className="relative flex h-screen overflow-hidden bg-surface-0">
       {/* ── L0 — Environment layer (ambient light + cursor parallax) ── */}
       <EnvironmentLayer />
