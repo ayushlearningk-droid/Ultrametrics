@@ -547,6 +547,117 @@ function stripImpactBlock(body: string): string {
   return out.join("\n").trim();
 }
 
+/* ── Root Cause parsing (Phase A / AI-015) ───────────────────────────────────
+ * Surfaces the per-campaign root cause the model relays from deriveRootCauses:
+ * a "Root Cause:" block with severity, confidence, grounded evidence, an ordered
+ * fix plan, and any contributing causes. Read-only hypothesis (never "proven").
+ * Pure presentation — numbers grounded in the tool result, never invented.
+ * Returns null when no "Root Cause:" header is present (graceful fallback). */
+
+type CauseSeverity = "critical" | "high" | "medium" | "low";
+type CauseConfidence = "high" | "medium" | "low";
+
+interface RootCauseData {
+  cause: string;
+  severity: CauseSeverity | null;
+  confidence: CauseConfidence | null;
+  evidence: string | null;
+  fixOrder: string[];
+  contributors: string[];
+}
+
+const ROOTCAUSE_HEADER_RE =
+  /^\s*[-*]?\s*\*{0,2}Root Cause\*{0,2}\s*:\s*(.+)$/im;
+// A line that belongs to the Root Cause block (markers, "Fix Order:", numbered).
+const ROOTCAUSE_MEMBER_RE =
+  /^\s*[-*]?\s*(\*{0,2}(severity|confidence|evidence|contributing|fix order)\*{0,2}\s*:|\d+[.)]\s)/i;
+
+/** Humanize a cause key: "bidding_inefficiency" → "Bidding inefficiency". */
+function humanizeCause(raw: string): string {
+  const s = raw.replace(/[_-]+/g, " ").trim().toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Parse the numbered remediation list that follows the "Fix Order:" line. */
+function parseFixOrder(body: string): string[] {
+  const lines = body.split("\n");
+  const out: string[] = [];
+  let inFix = false;
+  for (const raw of lines) {
+    const l = raw.trim();
+    if (/^[-*]?\s*\*{0,2}Fix Order\*{0,2}\s*:/i.test(l)) {
+      inFix = true;
+      continue;
+    }
+    if (!inFix) continue;
+    const m = /^[-*]?\s*\d+[.)]\s+(.+)$/.exec(l);
+    if (m) out.push(clean(m[1]));
+    else if (l !== "") break;
+  }
+  return out;
+}
+
+function parseRootCause(body: string): RootCauseData | null {
+  const header = ROOTCAUSE_HEADER_RE.exec(body);
+  if (!header) return null;
+
+  const sevRaw = (markerLine(body, "severity") ?? "").toLowerCase();
+  const severity: CauseSeverity | null = sevRaw.includes("critical")
+    ? "critical"
+    : sevRaw.includes("high")
+      ? "high"
+      : sevRaw.includes("medium")
+        ? "medium"
+        : sevRaw.includes("low")
+          ? "low"
+          : null;
+
+  const confRaw = (markerLine(body, "confidence") ?? "").toLowerCase();
+  const confidence: CauseConfidence | null = confRaw.includes("high")
+    ? "high"
+    : confRaw.includes("medium")
+      ? "medium"
+      : confRaw.includes("low")
+        ? "low"
+        : null;
+
+  const contribLine = markerLine(body, "contributing");
+  const contributors = contribLine
+    ? contribLine
+        .split(/[,;]/)
+        .map((c) => humanizeCause(c))
+        .filter(Boolean)
+    : [];
+
+  return {
+    cause: humanizeCause(clean(header[1])),
+    severity,
+    confidence,
+    evidence: markerLine(body, "evidence"),
+    fixOrder: parseFixOrder(body),
+    contributors,
+  };
+}
+
+/** Remove the contiguous "Root Cause:" block so it isn't double-rendered. */
+function stripRootCause(body: string): string {
+  const lines = body.split("\n");
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (ROOTCAUSE_HEADER_RE.test(lines[i])) {
+      i++; // drop the header
+      while (i < lines.length && ROOTCAUSE_MEMBER_RE.test(lines[i])) {
+        i++; // drop each contiguous block line
+      }
+      continue;
+    }
+    out.push(lines[i]);
+    i++;
+  }
+  return out.join("\n").trim();
+}
+
 /* ── Card primitives ─────────────────────────────────────────────────────── */
 
 function MetricCards({ heading, metrics }: { heading: string | null; metrics: Metric[] }) {
@@ -875,6 +986,119 @@ function PotentialImpact({
   );
 }
 
+/* ── Root Cause card (Phase A / AI-015) ──────────────────────────────────── */
+
+const SEVERITY_STYLES: Record<
+  CauseSeverity,
+  { label: string; chip: string; accent: string }
+> = {
+  critical: {
+    label: "Critical",
+    chip: "border-red-400/30 bg-red-400/15 text-red-200",
+    accent: "text-red-300",
+  },
+  high: {
+    label: "High",
+    chip: "border-red-400/25 bg-red-400/[0.08] text-red-300",
+    accent: "text-red-300",
+  },
+  medium: {
+    label: "Medium",
+    chip: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+    accent: "text-amber-300",
+  },
+  low: {
+    label: "Low",
+    chip: "border-slate-400/25 bg-slate-400/10 text-slate-200",
+    accent: "text-slate-300",
+  },
+};
+
+/** Read-only root-cause hypothesis card: cause + severity/confidence, grounded
+ *  evidence, and an ordered fix plan. Severity drives the accent. */
+function RootCauseCard({
+  data,
+  heading,
+}: {
+  data: RootCauseData;
+  heading: string | null;
+}) {
+  const sev = data.severity ? SEVERITY_STYLES[data.severity] : null;
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-4",
+        sev && (data.severity === "critical" || data.severity === "high")
+          ? "border-red-400/25 bg-red-400/[0.06]"
+          : data.severity === "medium"
+            ? "border-amber-400/25 bg-amber-400/[0.06]"
+            : "border-white/[0.08] bg-white/[0.025]"
+      )}
+    >
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+          <ShieldAlert
+            className={cn("h-3.5 w-3.5", sev?.accent ?? "text-foreground-muted")}
+          />
+          {heading ?? "Root Cause"}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {sev && (
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                sev.chip
+              )}
+            >
+              {sev.label}
+            </span>
+          )}
+          {data.confidence && (
+            <span className="inline-flex items-center rounded-full border border-white/[0.1] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium capitalize text-foreground-muted">
+              {data.confidence} confidence
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="text-[14px] font-semibold text-foreground">
+        {data.cause}
+      </div>
+
+      {data.evidence && (
+        <p className="mt-1 text-[12px] leading-relaxed text-foreground-muted">
+          {data.evidence}
+        </p>
+      )}
+
+      {data.contributors.length > 0 && (
+        <p className="mt-1.5 text-[11px] text-foreground-muted/80">
+          Contributing: {data.contributors.join(", ")}
+        </p>
+      )}
+
+      {data.fixOrder.length > 0 && (
+        <>
+          <div className="my-3 h-px bg-white/[0.06]" />
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+            Fix order
+          </div>
+          <ol className="space-y-1.5">
+            {data.fixOrder.map((step, i) => (
+              <li key={i} className="flex items-start gap-2 text-[12px] text-foreground/90">
+                <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded bg-brand/15 text-[10px] font-bold tabular-nums text-brand">
+                  {i + 1}
+                </span>
+                <span className="leading-snug">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
  * Visual Opportunity Card — the unified recommendation surface. Header shows the
  * score chip + evidence badge; body shows the action title, impact, factor
@@ -1145,6 +1369,19 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
   return (
     <div className="space-y-4">
       {sections.map((section, i) => {
+        // Phase A (AI-015): a "Root Cause:" block renders as a RootCauseCard,
+        // independent of heading. Strip the block; render any leftover markdown.
+        const rc = parseRootCause(section.body);
+        if (rc) {
+          const rest = stripRootCause(section.body);
+          return (
+            <div key={i} className="space-y-3">
+              {rest && <Markdown>{rest}</Markdown>}
+              <RootCauseCard data={rc} heading={section.heading} />
+            </div>
+          );
+        }
+
         // AI-011: pull optional Why/Evidence/Breakdown out of the body and strip
         // those marker lines so they aren't double-rendered as raw markdown.
         const bd = parseBreakdown(section.body);

@@ -76,6 +76,17 @@ Impact Assumption: <estimated_impact.assumptions[0], verbatim>
 - AI-013B (trend overview): when a get_executive_summary source result includes "trends" with "trends.metrics", add a section to THAT source's summary headed exactly "## Trend Overview", with ONE line per entry in trends.metrics formatted exactly:
 <METRIC> <changeLabel> (<Status>)
   e.g. "CTR +18% (Improving)". METRIC is the metric name (CTR/CPC/CPM/Conversions), and changeLabel + status come verbatim from each trends.metrics entry (status capitalized: Improving/Stable/Declining). This is ACCOUNT-LEVEL trend vs the previous 30 days — never attach it to an individual campaign/opportunity. Omit the whole section when "trends" is absent; never invent trend numbers.
+- AI-015 (root cause): when you relay a cause from a get_root_cause result, render it as a "Root Cause:" block so it displays as a root-cause card. Use EXACTLY this format, one block per cause, fields verbatim from the cause object (omit any line whose field is absent):
+Root Cause: <primaryCause>
+Severity: <critical | high | medium | low, from severity>
+Confidence: <high | medium | low, from confidence>
+Evidence: <the evidence string, verbatim>
+Fix Order:
+1. <fixOrder[0]>
+2. <fixOrder[1]>
+3. <fixOrder[2]>
+Contributing: <comma-separated contributors, if any>
+  Each cause is a grounded HYPOTHESIS, not a proven claim — present it as the likely cause with its confidence, never as certain. Never invent causes, evidence, severity, or fix steps; use only what the tool returned.
 
 WORKSPACE CONTEXT:
 - Workspace: ${ctx.workspaceName}

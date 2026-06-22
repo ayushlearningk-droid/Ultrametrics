@@ -14,10 +14,13 @@ import {
   PanelLeftOpen,
   Plus,
   Plug,
-  Activity,
+  FileText,
+  History,
+  Sparkles,
   Search,
   Settings,
 } from "lucide-react";
+import { useAsk } from "@/components/os/ask-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BRAND_ICON_MAP } from "@/components/ui/brand-icons";
 import {
@@ -39,10 +42,12 @@ const CONNECTORS = [
   { href: "/dashboard/connectors/google-ads", label: "Google Ads", provider: "google_ads" },
 ];
 
+/* ── Sidebar V7 navigation (Sprint 4 Phase C) ────────────────────── */
 const PRIMARY_NAV = [
-  { href: "/dashboard", label: "Mission Control", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/sync-jobs", label: "Pipeline", icon: Activity },
-  { href: "/dashboard/connectors", label: "Sources", icon: Plug },
+  { href: "/dashboard", label: "Brief", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/reports", label: "Reports", icon: FileText },
+  { href: "/dashboard/timeline", label: "Timeline", icon: History },
+  { href: "/dashboard/connectors", label: "Connectors", icon: Plug },
 ];
 
 const BOTTOM_NAV = [
@@ -177,6 +182,7 @@ function SidebarRail({
   collapsible,
 }: RailProps) {
   const router = useRouter();
+  const { open: openAsk } = useAsk();
 
   function selectWorkspace(id: string) {
     document.cookie = `workspace_id=${id};path=/;max-age=31536000;SameSite=Lax`;
@@ -272,7 +278,19 @@ function SidebarRail({
         </button>
       )}
 
-      {/* ── Primary nav ───────────────────────────────────────────── */}
+      {/* ── Ask (opens the drawer) ────────────────────────────────── */}
+      <button
+        onClick={() => {
+          openAsk();
+          onClose?.();
+        }}
+        className="group relative flex items-center gap-3 rounded-lg px-3 py-2 type-body text-foreground-muted transition-all duration-150 hover:bg-white/[0.035] hover:text-foreground"
+      >
+        <Sparkles className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+        <span className="truncate">Ask</span>
+      </button>
+
+      {/* ── Primary nav (Brief · Reports · Timeline · Connectors) ──── */}
       <nav className="flex flex-col gap-0.5">
         {PRIMARY_NAV.map((item) => (
           <NavItem key={item.href} {...item} onClose={onClose} />
@@ -300,7 +318,7 @@ function SidebarRail({
             className="flex items-center gap-3 rounded-lg px-3 py-2 type-body text-foreground-muted transition-colors hover:bg-white/[0.035] hover:text-foreground"
           >
             <Bell className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
-            <span>Activity</span>
+            <span>Notifications</span>
           </button>
         )}
         {BOTTOM_NAV.map((item) => (
