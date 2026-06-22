@@ -8,6 +8,7 @@ import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { BottomCommandBar } from "@/components/os/bottom-command-bar";
 import { AskProvider } from "@/components/os/ask-provider";
 import { AskDrawer } from "@/components/os/ask-drawer";
+import { AskOrb } from "@/components/os/ask-orb";
 import { EnvironmentLayer } from "@/components/dashboard/environment-layer";
 import type { User, Workspace } from "@/types/database";
 
@@ -96,6 +97,9 @@ export function DashboardShell({
 
       {/* ── L4 — Ask Ultrametrics drawer (shared conversation) ──── */}
       <AskDrawer />
+
+      {/* ── L3 — Floating Ask Orb (desktop; hidden when drawer open) ── */}
+      <AskOrb />
     </div>
     </AskProvider>
   );
