@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage, ChatStreamEvent } from "@/lib/ai/types";
-import type { AiMessage } from "@/types/database";
+import type { AiConversation, AiMessage } from "@/types/database";
 
 export interface UseAskUltrametrics {
   messages: ChatMessage[];
@@ -30,6 +30,16 @@ export interface UseAskUltrametrics {
   newChat: () => void;
   /** U1 Step 5: load a persisted conversation's messages into the thread. */
   loadConversation: (id: string) => Promise<void>;
+  /** Sprint 2: the user's conversations in this workspace (recent first). */
+  conversations: AiConversation[];
+  /** Re-fetch the conversation list for the active workspace. */
+  refreshConversations: () => Promise<void>;
+  /** Switch the thread to an existing conversation (clears the current one). */
+  selectConversation: (id: string) => Promise<void>;
+  /** Rename a conversation (optimistic; reverts to server on failure). */
+  renameConversation: (id: string, title: string) => Promise<void>;
+  /** Delete a conversation; starts a new chat if it was the active one. */
+  deleteConversation: (id: string) => Promise<void>;
 }
 
 /** Title for a lazily-created conversation: the first user message, truncated. */
@@ -50,6 +60,8 @@ export function useAskUltrametrics(
   // freshly-created id within the same tick (no stale closure).
   const [conversationId, setConversationId] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  // Sprint 2: the workspace's conversation list (powers the rail).
+  const [conversations, setConversations] = useState<AiConversation[]>([]);
   // Sticky escalation: round-tripped to the server on each turn.
   const escalatedRef = useRef(false);
 
@@ -84,6 +96,22 @@ export function useAskUltrametrics(
     }
   }, [reset]);
 
+  // Sprint 2: re-fetch the workspace's conversation list (GET is server-scoped
+  // to the active workspace + user via RLS). Generation-guarded so a workspace
+  // switch mid-fetch discards the stale list.
+  const refreshConversations = useCallback(async (): Promise<void> => {
+    const gen = generationRef.current;
+    try {
+      const res = await fetch("/api/ai/conversations");
+      if (!res.ok) return;
+      const data = (await res.json()) as { conversations?: AiConversation[] };
+      if (generationRef.current !== gen) return;
+      setConversations(data.conversations ?? []);
+    } catch {
+      /* ignore — list simply isn't refreshed */
+    }
+  }, []);
+
   /**
    * Ensure a persisted conversation exists, lazily creating one on the first
    * send of a thread via the existing POST /api/ai/conversations. Best-effort:
@@ -106,13 +134,15 @@ export function useAskUltrametrics(
         if (id) {
           conversationIdRef.current = id;
           setConversationId(id);
+          // Sprint 2: surface the new thread in the rail.
+          void refreshConversations();
         }
         return id;
       } catch {
         return null;
       }
     },
-    []
+    [refreshConversations]
   );
 
   /**
@@ -153,16 +183,69 @@ export function useAskUltrametrics(
     }
   }, []);
 
+  // Sprint 2: switch the thread to an existing conversation. reset() clears the
+  // current thread and bumps the generation (dropping any in-flight stream),
+  // then loadConversation hydrates the selected one under the new generation.
+  const selectConversation = useCallback(
+    async (id: string): Promise<void> => {
+      reset();
+      await loadConversation(id);
+    },
+    [reset, loadConversation]
+  );
+
+  // Sprint 2: optimistic rename; reverts to server truth on failure.
+  const renameConversation = useCallback(
+    async (id: string, title: string): Promise<void> => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, title: trimmed } : c))
+      );
+      try {
+        const res = await fetch(`/api/ai/conversations/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: trimmed }),
+        });
+        if (!res.ok) await refreshConversations();
+      } catch {
+        await refreshConversations();
+      }
+    },
+    [refreshConversations]
+  );
+
+  // Sprint 2: delete a conversation (optimistic removal). If it was the active
+  // thread, start a fresh chat so the UI doesn't point at a deleted row.
+  const deleteConversation = useCallback(
+    async (id: string): Promise<void> => {
+      const wasCurrent = conversationIdRef.current === id;
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      try {
+        await fetch(`/api/ai/conversations/${id}`, { method: "DELETE" });
+      } catch {
+        /* ignore — refresh below reconciles */
+      }
+      if (wasCurrent) newChat();
+      await refreshConversations();
+    },
+    [newChat, refreshConversations]
+  );
+
   // U1 Step 5 hydration: on mount AND whenever the workspace changes, reset the
   // in-memory thread (clears the previous workspace's chat) and restore that
   // workspace's last conversation from ?c= (override) or localStorage.
   useEffect(() => {
     reset();
+    setConversations([]);
     hydratedRef.current = false;
     if (!workspaceId) {
       hydratedRef.current = true;
       return;
     }
+    // Sprint 2: load this workspace's conversation list for the rail.
+    void refreshConversations();
     let id: string | null = null;
     try {
       id = new URLSearchParams(window.location.search).get("c");
@@ -183,7 +266,7 @@ export function useAskUltrametrics(
     } else {
       hydratedRef.current = true;
     }
-  }, [workspaceId, reset, loadConversation]);
+  }, [workspaceId, reset, loadConversation, refreshConversations]);
 
   // U1 Step 5: persist the active conversation per workspace (write-only; New
   // Chat clears the key explicitly, so this never erases it before hydration).
@@ -303,5 +386,10 @@ export function useAskUltrametrics(
     reset,
     newChat,
     loadConversation,
+    conversations,
+    refreshConversations,
+    selectConversation,
+    renameConversation,
+    deleteConversation,
   };
 }

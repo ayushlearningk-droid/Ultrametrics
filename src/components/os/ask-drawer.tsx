@@ -18,6 +18,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, X } from "lucide-react";
 import { useAsk } from "@/components/os/ask-provider";
 import { ChatMessage } from "@/components/os/chat-message";
+import { ConversationRail } from "@/components/os/conversation-rail";
 
 /** Distance (px) from the bottom within which we treat the user as "at bottom". */
 const NEAR_BOTTOM_PX = 80;
@@ -123,7 +124,7 @@ export function AskDrawer() {
 
           {/* Drawer panel */}
           <motion.aside
-            className="fixed inset-y-0 right-0 z-[61] flex w-full flex-col border-l border-white/[0.08] bg-[hsl(var(--card))] shadow-2xl md:w-[680px]"
+            className="fixed inset-y-0 right-0 z-[61] flex w-full border-l border-white/[0.08] bg-[hsl(var(--card))] shadow-2xl md:w-[720px]"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -131,6 +132,13 @@ export function AskDrawer() {
             role="dialog"
             aria-label="Ask Ultrametrics"
           >
+            {/* Left pane — conversation rail (desktop only; hidden on mobile) */}
+            <div className="hidden shrink-0 md:flex">
+              <ConversationRail />
+            </div>
+
+            {/* Right pane — chat thread (unchanged: header, messages, composer) */}
+            <div className="flex min-w-0 flex-1 flex-col">
             {/* Header */}
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/[0.07] px-6">
               <div className="flex flex-col gap-0.5">
@@ -226,6 +234,7 @@ export function AskDrawer() {
                 </button>
               </div>
             </form>
+            </div>
           </motion.aside>
         </>
       )}
