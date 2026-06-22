@@ -67,6 +67,7 @@ import {
   type TrendMetric,
 } from "@/lib/ai/trend/trend-analysis";
 import { buildImpactEstimate } from "@/lib/ai/impact";
+import { deriveRootCauses } from "@/lib/ai/root-cause";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -970,6 +971,18 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
     },
   },
   {
+    name: "get_root_cause",
+    description:
+      "Get likely ROOT CAUSES for underperforming campaigns per source: tracking gaps, weak creative (low CTR), or inefficient bidding (high CPC). Use when the user asks WHY a campaign is underperforming, what's driving poor results, or for a diagnosis behind a recommendation. Returns up to 5 per source (highest-spend underperformers), each with primaryCause, confidence, severity, evidence, an ordered fixOrder, and any contributing causes. READ-ONLY ADVISORY: each cause is a grounded HYPOTHESIS, not a certainty — relay it as a likely cause with its confidence, never as proven. Omit since/until for the default window.",
+    input_schema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "Optional start date, inclusive (YYYY-MM-DD). Omit for the default window." },
+        until: { type: "string", description: "Optional end date, inclusive (YYYY-MM-DD). Omit for the default window." },
+      },
+    },
+  },
+  {
     name: "list_connected_providers",
     description:
       "List which data sources are connected to the current workspace and what metrics each can report. Use to answer 'what's connected' or before deciding which source to query.",
@@ -1156,6 +1169,32 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
     });
 
     return JSON.stringify({ dateRange: campRes.dateRange, summaries });
+  },
+
+  // AI-015 Phase 2: read-only root-cause diagnosis for underperforming
+  // campaigns. Reuses the cached campaign-level fetch; the pure orchestrator
+  // selects underperformers and caps to the Top 5 by spend.
+  async get_root_cause(input, ctx) {
+    const base = buildQuery(input, ctx.todayISO);
+    const res = await getMetricsWithFallback(ctx.workspaceId, {
+      ...base,
+      level: "campaign",
+      granularity: "total",
+    });
+
+    const providers = res.providers.map((p) => {
+      if (p.status !== "ok" || !p.metrics) {
+        return { provider: p.provider, status: p.status, causes: [] };
+      }
+      return {
+        provider: p.provider,
+        status: p.status,
+        currency: p.metrics.currency,
+        causes: deriveRootCauses(p.metrics),
+      };
+    });
+
+    return JSON.stringify({ dateRange: res.dateRange, providers });
   },
 
   async list_connected_providers(_input, ctx) {
