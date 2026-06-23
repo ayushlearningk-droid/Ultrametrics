@@ -8,6 +8,7 @@ import {
   Check,
   ChevronsUpDown,
   CreditCard,
+  Gauge,
   LayoutDashboard,
   ListTodo,
   LogOut,
@@ -53,6 +54,7 @@ const PRIMARY_NAV = [
 ];
 
 const BOTTOM_NAV = [
+  { href: "/dashboard/ai-usage", label: "AI Usage", icon: Gauge },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
