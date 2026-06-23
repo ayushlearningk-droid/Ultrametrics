@@ -413,6 +413,51 @@ export type Database = {
           created_at?: string;
         };
       };
+      action_queue: {
+        Relationships: [];
+        Row: {
+          id: string;
+          workspace_id: string;
+          user_id: string;
+          title: string;
+          source: string | null;
+          type: string | null;
+          rationale: string | null;
+          expected_impact: string | null;
+          priority: "High" | "Medium" | "Low" | null;
+          status: "pending" | "approved" | "dismissed";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          user_id: string;
+          title: string;
+          source?: string | null;
+          type?: string | null;
+          rationale?: string | null;
+          expected_impact?: string | null;
+          priority?: "High" | "Medium" | "Low" | null;
+          status?: "pending" | "approved" | "dismissed";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          user_id?: string;
+          title?: string;
+          source?: string | null;
+          type?: string | null;
+          rationale?: string | null;
+          expected_impact?: string | null;
+          priority?: "High" | "Medium" | "Low" | null;
+          status?: "pending" | "approved" | "dismissed";
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -436,3 +481,9 @@ export type Subscription =
 export type AiConversation =
   Database["public"]["Tables"]["ai_conversations"]["Row"];
 export type AiMessage = Database["public"]["Tables"]["ai_messages"]["Row"];
+export type ActionQueueRow =
+  Database["public"]["Tables"]["action_queue"]["Row"];
+export type ActionQueueInsert =
+  Database["public"]["Tables"]["action_queue"]["Insert"];
+export type ActionQueueUpdate =
+  Database["public"]["Tables"]["action_queue"]["Update"];

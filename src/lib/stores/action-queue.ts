@@ -1,18 +1,20 @@
 "use client";
 
 /**
- * Action Queue — shared client store (Sprint 9, Decision Queue Integration).
+ * Action Queue — server-backed client store (Sprint 10E).
  *
- * A module-level, in-memory store (via useSyncExternalStore) that connects AI
- * recommendation approvals to the Action Queue page. NO database, NO Meta/Google
- * API, NO execution — purely local, session-scoped shared state. Approving an AI
- * recommendation enqueues it here; the /dashboard/actions surface reads the same
- * store, so the approved item appears in the queue across client navigation.
+ * A module-level store (useSyncExternalStore) that mirrors the persisted
+ * action_queue via /api/actions, with OPTIMISTIC updates so the UI stays
+ * instant. Approving an AI recommendation enqueues optimistically (temp id),
+ * POSTs, then swaps the temp id for the server row. Status changes PATCH;
+ * removals DELETE. Hydrates from the server on demand and survives reload.
  *
- * Resets on a full page reload (intentional — there is no persistence layer).
+ * No execution — this records decisions only. Session cache resets on reload
+ * until hydrateActions() repopulates it from the server.
  */
 
 import { useSyncExternalStore } from "react";
+import type { ActionQueueRow } from "@/types/database";
 
 export type ActionStatus = "pending" | "approved" | "dismissed";
 export type ActionPriority = "High" | "Medium" | "Low";
@@ -20,9 +22,7 @@ export type ActionPriority = "High" | "Medium" | "Low";
 export interface QueuedAction {
   id: string;
   title: string;
-  /** Where it originated, e.g. "Meta Ads", "Ask Ultrametrics". */
   source: string;
-  /** Coarse action kind, e.g. "scale" | "pause" | "budget" | "fix". */
   type?: string;
   rationale?: string;
   expectedImpact?: string;
@@ -40,16 +40,16 @@ export interface ActionInput {
   priority?: ActionPriority;
 }
 
-/**
- * Initial queue (Sprint 9, Option A): starts EMPTY — the queue is populated
- * solely by AI-recommendation approvals, so an approved item is the only entry.
- */
-const SEED: QueuedAction[] = [];
-
 // ── Store internals ──────────────────────────────────────────────────────────
-let state: QueuedAction[] = SEED;
+const EMPTY: QueuedAction[] = [];
+let state: QueuedAction[] = EMPTY;
 let seq = 0;
+let generation = 0;
 const listeners = new Set<() => void>();
+/** Temp ids with a POST in flight → lets un-approve cancel the created row. */
+const pendingTemps = new Map<string, { cancelled: boolean }>();
+/** temp id → server id, so un-approve after a swap deletes the right row. */
+const idAlias = new Map<string, string>();
 
 function emit() {
   for (const l of listeners) l();
@@ -64,21 +64,68 @@ function getSnapshot(): QueuedAction[] {
   return state;
 }
 
-/** Stable server snapshot (the seed) so SSR + first client render agree. */
+/** Stable empty snapshot so SSR + first client render agree (hydrate is async). */
 function getServerSnapshot(): QueuedAction[] {
-  return SEED;
+  return EMPTY;
 }
 
-// ── Public actions ───────────────────────────────────────────────────────────
+function mapRow(row: ActionQueueRow): QueuedAction {
+  return {
+    id: row.id,
+    title: row.title,
+    source: row.source ?? "Ask Ultrametrics",
+    type: row.type ?? undefined,
+    rationale: row.rationale ?? undefined,
+    expectedImpact: row.expected_impact ?? undefined,
+    priority: row.priority ?? undefined,
+    status: row.status,
+  };
+}
+
+// ── Hydration / reset (workspace switching, reload persistence) ──────────────
 
 /**
- * Enqueue an approved AI recommendation. Returns the new id so the caller can
- * remove it again if the user toggles the approval off.
+ * Load the queue from the server (RLS-scoped to the active workspace). Bumps a
+ * generation so a stale in-flight load (e.g. after a workspace switch) is
+ * discarded. Preserves still-in-flight optimistic temp items, deduped by id.
+ */
+export async function hydrateActions(): Promise<void> {
+  const gen = ++generation;
+  try {
+    const res = await fetch("/api/actions");
+    if (!res.ok) return;
+    const data = (await res.json()) as { actions?: ActionQueueRow[] };
+    if (gen !== generation) return; // superseded by a newer hydrate/reset
+    const serverItems = (data.actions ?? []).map(mapRow);
+    const serverIds = new Set(serverItems.map((a) => a.id));
+    const pendingItems = state.filter(
+      (a) => a.id.startsWith("temp-") && pendingTemps.has(a.id) && !serverIds.has(a.id)
+    );
+    state = [...pendingItems, ...serverItems];
+    emit();
+  } catch {
+    /* best-effort — keep whatever we have */
+  }
+}
+
+/** Clear the queue (e.g. on workspace switch, before re-hydrating). */
+export function resetActions(): void {
+  generation++; // discard any in-flight hydrate
+  state = EMPTY;
+  emit();
+}
+
+// ── Mutations (optimistic) ───────────────────────────────────────────────────
+
+/**
+ * Optimistically enqueue an approved recommendation and POST it. Returns the
+ * TEMP id synchronously (callers track it); the temp id is swapped for the
+ * server row on success, and removeAction(tempId) keeps working before/after.
  */
 export function enqueueAction(input: ActionInput): string {
-  const id = `ai-${++seq}`;
-  const action: QueuedAction = {
-    id,
+  const tempId = `temp-${++seq}`;
+  const optimistic: QueuedAction = {
+    id: tempId,
     title: input.title,
     source: input.source ?? "Ask Ultrametrics",
     type: input.type,
@@ -87,21 +134,94 @@ export function enqueueAction(input: ActionInput): string {
     priority: input.priority,
     status: "approved",
   };
-  state = [action, ...state];
+  state = [optimistic, ...state];
   emit();
-  return id;
+  pendingTemps.set(tempId, { cancelled: false });
+
+  void fetch("/api/actions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`POST failed (${res.status})`);
+      const data = (await res.json()) as { action?: ActionQueueRow };
+      if (!data.action) throw new Error("No action returned");
+      const entry = pendingTemps.get(tempId);
+      pendingTemps.delete(tempId);
+      const mapped = mapRow(data.action);
+
+      if (entry?.cancelled) {
+        // Un-approved while in flight → drop it and delete the created row.
+        state = state.filter((a) => a.id !== tempId && a.id !== mapped.id);
+        emit();
+        void fetch(`/api/actions/${mapped.id}`, { method: "DELETE" }).catch(
+          () => {}
+        );
+        return;
+      }
+
+      idAlias.set(tempId, mapped.id);
+      // Swap temp → server row, dropping any pre-existing dup of the server id.
+      state = state.flatMap((a) => {
+        if (a.id === tempId) return [mapped];
+        if (a.id === mapped.id) return [];
+        return [a];
+      });
+      emit();
+    })
+    .catch(() => {
+      pendingTemps.delete(tempId);
+      state = state.filter((a) => a.id !== tempId);
+      emit();
+    });
+
+  return tempId;
 }
 
-/** Remove an action (e.g. the user un-approves a recommendation). */
+/** Remove an action (un-approve). Works for temp ids before/after the swap. */
 export function removeAction(id: string): void {
-  state = state.filter((a) => a.id !== id);
+  const resolved = idAlias.get(id) ?? id;
+  state = state.filter((a) => a.id !== id && a.id !== resolved);
   emit();
+
+  if (id.startsWith("temp-") && resolved === id) {
+    // Still in flight (no server id yet) → cancel the POST's created row.
+    const entry = pendingTemps.get(id);
+    if (entry) entry.cancelled = true;
+    return;
+  }
+
+  idAlias.delete(id);
+  void fetch(`/api/actions/${resolved}`, { method: "DELETE" }).catch(() => {});
 }
 
 /** Update an action's status (Approve / Dismiss on the queue page). */
 export function setActionStatus(id: string, status: ActionStatus): void {
-  state = state.map((a) => (a.id === id ? { ...a, status } : a));
+  const resolved = idAlias.get(id) ?? id;
+  const prev = state.find((a) => a.id === id || a.id === resolved)?.status;
+  state = state.map((a) =>
+    a.id === id || a.id === resolved ? { ...a, status } : a
+  );
   emit();
+
+  if (resolved.startsWith("temp-")) return; // not persisted yet; reconciles on swap
+
+  const revert = () => {
+    if (!prev) return;
+    state = state.map((a) => (a.id === resolved ? { ...a, status: prev } : a));
+    emit();
+  };
+
+  void fetch(`/api/actions/${resolved}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  })
+    .then((res) => {
+      if (!res.ok) revert();
+    })
+    .catch(revert);
 }
 
 /** Subscribe a component to the shared Action Queue. */

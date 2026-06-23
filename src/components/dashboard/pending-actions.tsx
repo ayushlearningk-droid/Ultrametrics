@@ -9,11 +9,13 @@
  * no API, no execution. Reuses the existing card visual language.
  */
 
+import { useEffect, useState } from "react";
 import { Check, X, Zap, Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useActionQueue,
   setActionStatus,
+  hydrateActions,
   type QueuedAction,
   type ActionStatus,
   type ActionPriority,
@@ -116,7 +118,20 @@ function ActionCard({ action }: { action: QueuedAction }) {
 
 export function PendingActions() {
   const actions = useActionQueue();
+  const [loading, setLoading] = useState(true);
   const count = actions.length;
+
+  // Sprint 10F: hydrate from the server on mount so the queue survives reloads.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void hydrateActions().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-6">
@@ -135,7 +150,16 @@ export function PendingActions() {
         )}
       </header>
 
-      {count === 0 ? (
+      {loading && count === 0 ? (
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-24 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
+            />
+          ))}
+        </div>
+      ) : count === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-6 py-16 text-center">
           <Zap className="mb-3 h-6 w-6 text-foreground-muted" />
           <h2 className="text-[15px] font-semibold text-foreground">
