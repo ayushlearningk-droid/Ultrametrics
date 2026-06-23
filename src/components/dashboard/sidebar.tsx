@@ -9,6 +9,7 @@ import {
   ChevronsUpDown,
   CreditCard,
   LayoutDashboard,
+  ListTodo,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -45,6 +46,7 @@ const CONNECTORS = [
 /* ── Sidebar V7 navigation (Sprint 4 Phase C) ────────────────────── */
 const PRIMARY_NAV = [
   { href: "/dashboard", label: "Brief", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/actions", label: "Actions", icon: ListTodo },
   { href: "/dashboard/reports", label: "Reports", icon: FileText },
   { href: "/dashboard/timeline", label: "Timeline", icon: History },
   { href: "/dashboard/connectors", label: "Connectors", icon: Plug },
