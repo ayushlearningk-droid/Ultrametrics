@@ -157,7 +157,7 @@ export function ConversationRow({
       {/* Meta: timestamp + ⋯ menu (menu revealed on hover / active) */}
       {!renaming && (
         <div className="flex shrink-0 items-center gap-1 pt-0.5">
-          <span className="text-[10px] tabular-nums text-foreground-muted/70 group-hover:opacity-0">
+          <span className="text-[10px] tabular-nums text-foreground-muted/70">
             {relativeTime(conversation.updated_at)}
           </span>
           <DropdownMenu>
@@ -166,7 +166,7 @@ export function ConversationRow({
                 type="button"
                 aria-label="Conversation actions"
                 onClick={(e) => e.stopPropagation()}
-                className="absolute right-2 top-1.5 flex h-6 w-6 items-center justify-center rounded-md text-foreground-muted opacity-0 transition-opacity hover:bg-white/[0.06] hover:text-foreground group-hover:opacity-100 data-[state=open]:opacity-100"
+                className="flex h-6 w-6 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:opacity-100 data-[state=open]:bg-white/[0.06] data-[state=open]:text-foreground"
               >
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
