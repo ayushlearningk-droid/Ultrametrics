@@ -17,16 +17,48 @@ import type {
 /** Max chars stored in last_message_preview (sidebar snippet). */
 const PREVIEW_MAX = 140;
 
-/** List the current user's non-archived conversations in a workspace. */
+/** Max chars of a search query honoured (after sanitisation). */
+const SEARCH_MAX = 100;
+
+/**
+ * Sanitise a search query for a PostgREST `.or()` ilike expression: strip the
+ * chars that have structural (`, ( )`) or wildcard/escape (`% * _ \`) meaning so
+ * they can't break the filter, then trim + cap. Returns "" when nothing usable
+ * remains (caller then skips the filter).
+ */
+function sanitizeSearch(q: string): string {
+  return q.replace(/[,()%*\\_]/g, "").trim().slice(0, SEARCH_MAX);
+}
+
+/**
+ * List the current user's conversations in a workspace (Sprint 5).
+ *  - `archived: false` (default) → non-archived; `true` → archived only.
+ *  - `q` → substring search across title + last_message_preview (ilike).
+ * Ordered pinned-first (pinned_at DESC NULLS LAST), then updated_at DESC.
+ */
 export async function listConversations(
-  workspaceId: string
+  workspaceId: string,
+  opts?: { q?: string; archived?: boolean }
 ): Promise<AiConversation[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("ai_conversations")
     .select("*")
-    .eq("workspace_id", workspaceId)
-    .is("archived_at", null)
+    .eq("workspace_id", workspaceId);
+
+  query = opts?.archived
+    ? query.not("archived_at", "is", null)
+    : query.is("archived_at", null);
+
+  const safe = opts?.q ? sanitizeSearch(opts.q) : "";
+  if (safe) {
+    query = query.or(
+      `title.ilike.%${safe}%,last_message_preview.ilike.%${safe}%`
+    );
+  }
+
+  const { data } = await query
+    .order("pinned_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false });
   return (data ?? []) as AiConversation[];
 }
@@ -81,7 +113,7 @@ export async function getMessages(
   return (data ?? []) as AiMessage[];
 }
 
-/** Patch a conversation (rename, archive, preview). Returns the updated row. */
+/** Patch a conversation (rename, archive, pin, preview). Returns the updated row. */
 export async function updateConversation(
   id: string,
   patch: {
@@ -89,6 +121,7 @@ export async function updateConversation(
     titleGenerated?: boolean;
     lastMessagePreview?: string | null;
     archived?: boolean;
+    pinned?: boolean;
   }
 ): Promise<AiConversation | null> {
   const supabase = await createClient();
@@ -100,6 +133,8 @@ export async function updateConversation(
     update.last_message_preview = patch.lastMessagePreview;
   if (patch.archived !== undefined)
     update.archived_at = patch.archived ? new Date().toISOString() : null;
+  if (patch.pinned !== undefined)
+    update.pinned_at = patch.pinned ? new Date().toISOString() : null;
 
   const { data, error } = await supabase
     .from("ai_conversations")

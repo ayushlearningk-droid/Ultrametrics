@@ -29,7 +29,7 @@ async function resolveWorkspaceId(): Promise<string | null> {
   return getCurrentWorkspaceId(workspaces);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await requireUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,7 +41,13 @@ export async function GET() {
       { status: 400 }
     );
   }
-  const conversations = await listConversations(workspaceId);
+
+  // Sprint 5: optional search (?q=) + archived-only (?archived=true) filters.
+  const params = new URL(request.url).searchParams;
+  const q = params.get("q") ?? undefined;
+  const archived = params.get("archived") === "true";
+
+  const conversations = await listConversations(workspaceId, { q, archived });
   return NextResponse.json({ conversations });
 }
 

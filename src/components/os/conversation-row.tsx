@@ -13,7 +13,15 @@
  */
 
 import { useState } from "react";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Pin,
+  PinOff,
+  Archive,
+  ArchiveRestore,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +37,12 @@ export interface ConversationRowProps {
   onSelect: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
+  /** Sprint 5 — optional so the rail can wire them in File 8. */
+  onPin?: (id: string, pinned: boolean) => void;
+  onArchive?: (id: string) => void;
+  onRestore?: (id: string) => void;
+  /** When true, this is an archived row: show Restore instead of Pin/Archive. */
+  archived?: boolean;
 }
 
 /** Compact relative time: "now", "5m", "3h", "2d", else a short date. */
@@ -55,9 +69,14 @@ export function ConversationRow({
   onSelect,
   onRename,
   onDelete,
+  onPin,
+  onArchive,
+  onRestore,
+  archived = false,
 }: ConversationRowProps) {
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(conversation.title);
+  const pinned = conversation.pinned_at != null;
 
   const startRename = () => {
     setDraft(conversation.title);
@@ -115,11 +134,17 @@ export function ConversationRow({
         >
           <div
             className={cn(
-              "truncate text-[13px] leading-snug",
+              "flex items-center gap-1 truncate text-[13px] leading-snug",
               active ? "font-medium text-foreground" : "text-foreground/85"
             )}
           >
-            {conversation.title}
+            {pinned && !archived && (
+              <Pin
+                aria-hidden
+                className="h-3 w-3 shrink-0 text-brand"
+              />
+            )}
+            <span className="truncate">{conversation.title}</span>
           </div>
           {conversation.last_message_preview && (
             <div className="mt-0.5 truncate text-[11px] leading-snug text-foreground-muted">
@@ -147,10 +172,43 @@ export function ConversationRow({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuItem onClick={startRename} className="cursor-pointer">
-                <Pencil className="mr-2 h-3.5 w-3.5" />
-                Rename
-              </DropdownMenuItem>
+              {archived ? (
+                <DropdownMenuItem
+                  onClick={() => onRestore?.(conversation.id)}
+                  className="cursor-pointer"
+                >
+                  <ArchiveRestore className="mr-2 h-3.5 w-3.5" />
+                  Restore
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => onPin?.(conversation.id, !pinned)}
+                    className="cursor-pointer"
+                  >
+                    {pinned ? (
+                      <PinOff className="mr-2 h-3.5 w-3.5" />
+                    ) : (
+                      <Pin className="mr-2 h-3.5 w-3.5" />
+                    )}
+                    {pinned ? "Unpin" : "Pin"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={startRename}
+                    className="cursor-pointer"
+                  >
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onArchive?.(conversation.id)}
+                    className="cursor-pointer"
+                  >
+                    <Archive className="mr-2 h-3.5 w-3.5" />
+                    Archive
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuItem
                 onClick={() => onDelete(conversation.id)}
                 className="cursor-pointer text-red-300 focus:text-red-200"

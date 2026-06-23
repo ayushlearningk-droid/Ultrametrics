@@ -357,6 +357,7 @@ export type Database = {
           title_generated: boolean;
           last_message_preview: string | null;
           archived_at: string | null;
+          pinned_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -368,6 +369,7 @@ export type Database = {
           title_generated?: boolean;
           last_message_preview?: string | null;
           archived_at?: string | null;
+          pinned_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -379,6 +381,7 @@ export type Database = {
           title_generated?: boolean;
           last_message_preview?: string | null;
           archived_at?: string | null;
+          pinned_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -40,6 +40,18 @@ export interface UseAskUltrametrics {
   renameConversation: (id: string, title: string) => Promise<void>;
   /** Delete a conversation; starts a new chat if it was the active one. */
   deleteConversation: (id: string) => Promise<void>;
+  /** Sprint 5: current search query (drives the list ?q= filter). */
+  search: string;
+  /** Set the search query (the rail debounces, then calls refreshConversations). */
+  setSearch: (q: string) => void;
+  /** Pin / unpin a conversation (optimistic; reconciles via refresh). */
+  pinConversation: (id: string, pinned: boolean) => Promise<void>;
+  /** Archive a conversation (optimistic remove; keeps the thread open). */
+  archiveConversation: (id: string) => Promise<void>;
+  /** Restore an archived conversation back into the active list. */
+  restoreConversation: (id: string) => Promise<void>;
+  /** Lazily fetch the workspace's ARCHIVED conversations (for the Archived section). */
+  loadArchived: () => Promise<AiConversation[]>;
 }
 
 /** Title for a lazily-created conversation: the first user message, truncated. */
@@ -62,6 +74,10 @@ export function useAskUltrametrics(
   const conversationIdRef = useRef<string | null>(null);
   // Sprint 2: the workspace's conversation list (powers the rail).
   const [conversations, setConversations] = useState<AiConversation[]>([]);
+  // Sprint 5: search query (the rail debounces). A ref mirrors it so the
+  // generation-shared refreshConversations reads the latest value.
+  const [search, setSearchState] = useState("");
+  const searchRef = useRef("");
   // Sticky escalation: round-tripped to the server on each turn.
   const escalatedRef = useRef(false);
 
@@ -102,7 +118,11 @@ export function useAskUltrametrics(
   const refreshConversations = useCallback(async (): Promise<void> => {
     const gen = generationRef.current;
     try {
-      const res = await fetch("/api/ai/conversations");
+      const q = searchRef.current.trim();
+      const url = q
+        ? `/api/ai/conversations?q=${encodeURIComponent(q)}`
+        : "/api/ai/conversations";
+      const res = await fetch(url);
       if (!res.ok) return;
       const data = (await res.json()) as { conversations?: AiConversation[] };
       if (generationRef.current !== gen) return;
@@ -110,6 +130,13 @@ export function useAskUltrametrics(
     } catch {
       /* ignore — list simply isn't refreshed */
     }
+  }, []);
+
+  // Sprint 5: update the search query (no fetch here — the rail debounces and
+  // then calls refreshConversations, which reads searchRef).
+  const setSearch = useCallback((q: string) => {
+    searchRef.current = q;
+    setSearchState(q);
   }, []);
 
   /**
@@ -233,12 +260,86 @@ export function useAskUltrametrics(
     [newChat, refreshConversations]
   );
 
+  // Sprint 5: pin / unpin (optimistic pinned_at, then reconcile via refresh).
+  const pinConversation = useCallback(
+    async (id: string, pinned: boolean): Promise<void> => {
+      const stamp = pinned ? new Date().toISOString() : null;
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, pinned_at: stamp } : c))
+      );
+      try {
+        await fetch(`/api/ai/conversations/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pinned }),
+        });
+      } catch {
+        /* ignore — refresh below reconciles */
+      }
+      // Reconcile the pinned-first ordering from the server.
+      await refreshConversations();
+    },
+    [refreshConversations]
+  );
+
+  // Sprint 5: archive (optimistic remove from the active list). Unlike delete,
+  // the thread stays open and the data is preserved (archived_at set).
+  const archiveConversation = useCallback(
+    async (id: string): Promise<void> => {
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      try {
+        await fetch(`/api/ai/conversations/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: true }),
+        });
+      } catch {
+        /* ignore — refresh below reconciles */
+      }
+      await refreshConversations();
+    },
+    [refreshConversations]
+  );
+
+  // Sprint 5: restore an archived conversation back into the active list.
+  const restoreConversation = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        await fetch(`/api/ai/conversations/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: false }),
+        });
+      } catch {
+        /* ignore — refresh below reconciles */
+      }
+      await refreshConversations();
+    },
+    [refreshConversations]
+  );
+
+  // Sprint 5: lazily fetch the workspace's ARCHIVED conversations (the rail
+  // calls this when the Archived section is expanded). Returns [] on failure.
+  const loadArchived = useCallback(async (): Promise<AiConversation[]> => {
+    try {
+      const res = await fetch("/api/ai/conversations?archived=true");
+      if (!res.ok) return [];
+      const data = (await res.json()) as { conversations?: AiConversation[] };
+      return data.conversations ?? [];
+    } catch {
+      return [];
+    }
+  }, []);
+
   // U1 Step 5 hydration: on mount AND whenever the workspace changes, reset the
   // in-memory thread (clears the previous workspace's chat) and restore that
   // workspace's last conversation from ?c= (override) or localStorage.
   useEffect(() => {
     reset();
     setConversations([]);
+    // Sprint 5: clear any search when switching workspaces.
+    searchRef.current = "";
+    setSearchState("");
     hydratedRef.current = false;
     if (!workspaceId) {
       hydratedRef.current = true;
@@ -391,5 +492,11 @@ export function useAskUltrametrics(
     selectConversation,
     renameConversation,
     deleteConversation,
+    search,
+    setSearch,
+    pinConversation,
+    archiveConversation,
+    restoreConversation,
+    loadArchived,
   };
 }

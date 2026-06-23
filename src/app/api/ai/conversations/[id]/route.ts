@@ -49,9 +49,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
   const { id } = await params;
 
-  let body: { title?: unknown; archived?: unknown } = {};
+  let body: { title?: unknown; archived?: unknown; pinned?: unknown } = {};
   try {
-    body = (await request.json()) as { title?: unknown; archived?: unknown };
+    body = (await request.json()) as {
+      title?: unknown;
+      archived?: unknown;
+      pinned?: unknown;
+    };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -60,6 +64,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     title?: string;
     titleGenerated?: boolean;
     archived?: boolean;
+    pinned?: boolean;
   } = {};
   if (typeof body.title === "string" && body.title.trim()) {
     patch.title = body.title.trim().slice(0, TITLE_MAX);
@@ -69,9 +74,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (typeof body.archived === "boolean") {
     patch.archived = body.archived;
   }
+  // Sprint 5: pin / unpin.
+  if (typeof body.pinned === "boolean") {
+    patch.pinned = body.pinned;
+  }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json(
-      { error: "Nothing to update (title or archived required)" },
+      { error: "Nothing to update (title, archived, or pinned required)" },
       { status: 400 }
     );
   }
