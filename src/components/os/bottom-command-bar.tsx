@@ -47,6 +47,10 @@ export function BottomCommandBar() {
         <div
           className={cn(
             "surface-elevated flex items-center gap-3 px-4 py-3 transition-all duration-200",
+            // Hover: emerald ring + tint, with the elevation shadow retained.
+            "hover:border-brand/40 hover:bg-brand/5 hover:shadow-[0_0_0_1px_rgba(16,185,129,0.25),0_1px_0_0_hsl(0_0%_100%/0.06)_inset,0_16px_48px_hsl(240_30%_1%/0.6)]",
+            // Focus-within: stronger emerald two-layer ring, elevation retained.
+            "focus-within:border-brand/50 focus-within:bg-brand/10 focus-within:shadow-[0_0_0_1px_rgba(16,185,129,0.35),0_0_0_4px_rgba(16,185,129,0.10),0_16px_48px_hsl(240_30%_1%/0.6)]",
             focused && "cmd-bloom"
           )}
         >
