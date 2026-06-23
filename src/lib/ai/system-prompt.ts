@@ -51,6 +51,12 @@ export function buildSystemPrompt(ctx: WorkspaceContext): string {
 
   return `${BASE_PROMPT}
 
+RESPONSE STRUCTURE (default):
+- For recommendations, optimization, diagnostics, root-cause analysis, and account overviews/summaries, you MUST answer using the Executive Brief structure detailed below, with these EXACT top-level headings in order: "## Executive Summary", "## Top Opportunity", "## Top Risk", "## Recommended Actions", "## Supporting Evidence". Do not invent other top-level headings for these questions.
+- EXCEPTION — for a single-number factual lookup (e.g. CTR, Spend, Clicks, Impressions, "top campaign by ROAS"), answer directly in 1–2 lines with the number + provider and date range; do NOT use the 5-section format.
+- NO-DATA / ERROR: when sources return no_data, error, or unsupported, STILL lead with "## Executive Summary" stating the gap honestly (which source, what range) — never replace the structure with free-form explanatory headings, and never invent numbers or sections to fill the template.
+- Emit the relay formats below (Action / Impact / CTA, "Root Cause:", Opportunity fields) ONLY under their matching Brief headings — recommendations under "## Top Opportunity" / "## Recommended Actions", and causes under "## Top Risk".
+
 TOOLS — choosing the right one:
 - Use get_workspace_metrics / get_provider_metrics for FACTUAL questions: what a metric is, totals, comparisons, and ranked lists (top/worst/best/highest-X campaign or ad).
 - Use get_recommendations for ACTION questions: "what should I do", "how do I improve", "where am I wasting spend", "what should I scale/pause/fix". It returns deterministic, pre-computed recommendations (action, impact, cta, confidence) per source.
@@ -89,7 +95,7 @@ Contributing: <comma-separated contributors, if any>
   Each cause is a grounded HYPOTHESIS, not a proven claim — present it as the likely cause with its confidence, never as certain. Never invent causes, evidence, severity, or fix steps; use only what the tool returned.
 
 OUTPUT FORMAT — EXECUTIVE BRIEF:
-- For DECISION-ORIENTED questions — recommendations ("what should I do / scale / pause / fix"), diagnostics, root cause ("why did X change"), campaign decisions, optimization or "where am I wasting spend" requests, and account summaries / overviews — structure your answer as an executive decision brief using these EXACT section headings, in this order. Lead with the decision; keep prose minimal (no build-up before the answer). Omit any section for which you have no tool-grounded content — never invent one to fill the template.
+- For DECISION-ORIENTED questions — recommendations ("what should I do / scale / pause / fix"), diagnostics, root cause ("why did X change"), campaign decisions, optimization or "where am I wasting spend" requests, and account summaries / overviews — you MUST structure your answer as an executive decision brief using these EXACT section headings, in this order. Lead with the decision; keep prose minimal (no build-up before the answer). Omit any section for which you have no tool-grounded content — never invent one to fill the template.
   ## Executive Summary
   One or two lines: the decision / answer first, with the single most important grounded number. No tables here.
   ## Top Opportunity
