@@ -74,6 +74,7 @@ export function ConversationRail() {
     restoreConversation,
     refreshConversations,
     loadArchived,
+    searchFocusSignal,
   } = useAsk();
 
   const [loading, setLoading] = useState(true);
@@ -81,6 +82,7 @@ export function ConversationRail() {
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [archivedLoaded, setArchivedLoaded] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Initial list load (own loading flag) + debounce cleanup.
   useEffect(() => {
@@ -94,6 +96,20 @@ export function ConversationRail() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [refreshConversations]);
+
+  // Sprint 6: the `/` shortcut bumps searchFocusSignal — focus the search input.
+  // Two frames so we land after the drawer's own open-focus (the composer).
+  useEffect(() => {
+    if (searchFocusSignal === 0) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => searchInputRef.current?.focus());
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [searchFocusSignal]);
 
   // Debounced search: set the query immediately (controlled input), refetch later.
   const onSearchChange = useCallback(
@@ -192,6 +208,7 @@ export function ConversationRail() {
         <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5">
           <Search className="h-3.5 w-3.5 shrink-0 text-foreground-muted" />
           <input
+            ref={searchInputRef}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search chats…"

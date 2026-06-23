@@ -48,7 +48,8 @@ const PROMPT_CHIPS: { label: string; prompt: string }[] = [
 ];
 
 export function AskDrawer() {
-  const { messages, streaming, error, isOpen, close, send } = useAsk();
+  const { messages, streaming, error, isOpen, close, send, composerFocusSignal } =
+    useAsk();
 
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -63,6 +64,20 @@ export function AskDrawer() {
     const id = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(id);
   }, [isOpen]);
+
+  // Sprint 6: the Shift+A shortcut bumps composerFocusSignal — focus the input.
+  // Two frames so we land after the open-focus above (same pattern as the rail).
+  useEffect(() => {
+    if (composerFocusSignal === 0) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => inputRef.current?.focus());
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [composerFocusSignal]);
 
   // Track whether the user is near the bottom of the scroll region.
   const handleScroll = useCallback(() => {

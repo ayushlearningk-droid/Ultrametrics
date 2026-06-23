@@ -61,6 +61,7 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]): void {
     function handler(event: KeyboardEvent) {
       const editable = isEditableTarget(event.target);
       const hasMod = event.metaKey || event.ctrlKey;
+      const shift = event.shiftKey;
       const key = event.key.toLowerCase();
 
       // Bare modifier presses never trigger anything.
@@ -87,6 +88,20 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]): void {
         return; // a modified key is never a single-key/chord shortcut
       }
 
+      // 1b) Shift + key combos ("shift+a"). Letters differ from their plain form
+      // only by Shift; punctuation like "?" is its own key (handled as single).
+      if (shift) {
+        const combo = `shift+${key}`;
+        for (const s of shortcutsRef.current) {
+          if (s.combo === combo && (s.allowInInput || !editable)) {
+            event.preventDefault();
+            clearChord();
+            s.handler(event);
+            return;
+          }
+        }
+      }
+
       // 2) Chord continuation: a prefix is armed, this is the second key.
       if (chordPrefix) {
         const combo = `${chordPrefix} ${key}`;
@@ -104,6 +119,10 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]): void {
       // 3) Exact single-key match.
       for (const s of shortcutsRef.current) {
         if (s.combo === key && !s.combo.includes(" ")) {
+          // A letter held with Shift is a distinct combo (Shift+A ≠ A); skip it
+          // here so it can only match a "shift+<letter>" binding above.
+          const isLetter = key.length === 1 && key >= "a" && key <= "z";
+          if (isLetter && shift) continue;
           if (!s.allowInInput && editable) return;
           event.preventDefault();
           s.handler(event);
@@ -111,11 +130,11 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]): void {
         }
       }
 
-      // 4) Arm a chord prefix if any chord starts with this key.
+      // 4) Arm a chord prefix if any chord starts with this key (not while Shift).
       const startsChord = shortcutsRef.current.some(
         (s) => s.combo.includes(" ") && s.combo.split(" ")[0] === key
       );
-      if (startsChord && !editable) {
+      if (startsChord && !editable && !shift) {
         chordPrefix = key;
         chordTimer = setTimeout(clearChord, CHORD_TIMEOUT_MS);
       }

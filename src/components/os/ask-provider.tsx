@@ -24,6 +24,7 @@ import {
   useAskUltrametrics,
   type UseAskUltrametrics,
 } from "@/components/os/use-ask-ultrametrics";
+import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 
 interface AskContextValue extends UseAskUltrametrics {
   /** Whether the AI drawer is open. */
@@ -33,6 +34,14 @@ interface AskContextValue extends UseAskUltrametrics {
   toggle: () => void;
   /** Sprint 3A: a reply completed while the drawer was closed (orb badge). */
   hasUnread: boolean;
+  /** Sprint 6: bumped to request focusing the conversation search input. */
+  searchFocusSignal: number;
+  /** Sprint 6: focus the conversation search input (consumed by the rail). */
+  focusSearch: () => void;
+  /** Sprint 6: bumped to request focusing the Ask composer input. */
+  composerFocusSignal: number;
+  /** Sprint 6: focus the Ask composer input (consumed by the drawer). */
+  focusComposer: () => void;
 }
 
 const AskContext = createContext<AskContextValue | null>(null);
@@ -59,6 +68,44 @@ export function AskProvider({
   const close = useCallback(() => setIsOpen(false), []);
   const toggle = useCallback(() => setIsOpen((v) => !v), []);
 
+  // Sprint 6: search-focus signal — bumping it asks the rail to focus its input.
+  const [searchFocusSignal, setSearchFocusSignal] = useState(0);
+  const focusSearch = useCallback(() => setSearchFocusSignal((n) => n + 1), []);
+  const [composerFocusSignal, setComposerFocusSignal] = useState(0);
+  const focusComposer = useCallback(
+    () => setComposerFocusSignal((n) => n + 1),
+    []
+  );
+
+  // Sprint 6: AI keyboard shortcuts that need Ask context (live inside provider).
+  //   A → open drawer · Shift+A → open + focus composer · N → open + new
+  //   conversation · / → open + focus search.
+  // (Single keys are suppressed while typing by the shortcut hook's focus guard.)
+  useKeyboardShortcuts([
+    { combo: "a", handler: () => open() },
+    {
+      combo: "shift+a",
+      handler: () => {
+        open();
+        focusComposer();
+      },
+    },
+    {
+      combo: "n",
+      handler: () => {
+        open();
+        ask.newChat();
+      },
+    },
+    {
+      combo: "/",
+      handler: () => {
+        open();
+        focusSearch();
+      },
+    },
+  ]);
+
   // Detect the streaming true→false edge: a reply that completed while the
   // drawer was closed (and without an error) becomes an unread indicator.
   useEffect(() => {
@@ -75,8 +122,30 @@ export function AskProvider({
   }, [workspaceId]);
 
   const value = useMemo<AskContextValue>(
-    () => ({ ...ask, isOpen, open, close, toggle, hasUnread }),
-    [ask, isOpen, open, close, toggle, hasUnread]
+    () => ({
+      ...ask,
+      isOpen,
+      open,
+      close,
+      toggle,
+      hasUnread,
+      searchFocusSignal,
+      focusSearch,
+      composerFocusSignal,
+      focusComposer,
+    }),
+    [
+      ask,
+      isOpen,
+      open,
+      close,
+      toggle,
+      hasUnread,
+      searchFocusSignal,
+      focusSearch,
+      composerFocusSignal,
+      focusComposer,
+    ]
   );
 
   return <AskContext.Provider value={value}>{children}</AskContext.Provider>;

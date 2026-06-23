@@ -38,6 +38,7 @@ export function DashboardShell({
   // (A / N / / / ? live inside AskProvider — wired in the next phase.)
   useKeyboardShortcuts([
     { combo: "mod+k", handler: () => setCmdOpen((v) => !v) },
+    { combo: "g b", handler: () => router.push("/dashboard") },
     { combo: "g c", handler: () => router.push("/dashboard/connectors") },
     { combo: "g r", handler: () => router.push("/dashboard/reports") },
     { combo: "g t", handler: () => router.push("/dashboard/timeline") },
