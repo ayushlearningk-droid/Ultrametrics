@@ -79,6 +79,9 @@ export async function POST(request: Request) {
     workspaceId,
     userId: user.id,
     ...(title ? { title } : {}),
+    // P1: the initial first-message title is a replaceable placeholder — the
+    // AI title route may overwrite it once (until a manual rename locks it).
+    titleGenerated: true,
   });
   if (!conversation) {
     return NextResponse.json(

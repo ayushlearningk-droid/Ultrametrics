@@ -390,6 +390,8 @@ export function useAskUltrametrics(
       // R3: tie this stream to the current generation; a workspace switch
       // (reset) bumps the generation and all of this stream's effects are dropped.
       const gen = generationRef.current;
+      // P1: title generation runs once — only on the first exchange of a thread.
+      const isFirstTurn = messages.length === 0;
 
       setError(null);
       setStreaming(true);
@@ -415,6 +417,9 @@ export function useAskUltrametrics(
       // U1 Step 4: lazily ensure a persisted conversation (best-effort). null
       // when creation fails — the chat then runs exactly as before (unpersisted).
       const cid = await ensureConversation(trimmed);
+
+      // Track stream success so we only auto-title a clean first response.
+      let streamOk = true;
 
       try {
         const res = await fetch("/api/ai/chat", {
@@ -462,10 +467,12 @@ export function useAskUltrametrics(
               escalatedRef.current = event.escalated;
             } else if (event.type === "error") {
               setError(event.message);
+              streamOk = false;
             }
           }
         }
       } catch (err) {
+        streamOk = false;
         if (generationRef.current === gen) {
           setError(err instanceof Error ? err.message : String(err));
         }
@@ -473,9 +480,25 @@ export function useAskUltrametrics(
         if (generationRef.current === gen) {
           setStreaming(false);
         }
+        // P1: after a clean FIRST response, fire-and-forget AI title generation.
+        // Never blocks chat; failures are ignored; a workspace switch aborts the
+        // follow-up refresh via the generation guard.
+        if (isFirstTurn && cid && streamOk && generationRef.current === gen) {
+          void fetch(`/api/ai/conversations/${cid}/title`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userMessage: trimmed }),
+          })
+            .then(() => {
+              if (generationRef.current === gen) void refreshConversations();
+            })
+            .catch(() => {
+              /* best-effort: the placeholder title simply remains */
+            });
+        }
       }
     },
-    [messages, streaming, ensureConversation]
+    [messages, streaming, ensureConversation, refreshConversations]
   );
 
   return {
