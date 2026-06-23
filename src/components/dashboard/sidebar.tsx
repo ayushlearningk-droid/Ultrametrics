@@ -182,7 +182,7 @@ function SidebarRail({
   collapsible,
 }: RailProps) {
   const router = useRouter();
-  const { open: openAsk } = useAsk();
+  const { open: openAsk, isOpen: isAskOpen } = useAsk();
 
   function selectWorkspace(id: string) {
     document.cookie = `workspace_id=${id};path=/;max-age=31536000;SameSite=Lax`;
@@ -268,7 +268,7 @@ function SidebarRail({
       {onCommandOpen && (
         <button
           onClick={onCommandOpen}
-          className="mb-2 flex w-full items-center gap-2.5 rounded-lg border border-white/[0.05] px-3 py-2 type-body text-foreground-muted transition-colors hover:bg-white/[0.035] hover:text-foreground"
+          className="mb-2 flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 type-body text-foreground-muted transition-all duration-200 hover:border-brand/30 hover:bg-brand/10 hover:text-foreground"
         >
           <Search className="h-[15px] w-[15px] shrink-0" strokeWidth={1.7} />
           <span className="flex-1 text-left">Ask Ultrametrics</span>
@@ -284,7 +284,12 @@ function SidebarRail({
           openAsk();
           onClose?.();
         }}
-        className="group relative flex items-center gap-3 rounded-lg px-3 py-2 type-body text-foreground-muted transition-all duration-150 hover:bg-white/[0.035] hover:text-foreground"
+        className={cn(
+          "group relative flex items-center gap-3 rounded-lg border px-3 py-2 type-body transition-all duration-200",
+          isAskOpen
+            ? "border-brand/40 bg-brand/15 text-foreground"
+            : "border-transparent text-foreground-muted hover:border-brand/30 hover:bg-brand/10 hover:text-foreground"
+        )}
       >
         <Sparkles className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
         <span className="truncate">Ask</span>
