@@ -12,6 +12,7 @@
  * plain markdown until a section is complete).
  */
 
+import { useState } from "react";
 import {
   TrendingUp,
   Lightbulb,
@@ -1095,7 +1096,58 @@ function RootCauseCard({
           </ol>
         </>
       )}
+
+      {/* ── Action Center footer: non-executing Approve (UI-only) ── */}
+      <div className="mt-3.5 flex justify-end">
+        <ApproveButton />
+      </div>
     </div>
+  );
+}
+
+/** Priority derived from the UI-inferred recommendation rank (1 = highest). */
+function priorityFromRank(rank: number | null): string | null {
+  if (rank === null) return null;
+  if (rank <= 1) return "High";
+  if (rank === 2) return "Medium";
+  return "Low";
+}
+
+/** Compact summary of the top estimated-impact range (header chip). */
+function impactSummary(impact: ImpactData | null): string | null {
+  const r = impact?.ranges?.[0];
+  if (!r) return null;
+  const sign = r.direction === "decrease" ? "−" : "+";
+  return `${sign}${r.low}–${sign}${r.high}% ${r.metric}`;
+}
+
+/**
+ * Action Center (Sprint 7, Phase 1) — non-executing Approve control. UI-only
+ * local state: toggles Approve ⇄ Approved. No persistence, no API, no execution.
+ */
+function ApproveButton() {
+  const [approved, setApproved] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-pressed={approved}
+      onClick={() => setApproved((v) => !v)}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors",
+        approved
+          ? "bg-emerald-400/20 text-emerald-200"
+          : "border border-white/[0.14] text-foreground-muted hover:border-emerald-400/40 hover:text-foreground"
+      )}
+    >
+      {approved ? (
+        <>
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Approved
+        </>
+      ) : (
+        "Approve"
+      )}
+    </button>
   );
 }
 
@@ -1134,6 +1186,9 @@ function OpportunityCard({
   const cta = fields?.cta ?? markerLine(body, "cta");
   const title = fields?.action ?? heading ?? "Recommendation";
   const fallbackBody = fields ? null : stripField(body, "cta");
+  // Action Center (Phase 1): priority from rank + a prominent impact chip.
+  const priority = priorityFromRank(rank);
+  const impactStr = impactSummary(impact);
 
   return (
     <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
@@ -1145,9 +1200,15 @@ function OpportunityCard({
             {title}
           </h4>
         </div>
-        {(score !== null || evidence) && (
+        {(score !== null || evidence || impactStr) && (
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             {score !== null && <ScoreChip score={score} />}
+            {impactStr && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-200">
+                <Gauge className="h-3 w-3" />
+                {impactStr}
+              </span>
+            )}
             {evidence && <EvidenceBadge level={evidence} />}
           </div>
         )}
@@ -1181,20 +1242,29 @@ function OpportunityCard({
         {impact && <PotentialImpact data={impact} evidence={evidence} />}
       </div>
 
-      {/* ── Footer: CTA always a button ── */}
-      {cta && (
-        <div className="mt-3.5">
-          <button
-            type="button"
-            onClick={() => onPrompt?.(cta)}
-            disabled={!onPrompt}
-            className="inline-flex items-center gap-1 rounded-lg bg-emerald-400/15 px-3 py-1.5 text-[12px] font-medium text-emerald-200 transition-colors hover:bg-emerald-400/25 disabled:cursor-default disabled:opacity-60"
-          >
-            {cta}
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </button>
+      {/* ── Action Center footer: priority + CTA + (UI-only) Approve ── */}
+      <div className="mt-3.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {priority && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/[0.12] px-2 py-1 text-[11px] font-medium text-foreground-muted">
+              Priority:
+              <span className="text-foreground">{priority}</span>
+            </span>
+          )}
+          {cta && (
+            <button
+              type="button"
+              onClick={() => onPrompt?.(cta)}
+              disabled={!onPrompt}
+              className="inline-flex min-w-0 items-center gap-1 rounded-lg bg-emerald-400/15 px-3 py-1.5 text-[12px] font-medium text-emerald-200 transition-colors hover:bg-emerald-400/25 disabled:cursor-default disabled:opacity-60"
+            >
+              <span className="truncate">{cta}</span>
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+            </button>
+          )}
         </div>
-      )}
+        <ApproveButton />
+      </div>
     </div>
   );
 }
