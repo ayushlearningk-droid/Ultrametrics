@@ -6,6 +6,7 @@ import { Menu, Search } from "lucide-react";
 import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
+import { ShortcutsHelp } from "@/components/dashboard/shortcuts-help";
 import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { BottomCommandBar } from "@/components/os/bottom-command-bar";
 import { AskProvider } from "@/components/os/ask-provider";
@@ -33,9 +34,10 @@ export function DashboardShell({
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
-  // Global shortcuts reachable outside AskProvider: command palette + G-chord nav.
-  // (A / N / / / ? live inside AskProvider — wired in the next phase.)
+  // Global shortcuts reachable outside AskProvider: command palette, G-chord
+  // nav, and the "?" help modal. (A / N / / / Shift+A live inside AskProvider.)
   useKeyboardShortcuts([
     { combo: "mod+k", handler: () => setCmdOpen((v) => !v) },
     { combo: "g b", handler: () => router.push("/dashboard") },
@@ -43,6 +45,7 @@ export function DashboardShell({
     { combo: "g r", handler: () => router.push("/dashboard/reports") },
     { combo: "g t", handler: () => router.push("/dashboard/timeline") },
     { combo: "g s", handler: () => router.push("/dashboard/settings") },
+    { combo: "?", handler: () => setHelpOpen(true) },
   ]);
 
   return (
@@ -96,6 +99,7 @@ export function DashboardShell({
       </div>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
 
       {/* ── L4 — Ask Ultrametrics drawer (shared conversation) ──── */}

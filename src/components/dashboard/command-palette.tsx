@@ -8,12 +8,16 @@ import {
   CreditCard,
   ExternalLink,
   LayoutDashboard,
+  MessageSquare,
   Plug,
+  Plus,
   RefreshCw,
   Search,
   Settings,
+  Sparkles,
   X,
 } from "lucide-react";
+import { useAsk } from "@/components/os/ask-provider";
 import { cn } from "@/lib/utils";
 
 export interface CommandPaletteProps {
@@ -28,17 +32,68 @@ interface Command {
   icon: React.ElementType;
   shortcut?: string;
   action: () => void;
-  group: "navigate" | "action";
+  group: "ai" | "navigate" | "action";
 }
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const router = useRouter();
+  const {
+    open: openAsk,
+    newChat,
+    focusSearch,
+    focusComposer,
+  } = useAsk();
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   const allCommands: Command[] = [
+    {
+      id: "ai-open-ask",
+      label: "Open Ask",
+      description: "Ask Ultrametrics anything",
+      icon: Sparkles,
+      shortcut: "A",
+      group: "ai",
+      action: () => openAsk(),
+    },
+    {
+      id: "ai-new-conversation",
+      label: "New Conversation",
+      description: "Start a fresh chat",
+      icon: Plus,
+      shortcut: "N",
+      group: "ai",
+      action: () => {
+        openAsk();
+        newChat();
+      },
+    },
+    {
+      id: "ai-search-conversations",
+      label: "Search Conversations",
+      description: "Find a past chat",
+      icon: Search,
+      shortcut: "/",
+      group: "ai",
+      action: () => {
+        openAsk();
+        focusSearch();
+      },
+    },
+    {
+      id: "ai-focus-composer",
+      label: "Focus Composer",
+      description: "Jump to the Ask input",
+      icon: MessageSquare,
+      shortcut: "Shift+A",
+      group: "ai",
+      action: () => {
+        openAsk();
+        focusComposer();
+      },
+    },
     {
       id: "nav-overview",
       label: "Overview",
@@ -169,6 +224,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     item?.scrollIntoView({ block: "nearest" });
   }, [activeIdx]);
 
+  const aiCmds = filtered.filter((c) => c.group === "ai");
   const navCmds = filtered.filter((c) => c.group === "navigate");
   const actionCmds = filtered.filter((c) => c.group === "action");
 
@@ -284,6 +340,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                   </li>
                 ) : (
                   <>
+                    {renderGroup(aiCmds, "AI Commands")}
                     {renderGroup(navCmds, "Navigate")}
                     {renderGroup(actionCmds, "Actions")}
                   </>

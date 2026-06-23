@@ -268,7 +268,7 @@ function SidebarRail({
       {onCommandOpen && (
         <button
           onClick={onCommandOpen}
-          className="mb-2 flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 type-body text-foreground-muted transition-all duration-200 hover:border-brand/30 hover:bg-brand/10 hover:text-foreground"
+          className="mb-2 flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 type-body text-foreground-muted transition-all duration-200 hover:border-brand/30 hover:bg-brand/10 hover:text-foreground active:border-brand/40 active:bg-brand/15"
         >
           <Search className="h-[15px] w-[15px] shrink-0" strokeWidth={1.7} />
           <span className="flex-1 text-left">Ask Ultrametrics</span>
@@ -287,7 +287,7 @@ function SidebarRail({
         className={cn(
           "group relative flex items-center gap-3 rounded-lg border px-3 py-2 type-body transition-all duration-200",
           isAskOpen
-            ? "border-brand/40 bg-brand/15 text-foreground"
+            ? "border-brand/40 bg-brand/15 text-foreground shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
             : "border-transparent text-foreground-muted hover:border-brand/30 hover:bg-brand/10 hover:text-foreground"
         )}
       >
