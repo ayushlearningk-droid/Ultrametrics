@@ -12,7 +12,7 @@
  * plain markdown until a section is complete).
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   TrendingUp,
   Lightbulb,
@@ -33,6 +33,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/os/markdown";
+import {
+  enqueueAction,
+  removeAction,
+  type ActionInput,
+  type ActionPriority,
+} from "@/lib/stores/action-queue";
 
 /* ── Parsing ─────────────────────────────────────────────────────────────── */
 
@@ -1097,20 +1103,46 @@ function RootCauseCard({
         </>
       )}
 
-      {/* ── Action Center footer: non-executing Approve (UI-only) ── */}
+      {/* ── Action Center footer: Approve → shared Action Queue ── */}
       <div className="mt-3.5 flex justify-end">
-        <ApproveButton />
+        <ApproveButton
+          action={{
+            title: data.cause,
+            source: "Ask Ultrametrics",
+            type: "fix",
+            priority: severityToPriority(data.severity),
+          }}
+        />
       </div>
     </div>
   );
 }
 
 /** Priority derived from the UI-inferred recommendation rank (1 = highest). */
-function priorityFromRank(rank: number | null): string | null {
+function priorityFromRank(rank: number | null): ActionPriority | null {
   if (rank === null) return null;
   if (rank <= 1) return "High";
   if (rank === 2) return "Medium";
   return "Low";
+}
+
+/** Coarse action kind inferred from the recommendation title (Action Queue). */
+function inferActionType(title: string): string {
+  const t = title.toLowerCase();
+  if (/\b(pause|stop|disable|turn off)\b/.test(t)) return "pause";
+  if (/\b(scale|increase|raise|boost|expand)\b/.test(t)) return "scale";
+  if (/\b(budget|spend|reallocat|shift|tcpa|cpa|bid)\b/.test(t)) return "budget";
+  return "recommendation";
+}
+
+/** Map a root-cause severity to an Action Queue priority. */
+function severityToPriority(
+  severity: CauseSeverity | null
+): ActionPriority | undefined {
+  if (severity === "critical" || severity === "high") return "High";
+  if (severity === "medium") return "Medium";
+  if (severity === "low") return "Low";
+  return undefined;
 }
 
 /** Compact summary of the top estimated-impact range (header chip). */
@@ -1125,13 +1157,33 @@ function impactSummary(impact: ImpactData | null): string | null {
  * Action Center (Sprint 7, Phase 1) — non-executing Approve control. UI-only
  * local state: toggles Approve ⇄ Approved. No persistence, no API, no execution.
  */
-function ApproveButton() {
+function ApproveButton({ action }: { action?: ActionInput }) {
   const [approved, setApproved] = useState(false);
+  // Id of the queue entry this button created, so un-approving removes exactly
+  // that entry. Null when nothing is enqueued. (Side effects run in the click
+  // handler, not in the state updater — avoids double-enqueue in Strict Mode.)
+  const queueIdRef = useRef<string | null>(null);
+
+  const toggle = () => {
+    if (!approved) {
+      if (action && queueIdRef.current === null) {
+        queueIdRef.current = enqueueAction(action);
+      }
+      setApproved(true);
+    } else {
+      if (queueIdRef.current !== null) {
+        removeAction(queueIdRef.current);
+        queueIdRef.current = null;
+      }
+      setApproved(false);
+    }
+  };
+
   return (
     <button
       type="button"
       aria-pressed={approved}
-      onClick={() => setApproved((v) => !v)}
+      onClick={toggle}
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors",
         approved
@@ -1189,6 +1241,14 @@ function OpportunityCard({
   // Action Center (Phase 1): priority from rank + a prominent impact chip.
   const priority = priorityFromRank(rank);
   const impactStr = impactSummary(impact);
+  // Sprint 9: payload enqueued into the shared Action Queue on Approve.
+  const approveAction: ActionInput = {
+    title,
+    source: "Ask Ultrametrics",
+    type: inferActionType(title),
+    priority: priority ?? undefined,
+    expectedImpact: impactStr ?? undefined,
+  };
 
   return (
     <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
@@ -1263,7 +1323,7 @@ function OpportunityCard({
             </button>
           )}
         </div>
-        <ApproveButton />
+        <ApproveButton action={approveAction} />
       </div>
     </div>
   );
