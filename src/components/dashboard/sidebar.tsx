@@ -268,7 +268,7 @@ function SidebarRail({
       {onCommandOpen && (
         <button
           onClick={onCommandOpen}
-          className="mb-2 flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 type-body text-foreground-muted transition-all duration-200 hover:border-brand/30 hover:bg-brand/10 hover:text-foreground hover:shadow-[0_0_0_1px_rgba(16,185,129,0.15)] active:border-brand/40 active:bg-brand/15 active:text-foreground active:shadow-[0_0_0_1px_rgba(16,185,129,0.25)]"
+          className="mb-2 flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 type-body text-foreground-muted transition-all duration-200 hover:border-brand/40 hover:bg-brand/15 hover:text-foreground hover:shadow-[0_0_0_1px_rgba(16,185,129,0.35)] active:border-brand/50 active:bg-brand/20 active:text-foreground active:shadow-[0_0_0_1px_rgba(16,185,129,0.45)]"
         >
           <Search className="h-[15px] w-[15px] shrink-0" strokeWidth={1.7} />
           <span className="flex-1 text-left">Ask Ultrametrics</span>
