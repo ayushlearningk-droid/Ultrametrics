@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Menu, Search } from "lucide-react";
+import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { NotificationCenter } from "@/components/dashboard/notification-center";
@@ -27,20 +29,20 @@ export function DashboardShell({
   currentWorkspaceId,
   workspaceName,
 }: DashboardShellProps) {
+  const router = useRouter();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  useEffect(() => {
-    function handler(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setCmdOpen((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  // Global shortcuts reachable outside AskProvider: command palette + G-chord nav.
+  // (A / N / / / ? live inside AskProvider — wired in the next phase.)
+  useKeyboardShortcuts([
+    { combo: "mod+k", handler: () => setCmdOpen((v) => !v) },
+    { combo: "g c", handler: () => router.push("/dashboard/connectors") },
+    { combo: "g r", handler: () => router.push("/dashboard/reports") },
+    { combo: "g t", handler: () => router.push("/dashboard/timeline") },
+    { combo: "g s", handler: () => router.push("/dashboard/settings") },
+  ]);
 
   return (
     <AskProvider workspaceId={currentWorkspaceId}>
