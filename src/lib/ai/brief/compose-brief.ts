@@ -280,10 +280,21 @@ export async function composeBrief(input: {
     (watchCount > 0 ? `, ${watchCount} watch-out${watchCount === 1 ? "" : "s"}.` : ".");
 
   // Insight cards via relay markdown (reuses AiResponse cards).
+  // Morning Brief V2 — Phase 1: order = Top Opportunity → Top Risk → Trend →
+  // remaining Recommendations. The highest opportunity_score recommendation is
+  // the Top Opportunity (emitted first → the rank-1 OpportunityCard) and is
+  // excluded from the remaining list so it never renders twice. Reuses the
+  // existing recToMarkdown (recommendation heading → OpportunityCard).
+  const sortedRecs = [...recs].sort(
+    (a, b) => (b.opportunity_score ?? -1) - (a.opportunity_score ?? -1)
+  );
+  const [topOpportunity, ...restRecs] = sortedRecs;
+
   const blocks: string[] = [];
-  for (const r of recs.slice(0, 3)) blocks.push(recToMarkdown(r));
+  if (topOpportunity) blocks.push(recToMarkdown(topOpportunity));
   if (causes[0]) blocks.push(causeToMarkdown(causes[0]));
   if (trendMetrics.length > 0) blocks.push(trendsToMarkdown(trendMetrics));
+  for (const r of restRecs.slice(0, 2)) blocks.push(recToMarkdown(r));
 
   return {
     greeting: greeting(),
