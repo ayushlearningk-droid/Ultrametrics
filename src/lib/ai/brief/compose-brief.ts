@@ -39,6 +39,13 @@ export interface BriefData {
   kpis: BriefKpi[];
   /** Relay-format markdown rendered by <AiResponse> into existing cards. */
   cardsMarkdown: string;
+  /** Morning Brief V2 — per-section relay markdown, each rendered by its own
+   *  <AiResponse>. All optional so legacy consumers (fallbackBrief) and the
+   *  no_data path stay valid; cardsMarkdown is retained for backward-compat. */
+  topOpportunityMarkdown?: string;
+  topRiskMarkdown?: string;
+  trendMarkdown?: string;
+  recommendationsMarkdown?: string;
 }
 
 /* ── Loose shapes of the tool-result JSON we read ─────────────────────────── */
@@ -290,11 +297,26 @@ export async function composeBrief(input: {
   );
   const [topOpportunity, ...restRecs] = sortedRecs;
 
-  const blocks: string[] = [];
-  if (topOpportunity) blocks.push(recToMarkdown(topOpportunity));
-  if (causes[0]) blocks.push(causeToMarkdown(causes[0]));
-  if (trendMetrics.length > 0) blocks.push(trendsToMarkdown(trendMetrics));
-  for (const r of restRecs.slice(0, 2)) blocks.push(recToMarkdown(r));
+  // Per-section relay markdown (each rendered by its own <AiResponse>).
+  const topOpportunityMarkdown = topOpportunity
+    ? recToMarkdown(topOpportunity)
+    : undefined;
+  const topRiskMarkdown = causes[0] ? causeToMarkdown(causes[0]) : undefined;
+  const trendMarkdown =
+    trendMetrics.length > 0 ? trendsToMarkdown(trendMetrics) : undefined;
+  const recBlocks = restRecs.slice(0, 2).map((r) => recToMarkdown(r));
+  const recommendationsMarkdown =
+    recBlocks.length > 0 ? recBlocks.join("\n\n") : undefined;
+
+  // Backward-compat single blob (same order as the sections above).
+  const cardsMarkdown = [
+    topOpportunityMarkdown,
+    topRiskMarkdown,
+    trendMarkdown,
+    recommendationsMarkdown,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   return {
     greeting: greeting(),
@@ -308,6 +330,10 @@ export async function composeBrief(input: {
     currency,
     summary,
     kpis,
-    cardsMarkdown: blocks.join("\n\n"),
+    cardsMarkdown,
+    topOpportunityMarkdown,
+    topRiskMarkdown,
+    trendMarkdown,
+    recommendationsMarkdown,
   };
 }
