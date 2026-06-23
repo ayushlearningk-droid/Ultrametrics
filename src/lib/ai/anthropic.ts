@@ -145,6 +145,26 @@ export async function* streamWorkspaceChat(
       usage: { inputTokens, outputTokens },
     };
   } catch (err) {
+    // Phase 1 (debug instrumentation): the request is failing before generation
+    // (inputTokens=0 / stopReason=error). Surface the FULL Anthropic error so we
+    // can see the status, error type, and request-validation message. Logging
+    // only — the behaviour below is unchanged.
+    if (err instanceof Anthropic.APIError) {
+      const body = err.error as
+        | { error?: { type?: string; message?: string } }
+        | undefined;
+      console.error("[ANTHROPIC FULL ERROR]", JSON.stringify(err.error ?? null, null, 2));
+      console.error("[ANTHROPIC STATUS]", err.status);
+      console.error("[ANTHROPIC TYPE]", body?.error?.type ?? err.name);
+      console.error("[ANTHROPIC VALIDATION]", body?.error?.message ?? err.message);
+    } else {
+      console.error("[ANTHROPIC FULL ERROR]", err);
+      console.error("[ANTHROPIC STATUS]", "n/a (non-API error)");
+      console.error(
+        "[ANTHROPIC TYPE]",
+        err instanceof Error ? err.name : typeof err
+      );
+    }
     yield {
       type: "error",
       message: err instanceof Error ? err.message : String(err),
