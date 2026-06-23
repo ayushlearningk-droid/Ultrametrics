@@ -458,6 +458,48 @@ export type Database = {
           updated_at?: string;
         };
       };
+      ai_usage: {
+        Relationships: [];
+        Row: {
+          id: string;
+          workspace_id: string;
+          user_id: string;
+          model: string;
+          escalated: boolean;
+          route_reason: string | null;
+          input_tokens: number;
+          output_tokens: number;
+          tool_rounds: number;
+          stop_reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          user_id: string;
+          model: string;
+          escalated?: boolean;
+          route_reason?: string | null;
+          input_tokens?: number;
+          output_tokens?: number;
+          tool_rounds?: number;
+          stop_reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          user_id?: string;
+          model?: string;
+          escalated?: boolean;
+          route_reason?: string | null;
+          input_tokens?: number;
+          output_tokens?: number;
+          tool_rounds?: number;
+          stop_reason?: string | null;
+          created_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -487,3 +529,8 @@ export type ActionQueueInsert =
   Database["public"]["Tables"]["action_queue"]["Insert"];
 export type ActionQueueUpdate =
   Database["public"]["Tables"]["action_queue"]["Update"];
+export type AiUsageRow = Database["public"]["Tables"]["ai_usage"]["Row"];
+export type AiUsageInsert =
+  Database["public"]["Tables"]["ai_usage"]["Insert"];
+export type AiUsageUpdate =
+  Database["public"]["Tables"]["ai_usage"]["Update"];

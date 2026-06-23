@@ -27,6 +27,23 @@ const MAX_OUTPUT_TOKENS = 4096;
 /** Hard ceiling on tool round-trips within a single turn. */
 const MAX_TOOL_ROUNDS = 5;
 
+/** Transient-overload retry policy (overloaded_error / HTTP 529). */
+const OVERLOAD_MAX_ATTEMPTS = 3;
+/** Delay BEFORE each attempt: attempt 1 immediate, attempt 2 +1s, attempt 3 +2s. */
+const OVERLOAD_DELAYS_MS = [0, 1000, 2000];
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** True for a transient Anthropic overload (retryable pre-generation). */
+function isOverloaded(err: unknown): boolean {
+  if (!(err instanceof Anthropic.APIError)) return false;
+  if (err.status === 529) return true;
+  const body = err.error as { error?: { type?: string } } | undefined;
+  return body?.error?.type === "overloaded_error";
+}
+
 let client: Anthropic | null = null;
 
 /** Lazy singleton. Throws a clear error if the API key is missing. */
@@ -70,26 +87,50 @@ export async function* streamWorkspaceChat(
     const anthropic = getAnthropicClient();
 
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-      const stream = anthropic.messages.stream({
-        model: decision.model,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        system,
-        messages,
-        tools,
-        thinking: decision.thinking,
-        output_config: { effort: decision.effort },
-      });
+      // Resilient open: retry transient Anthropic overload (overloaded_error /
+      // HTTP 529) up to OVERLOAD_MAX_ATTEMPTS, but ONLY while no text has been
+      // streamed this attempt (overload occurs pre-generation, so re-opening
+      // can't double-emit). Schedule: attempt 1 immediate, +1000ms, +2000ms.
+      let final: Anthropic.Message | undefined;
+      for (let attempt = 1; ; attempt++) {
+        let textThisAttempt = false;
+        try {
+          const stream = anthropic.messages.stream({
+            model: decision.model,
+            max_tokens: MAX_OUTPUT_TOKENS,
+            system,
+            messages,
+            tools,
+            thinking: decision.thinking,
+            output_config: { effort: decision.effort },
+          });
 
-      for await (const event of stream) {
-        if (
-          event.type === "content_block_delta" &&
-          event.delta.type === "text_delta"
-        ) {
-          yield { type: "text", delta: event.delta.text };
+          for await (const event of stream) {
+            if (
+              event.type === "content_block_delta" &&
+              event.delta.type === "text_delta"
+            ) {
+              textThisAttempt = true;
+              yield { type: "text", delta: event.delta.text };
+            }
+          }
+
+          final = await stream.finalMessage();
+          break;
+        } catch (err) {
+          if (
+            isOverloaded(err) &&
+            !textThisAttempt &&
+            attempt < OVERLOAD_MAX_ATTEMPTS
+          ) {
+            await delay(OVERLOAD_DELAYS_MS[attempt]);
+            continue;
+          }
+          throw err;
         }
       }
-
-      const final = await stream.finalMessage();
+      // The loop only exits via break (final set) or a rethrow.
+      if (!final) throw new Error("Model stream produced no final message");
       inputTokens += final.usage.input_tokens;
       outputTokens += final.usage.output_tokens;
       stopReason = final.stop_reason;

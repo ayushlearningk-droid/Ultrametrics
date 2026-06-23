@@ -12,6 +12,8 @@
  * runs with AI_ENFORCE=false.
  */
 
+import { recordUsage } from "@/lib/data/ai-usage";
+
 export interface PlanLimits {
   /** Informational monthly token budget (enforced in Phase 2). */
   monthlyTokenBudget: number;
@@ -122,4 +124,7 @@ export interface UsageLogEntry {
 
 export function logUsage(entry: UsageLogEntry): void {
   console.log("[ai.usage]", JSON.stringify(entry));
+  // Sprint 11: best-effort persistence into ai_usage. Fire-and-forget — never
+  // awaited, never throws, so it cannot block or fail the chat turn.
+  void recordUsage(entry);
 }
