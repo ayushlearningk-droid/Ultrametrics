@@ -165,7 +165,6 @@ export function ConversationRow({
               <button
                 type="button"
                 aria-label="Conversation actions"
-                onClick={(e) => e.stopPropagation()}
                 className="flex h-6 w-6 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:opacity-100 data-[state=open]:bg-white/[0.06] data-[state=open]:text-foreground"
               >
                 <MoreHorizontal className="h-3.5 w-3.5" />
