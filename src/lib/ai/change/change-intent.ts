@@ -32,10 +32,11 @@ const METRIC_PATTERNS: ReadonlyArray<[RegExp, ChangeMetric]> = [
 /**
  * Directional CHANGE verbs (a metric moving over time), stemmed to catch tense
  * variants: drop/dropped, fell/fall, rose/rise/rising, increase/increased,
- * decrease/declining, grew/grow, jump/spike/surge, "went up/down".
+ * decrease/declining, grew/grow, jump/spike/surge, "went up/down", and the
+ * neutral "change/changed/changing" (e.g. "why did ROAS change").
  */
 const CHANGE_VERB =
-  /\b(drop|dropp|fell|fall|fall?en|declin|decreas|rose|ris(?:e|ing|en)|increas|grew|grow|jump|spike|surg|plummet|tank|went up|went down|going up|going down)\w*/i;
+  /\b(drop|dropp|fell|fall|fall?en|declin|decreas|rose|ris(?:e|ing|en)|increas|grew|grow|jump|spike|surg|plummet|tank|chang|went up|went down|going up|going down)\w*/i;
 
 /** Explicit "what changed / what's changing" phrasing (metric may be unnamed). */
 const WHAT_CHANGED = /\bwhat(?:'s|s| has| have| is| are)?\s+chang\w*/i;
