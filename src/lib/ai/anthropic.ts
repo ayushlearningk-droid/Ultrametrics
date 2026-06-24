@@ -156,11 +156,17 @@ export async function* streamWorkspaceChat(
         let resultText: string;
         let isError = false;
         try {
-          resultText = await dispatchTool(
-            use.name,
-            (use.input ?? {}) as Record<string, unknown>,
-            ctx
-          );
+          let toolInput = (use.input ?? {}) as Record<string, unknown>;
+          // Sprint 12: resolve the change-analysis period DETERMINISTICALLY from
+          // the query's date phrasing (router-detected), overriding whatever the
+          // model supplied — so "yesterday" → day, never left to model inference.
+          if (
+            use.name === "get_change_analysis" &&
+            decision.changeIntent?.period
+          ) {
+            toolInput = { ...toolInput, period: decision.changeIntent.period };
+          }
+          resultText = await dispatchTool(use.name, toolInput, ctx);
         } catch (err) {
           isError = true;
           resultText = err instanceof Error ? err.message : String(err);

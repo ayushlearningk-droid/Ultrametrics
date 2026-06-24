@@ -13,12 +13,22 @@
 
 import type { ChangeMetric } from "@/lib/ai/change/change-analysis";
 
+/** Comparison period for get_change_analysis (mirrors the tool's enum). */
+export type ChangePeriod = "day" | "week" | "month";
+
 /** A detected change question: always routes to get_change_analysis. */
 export interface ChangeIntent {
   /** The tool this intent must route to. Constant by construction. */
   tool: "get_change_analysis";
   /** The headline metric when one is named; null for a generic "what changed". */
   metric: ChangeMetric | null;
+  /**
+   * Deterministically extracted comparison period from the query's date phrasing
+   * ("yesterday" → day, "this week" → week, …), or null when none is stated. The
+   * dispatch layer injects this into the tool args so the period is NEVER left to
+   * the model to infer.
+   */
+  period: ChangePeriod | null;
 }
 
 /** Metric name → ChangeMetric, in priority order (first match wins). */
@@ -53,6 +63,28 @@ function detectMetric(message: string): ChangeMetric | null {
 }
 
 /**
+ * Date-phrasing → comparison period, checked in order (day, week, month; first
+ * match wins). Deterministic — the period is resolved here, never inferred by
+ * the model. Returns null when no period phrase is present (caller defaults).
+ */
+const PERIOD_PATTERNS: ReadonlyArray<[RegExp, ChangePeriod]> = [
+  [
+    /\b(yesterday|today|last 24[- ]?hours|past 24[- ]?hours|day[- ]over[- ]day|daily)\b/i,
+    "day",
+  ],
+  [/\b(this week|week[- ]over[- ]week|weekly)\b/i, "week"],
+  [/\b(this month|month[- ]over[- ]month|monthly)\b/i, "month"],
+];
+
+/** Extract an explicit comparison period from the query, or null. */
+export function extractPeriod(message: string): ChangePeriod | null {
+  for (const [pattern, period] of PERIOD_PATTERNS) {
+    if (pattern.test(message)) return period;
+  }
+  return null;
+}
+
+/**
  * Classify a message as a Change Intelligence question, or null.
  *
  * A change question is either:
@@ -65,13 +97,14 @@ function detectMetric(message: string): ChangeMetric | null {
  */
 export function detectChangeIntent(message: string): ChangeIntent | null {
   const metric = detectMetric(message);
+  const period = extractPeriod(message);
 
   if (WHAT_CHANGED.test(message)) {
-    return { tool: "get_change_analysis", metric };
+    return { tool: "get_change_analysis", metric, period };
   }
 
   if (metric && CHANGE_VERB.test(message)) {
-    return { tool: "get_change_analysis", metric };
+    return { tool: "get_change_analysis", metric, period };
   }
 
   return null;
