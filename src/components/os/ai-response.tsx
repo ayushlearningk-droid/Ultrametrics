@@ -39,6 +39,7 @@ import {
   type ActionInput,
   type ActionPriority,
 } from "@/lib/stores/action-queue";
+import type { ActionRecommendation } from "@/lib/ai/types";
 
 /* ── Parsing ─────────────────────────────────────────────────────────────── */
 
@@ -1219,6 +1220,7 @@ function OpportunityCard({
   impact,
   body,
   onPrompt,
+  structured,
 }: {
   heading: string | null;
   /** UI-inferred 1-based rank among recommendation cards in this answer. */
@@ -1231,6 +1233,8 @@ function OpportunityCard({
   /** Marker-stripped body, used only for the markdown fallback. */
   body: string;
   onPrompt?: (text: string) => void;
+  /** Sprint 13B: guaranteed structured recommendation for this card, or null. */
+  structured?: ActionRecommendation | null;
 }) {
   const evidence = breakdown?.evidence ?? null;
   // CTA is rendered as a button even in the fallback path: parse it independently
@@ -1242,12 +1246,25 @@ function OpportunityCard({
   const priority = priorityFromRank(rank);
   const impactStr = impactSummary(impact);
   // Sprint 9: payload enqueued into the shared Action Queue on Approve.
+  // Sprint 13B: when a GUARANTEED structured recommendation is present, carry its
+  // real provider/entity/action_type/params (verbatim from the server — never
+  // parsed from this card's prose). `type` (legacy coarse text) is unchanged;
+  // the structured action_type comes only from `structured`, never inferActionType.
   const approveAction: ActionInput = {
     title,
     source: "Ask Ultrametrics",
     type: inferActionType(title),
     priority: priority ?? undefined,
     expectedImpact: impactStr ?? undefined,
+    ...(structured
+      ? {
+          provider: structured.provider,
+          entityLevel: structured.entityLevel,
+          entityId: structured.entityId,
+          actionType: structured.actionType,
+          paramsJson: structured.params,
+        }
+      : {}),
   };
 
   return (
@@ -1465,11 +1482,35 @@ export interface AiResponseProps {
   content: string;
   /** Interactive CTA handler (reuses the existing send path). Optional. */
   onPrompt?: (text: string) => void;
+  /** Sprint 13B: structured recommendations for THIS turn (grounded). */
+  recommendations?: ActionRecommendation[];
 }
 
 /** Render an AI markdown answer as structured cards, with markdown fallback. */
-export function AiResponse({ content, onPrompt }: AiResponseProps) {
+export function AiResponse({
+  content,
+  onPrompt,
+  recommendations,
+}: AiResponseProps) {
   const sections = parseSections(content);
+
+  // Sprint 13B (Option C, safe persistence): attach a structured payload to the
+  // Approve action ONLY when the association is GUARANTEED — exactly ONE
+  // structured recommendation in the turn AND exactly ONE rendered
+  // recommendation card. Otherwise the approval persists text-only (NULL
+  // structured fields). Never matched by title, prose, or position.
+  const recCardCount = sections.filter((section) => {
+    if (parseRootCause(section.body)) return false;
+    const bd = parseBreakdown(section.body);
+    const view = bd
+      ? { ...section, body: stripBreakdown(section.body) }
+      : section;
+    return classify(view).kind === "recommendation";
+  }).length;
+  const guaranteedRec =
+    recommendations && recommendations.length === 1 && recCardCount === 1
+      ? recommendations[0]
+      : null;
 
   // No headings → nothing to structure; render straight markdown — unless the
   // whole answer is a ranking table, which still deserves a leaderboard card.
@@ -1538,6 +1579,7 @@ export function AiResponse({ content, onPrompt }: AiResponseProps) {
                 impact={impact}
                 body={cardBody}
                 onPrompt={onPrompt}
+                structured={guaranteedRec}
               />
             </div>
           );

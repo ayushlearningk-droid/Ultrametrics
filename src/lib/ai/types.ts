@@ -9,6 +9,7 @@
  */
 
 import type { MetricsProvider } from "@/lib/metrics/types";
+import type { ChangeIntent } from "@/lib/ai/change/change-intent";
 
 /** The two models Phase 1 routes between. */
 export type AiModel = "claude-sonnet-4-6" | "claude-opus-4-8";
@@ -25,6 +26,24 @@ export type AiEffort = "low" | "medium" | "high";
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+/**
+ * Sprint 13B: structured, executable recommendation metadata surfaced from the
+ * server's get_recommendations tool result to the client — the ONLY grounded
+ * carrier of provider/entity/action (the rendered card is prose and cannot be
+ * trusted for these). `actionType` is null unless the kind maps unambiguously to
+ * a supported action (never guessed). `params` is reserved (null in 13B).
+ */
+export interface ActionRecommendation {
+  provider: string;
+  entityLevel: "account" | "campaign" | "ad";
+  entityId: string;
+  actionType: "PAUSE_CAMPAIGN" | "RESUME_CAMPAIGN" | "ADJUST_BUDGET" | null;
+  /** The server-authored action line (used only as a display title). */
+  title: string;
+  /** Typed action params (e.g. budget). Always null until a later sprint. */
+  params: Record<string, unknown> | null;
 }
 
 /**
@@ -62,6 +81,13 @@ export interface RouteDecision {
   escalated: boolean;
   /** Human-readable rationale, logged for cost telemetry. */
   reason: string;
+  /**
+   * Sprint 12: detected Change Intelligence intent ("why did ROAS drop", etc.),
+   * or null. When present, the turn must route to get_change_analysis — never
+   * get_root_cause. Surfaced for telemetry/steering; tool invocation stays
+   * model-driven under the system-prompt guard.
+   */
+  changeIntent: ChangeIntent | null;
 }
 
 /** Normalized stream events emitted by streamWorkspaceChat. */
@@ -69,6 +95,8 @@ export type ChatStreamEvent =
   | { type: "model"; model: AiModel; reason: string }
   | { type: "text"; delta: string }
   | { type: "tool_call"; name: string }
+  // Sprint 13B: structured recommendations for this turn (from get_recommendations).
+  | { type: "recommendations"; items: ActionRecommendation[] }
   | {
       type: "done";
       model: AiModel;

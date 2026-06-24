@@ -48,8 +48,16 @@ const PROMPT_CHIPS: { label: string; prompt: string }[] = [
 ];
 
 export function AskDrawer() {
-  const { messages, streaming, error, isOpen, close, send, composerFocusSignal } =
-    useAsk();
+  const {
+    messages,
+    streaming,
+    error,
+    isOpen,
+    close,
+    send,
+    composerFocusSignal,
+    turnRecommendations,
+  } = useAsk();
 
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -212,6 +220,13 @@ export function AskDrawer() {
                     i === messages.length - 1
                   }
                   onPrompt={sendPrompt}
+                  // Sprint 13B: attach structured recs ONLY to the exact message
+                  // they belong to (never to historical turns).
+                  recommendations={
+                    turnRecommendations && turnRecommendations.index === i
+                      ? turnRecommendations.items
+                      : undefined
+                  }
                 />
               ))}
 

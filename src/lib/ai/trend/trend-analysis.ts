@@ -17,9 +17,21 @@
  */
 
 import type { MetricTotals } from "@/lib/metrics/types";
-import { MIN_IMPRESSIONS, MIN_CLICKS } from "@/lib/ai/thresholds";
+import { MIN_IMPRESSIONS, MIN_CLICKS, MIN_SPEND } from "@/lib/ai/thresholds";
 
-export type TrendMetric = "ctr" | "cpc" | "cpm" | "conversions";
+export type TrendMetric =
+  | "ctr"
+  | "cpc"
+  | "cpm"
+  | "conversions"
+  // Sprint 12 Phase A: headline ratio + raw drivers for change decomposition.
+  // roas is a headline ratio; revenue/spend/clicks/impressions are the raw
+  // inputs the Change Intelligence Engine decomposes a ratio change into.
+  | "roas"
+  | "revenue"
+  | "spend"
+  | "clicks"
+  | "impressions";
 
 export type TrendStatus =
   | "improving"
@@ -27,7 +39,7 @@ export type TrendStatus =
   | "declining"
   | "insufficient_data";
 
-type Polarity = "higher_better" | "lower_better";
+type Polarity = "higher_better" | "lower_better" | "neutral";
 
 export interface MetricTrend {
   metric: TrendMetric;
@@ -57,6 +69,15 @@ const POLARITY: Record<TrendMetric, Polarity> = {
   cpc: "lower_better",
   cpm: "lower_better",
   conversions: "higher_better",
+  roas: "higher_better",
+  revenue: "higher_better",
+  clicks: "higher_better",
+  impressions: "higher_better",
+  // spend carries no good/bad polarity on its own — a rise or fall is neither
+  // "improving" nor "declining" without context. It exists here as a decomposition
+  // driver; its magnitude lives in changePct, and statusFor returns a neutral
+  // "stable" so spend is never surfaced as a misleading trend arrow.
+  spend: "neutral",
 };
 
 function valueOf(metric: TrendMetric, t: MetricTotals): number {
@@ -69,6 +90,16 @@ function valueOf(metric: TrendMetric, t: MetricTotals): number {
       return t.cpm;
     case "conversions":
       return t.conversions;
+    case "roas":
+      return t.roas;
+    case "revenue":
+      return t.revenue;
+    case "spend":
+      return t.spend;
+    case "clicks":
+      return t.clicks;
+    case "impressions":
+      return t.impressions;
   }
 }
 
@@ -89,16 +120,30 @@ function hasVolume(
         cur.impressions >= MIN_IMPRESSIONS && prev.impressions >= MIN_IMPRESSIONS
       );
     case "cpc":
+    case "clicks":
       return cur.clicks >= MIN_CLICKS && prev.clicks >= MIN_CLICKS;
     case "conversions":
       return prev.conversions > 0;
+    case "roas":
+    case "spend":
+      // Ratio rests on spend; raw spend needs a non-zero previous to form a ratio.
+      return cur.spend >= MIN_SPEND && prev.spend >= MIN_SPEND;
+    case "revenue":
+      return prev.revenue > 0;
+    case "impressions":
+      return (
+        cur.impressions >= MIN_IMPRESSIONS && prev.impressions >= MIN_IMPRESSIONS
+      );
   }
 }
 
 function statusFor(metric: TrendMetric, changePct: number): TrendStatus {
   if (Math.abs(changePct) < STABLE_BAND) return "stable";
+  const polarity = POLARITY[metric];
+  // Neutral metrics (spend) carry no good/bad direction — never assert an arrow.
+  if (polarity === "neutral") return "stable";
   const up = changePct > 0;
-  const improving = POLARITY[metric] === "higher_better" ? up : !up;
+  const improving = polarity === "higher_better" ? up : !up;
   return improving ? "improving" : "declining";
 }
 

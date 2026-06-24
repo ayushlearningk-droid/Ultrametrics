@@ -57,7 +57,10 @@ const META_ADS: ProviderCapabilities = {
   provider: "meta_ads",
   kind: "ads",
   rawMetrics: ["spend", "impressions", "clicks", "conversions", "reach", "revenue"],
-  derivedMetrics: ["ctr", "cpc", "cpm", "roas", "conversion_rate"],
+  // conversion_rate is in the DerivedKey catalog but is NOT computed by toTotals/
+  // derive.ts nor serialized by the metrics tools, so advertising it here caused
+  // the model to invent a value when asked. Removed until it is actually derived.
+  derivedMetrics: ["ctr", "cpc", "cpm", "roas"],
   supportsDaily: true,
   supportsCampaignLevel: true,
   supportsCreativeLevel: true,
@@ -71,7 +74,10 @@ const GOOGLE_ADS: ProviderCapabilities = {
   provider: "google_ads",
   kind: "ads",
   rawMetrics: ["spend", "impressions", "clicks", "conversions", "revenue"],
-  derivedMetrics: ["ctr", "cpc", "cpm", "roas", "conversion_rate"],
+  // conversion_rate is in the DerivedKey catalog but is NOT computed by toTotals/
+  // derive.ts nor serialized by the metrics tools, so advertising it here caused
+  // the model to invent a value when asked. Removed until it is actually derived.
+  derivedMetrics: ["ctr", "cpc", "cpm", "roas"],
   supportsDaily: true,
   supportsCampaignLevel: true,
   currency: "native",
@@ -82,7 +88,10 @@ const GOOGLE_ADS: ProviderCapabilities = {
 const GA4: ProviderCapabilities = {
   provider: "ga4",
   kind: "analytics",
-  rawMetrics: ["sessions", "users", "engaged_sessions", "conversions", "revenue"],
+  // sessions/users/engaged_sessions are in the MetricKey catalog but are NOT
+  // modeled on RawMetricSet nor serialized by the metrics tools, so advertising
+  // them caused the model to invent values. Removed until they are serializable.
+  rawMetrics: ["conversions", "revenue"],
   // engagement_rate is declared in the DerivedKey catalog but is NOT computed by
   // derive.ts nor serialized by the metrics tools, so advertising it here caused
   // the model to invent a value when asked. Removed until it is actually derived.
@@ -97,8 +106,12 @@ const GA4: ProviderCapabilities = {
 const SHOPIFY: ProviderCapabilities = {
   provider: "shopify",
   kind: "commerce",
-  rawMetrics: ["orders", "revenue", "refunds", "sessions"],
-  derivedMetrics: ["aov", "conversion_rate"],
+  // orders/refunds/sessions (raw) and aov/conversion_rate (derived) are in the
+  // catalogs but are NOT modeled on RawMetricSet/computed by toTotals nor
+  // serialized by the metrics tools, so advertising them caused the model to
+  // invent values. Removed until they are serializable.
+  rawMetrics: ["revenue"],
+  derivedMetrics: [],
   supportsDaily: true,
   supportsCampaignLevel: false,
   currency: "native",
@@ -109,16 +122,12 @@ const SHOPIFY: ProviderCapabilities = {
 const TIKTOK: ProviderCapabilities = {
   provider: "tiktok",
   kind: "ads",
-  rawMetrics: [
-    "spend",
-    "impressions",
-    "clicks",
-    "conversions",
-    "reach",
-    "revenue",
-    "video_views",
-  ],
-  derivedMetrics: ["ctr", "cpc", "cpm", "roas", "conversion_rate"],
+  // video_views (raw) and conversion_rate (derived) are in the catalogs but are
+  // NOT modeled on RawMetricSet/computed by toTotals nor serialized by the
+  // metrics tools, so advertising them caused the model to invent values.
+  // Removed until they are serializable.
+  rawMetrics: ["spend", "impressions", "clicks", "conversions", "reach", "revenue"],
+  derivedMetrics: ["ctr", "cpc", "cpm", "roas"],
   supportsDaily: true,
   supportsCampaignLevel: true,
   currency: "native",
@@ -130,7 +139,10 @@ const AMAZON_ADS: ProviderCapabilities = {
   provider: "amazon_ads",
   kind: "ads",
   rawMetrics: ["spend", "impressions", "clicks", "conversions", "revenue"],
-  derivedMetrics: ["ctr", "cpc", "cpm", "roas", "acos", "conversion_rate"],
+  // acos/conversion_rate are in the DerivedKey catalog but are NOT computed by
+  // toTotals nor serialized by the metrics tools, so advertising them caused the
+  // model to invent values. Removed until they are serializable.
+  derivedMetrics: ["ctr", "cpc", "cpm", "roas"],
   supportsDaily: true,
   supportsCampaignLevel: true,
   currency: "native",
@@ -141,8 +153,12 @@ const AMAZON_ADS: ProviderCapabilities = {
 const LINKEDIN_ADS: ProviderCapabilities = {
   provider: "linkedin_ads",
   kind: "ads",
-  rawMetrics: ["spend", "impressions", "clicks", "conversions", "revenue", "leads"],
-  derivedMetrics: ["ctr", "cpc", "cpm", "roas", "conversion_rate"],
+  // leads (raw) and conversion_rate (derived) are in the catalogs but are NOT
+  // modeled on RawMetricSet/computed by toTotals nor serialized by the metrics
+  // tools, so advertising them caused the model to invent values. Removed until
+  // they are serializable.
+  rawMetrics: ["spend", "impressions", "clicks", "conversions", "revenue"],
+  derivedMetrics: ["ctr", "cpc", "cpm", "roas"],
   supportsDaily: true,
   supportsCampaignLevel: true,
   currency: "native",

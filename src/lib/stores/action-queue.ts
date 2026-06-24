@@ -19,6 +19,10 @@ import type { ActionQueueRow } from "@/types/database";
 export type ActionStatus = "pending" | "approved" | "dismissed";
 export type ActionPriority = "High" | "Medium" | "Low";
 
+/** Sprint 13B: structured executable-target vocabularies (mirror the data layer). */
+export type ActionEntityLevel = "account" | "campaign" | "ad";
+export type ActionType = "PAUSE_CAMPAIGN" | "RESUME_CAMPAIGN" | "ADJUST_BUDGET";
+
 export interface QueuedAction {
   id: string;
   title: string;
@@ -28,6 +32,12 @@ export interface QueuedAction {
   expectedImpact?: string;
   priority?: ActionPriority;
   status: ActionStatus;
+  // Sprint 13B: structured executable target (present only when guaranteed).
+  provider?: string;
+  entityLevel?: ActionEntityLevel;
+  entityId?: string;
+  actionType?: ActionType;
+  paramsJson?: Record<string, unknown> | null;
 }
 
 /** Payload an AI card passes when the user approves a recommendation. */
@@ -38,6 +48,12 @@ export interface ActionInput {
   rationale?: string;
   expectedImpact?: string;
   priority?: ActionPriority;
+  // Sprint 13B: structured fields — sent ONLY when association is guaranteed.
+  provider?: string | null;
+  entityLevel?: ActionEntityLevel | null;
+  entityId?: string | null;
+  actionType?: ActionType | null;
+  paramsJson?: Record<string, unknown> | null;
 }
 
 // ── Store internals ──────────────────────────────────────────────────────────
@@ -79,6 +95,12 @@ function mapRow(row: ActionQueueRow): QueuedAction {
     expectedImpact: row.expected_impact ?? undefined,
     priority: row.priority ?? undefined,
     status: row.status,
+    // Sprint 13B: structured target (null on legacy/text-only rows).
+    provider: row.provider ?? undefined,
+    entityLevel: row.entity_level ?? undefined,
+    entityId: row.entity_id ?? undefined,
+    actionType: row.action_type ?? undefined,
+    paramsJson: (row.params_json as Record<string, unknown> | null) ?? null,
   };
 }
 
@@ -133,6 +155,12 @@ export function enqueueAction(input: ActionInput): string {
     expectedImpact: input.expectedImpact,
     priority: input.priority,
     status: "approved",
+    // Sprint 13B: carry structured fields when present (POST body sends them too).
+    ...(input.provider != null ? { provider: input.provider } : {}),
+    ...(input.entityLevel != null ? { entityLevel: input.entityLevel } : {}),
+    ...(input.entityId != null ? { entityId: input.entityId } : {}),
+    ...(input.actionType != null ? { actionType: input.actionType } : {}),
+    ...(input.paramsJson !== undefined ? { paramsJson: input.paramsJson } : {}),
   };
   state = [optimistic, ...state];
   emit();

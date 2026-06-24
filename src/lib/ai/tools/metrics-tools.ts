@@ -68,6 +68,11 @@ import {
 } from "@/lib/ai/trend/trend-analysis";
 import { buildImpactEstimate } from "@/lib/ai/impact";
 import { deriveRootCauses } from "@/lib/ai/root-cause";
+import {
+  deriveChange,
+  type ChangeMetric,
+  type ChangeExplanation,
+} from "@/lib/ai/change";
 
 /** A read tool handler: model-supplied input + server-bound context → JSON string. */
 export type ReadToolHandler = (
@@ -226,6 +231,49 @@ function trendWindows(todayISO: string): {
 } {
   const mid = shiftISO(todayISO, TREND_LOOKBACK_DAYS);
   const start = shiftISO(todayISO, TREND_LOOKBACK_DAYS * 2);
+  return {
+    current: { since: mid, until: todayISO },
+    previous: { since: start, until: mid },
+  };
+}
+
+/* ── Change Intelligence windows (Sprint 12, Phase B) ──────────────────────── */
+
+/** Comparison period the change tool supports → equal-length window lengths. */
+type ChangePeriod = "day" | "week" | "month";
+
+const CHANGE_PERIOD_DAYS: Record<ChangePeriod, number> = {
+  day: 1,
+  week: 7,
+  month: 30,
+};
+
+/** Validate a model-supplied change period; default "week". */
+function asChangePeriod(value: unknown): ChangePeriod {
+  return value === "day" || value === "month" ? value : "week";
+}
+
+const CHANGE_METRICS: readonly ChangeMetric[] = ["roas", "ctr", "cpc", "conversions"];
+
+/** Validate the (required) headline metric to explain a change for. */
+function asChangeMetric(value: unknown): ChangeMetric {
+  if (typeof value === "string" && (CHANGE_METRICS as readonly string[]).includes(value)) {
+    return value as ChangeMetric;
+  }
+  throw new Error(`"metric" must be one of: ${CHANGE_METRICS.join(", ")}`);
+}
+
+/**
+ * Current vs previous EQUAL-length, adjacent, non-overlapping windows for a
+ * `lookbackDays` span. current = [today-N, today]; previous = [today-2N, today-N].
+ * Same shape as trendWindows, parameterized by the change period.
+ */
+function changeWindows(
+  todayISO: string,
+  lookbackDays: number
+): { current: MetricsDateRange; previous: MetricsDateRange } {
+  const mid = shiftISO(todayISO, lookbackDays);
+  const start = shiftISO(todayISO, lookbackDays * 2);
   return {
     current: { since: mid, until: todayISO },
     previous: { since: start, until: mid },
@@ -423,8 +471,14 @@ function serializeCampaigns(
 ) {
   const cap = getCapabilities(provider);
   const { base, meta } = qualify(campaigns, sortBy);
-  const sorted = [...base].sort((a, b) =>
-    compareByKey(a.totals, b.totals, sortBy, order)
+  // Stable, deterministic order: rank by sortBy/order, then break ties on
+  // campaign name (always ascending), then campaign id (unique) — so equal
+  // sort values no longer fall back to arbitrary upstream row order.
+  const sorted = [...base].sort(
+    (a, b) =>
+      compareByKey(a.totals, b.totals, sortBy, order) ||
+      a.campaignName.localeCompare(b.campaignName) ||
+      a.campaignId.localeCompare(b.campaignId)
   );
   const top = sorted.slice(0, TOP_K_CAMPAIGNS);
 
@@ -470,8 +524,14 @@ function serializeAssets(
 ) {
   const cap = getCapabilities(provider);
   const { base, meta } = qualify(assets, sortBy);
-  const sorted = [...base].sort((a, b) =>
-    compareByKey(a.totals, b.totals, sortBy, order)
+  // Stable, deterministic order: rank by sortBy/order, then break ties on ad
+  // name (always ascending), then ad id (unique) — so equal sort values no
+  // longer fall back to arbitrary upstream row order.
+  const sorted = [...base].sort(
+    (a, b) =>
+      compareByKey(a.totals, b.totals, sortBy, order) ||
+      a.assetName.localeCompare(b.assetName) ||
+      a.assetId.localeCompare(b.assetId)
   );
   const top = sorted.slice(0, TOP_K_ASSETS);
 
@@ -637,6 +697,42 @@ function serializeRecommendation(r: Recommendation) {
   // AI-010A: additively overlay breakdown contributions (#1), evidence
   // strength (#3), and the "why" (#2). Reads only — score unchanged.
   return enrichSerialized(base, r);
+}
+
+/**
+ * Compact, relay-ready view of a ChangeExplanation (Sprint 12, Phase B). On
+ * insufficient_data only status/metric/reason are emitted — never numbers or a
+ * cause. Field names are snake_cased to match the other tool payloads.
+ */
+function serializeChange(c: ChangeExplanation) {
+  if (c.status !== "ok") {
+    return {
+      status: c.status,
+      metric: c.metric,
+      ...(c.reason ? { reason: c.reason } : {}),
+    };
+  }
+  return {
+    status: c.status,
+    metric: c.metric,
+    direction: c.direction,
+    change_pct: c.changePct,
+    change_label: c.changeLabel,
+    current: c.current,
+    previous: c.previous,
+    drivers: c.drivers?.map((d) => ({
+      name: d.name,
+      current: d.current,
+      previous: d.previous,
+      change_pct: d.changePct,
+      contribution_share: d.contributionShare,
+    })),
+    ...(c.primaryDriver ? { primary_driver: c.primaryDriver } : {}),
+    attribution: c.attribution,
+    confidence: c.confidence,
+    basis: c.basis,
+    ...(c.caveats ? { caveats: c.caveats } : {}),
+  };
 }
 
 /** Run the rules for one provider result, or [] when it has no usable metrics. */
@@ -983,6 +1079,29 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
     },
   },
   {
+    name: "get_change_analysis",
+    description:
+      "Explain WHY a headline metric CHANGED between two equal-length, adjacent periods (current vs the period immediately before). Use this — and ONLY this — for questions like 'why did ROAS drop?', 'why did CTR increase this week?', 'why did CPC rise?', 'why did conversions fall?'. It returns a grounded, arithmetic decomposition of the change into its real drivers (ROAS → revenue vs spend; CTR → clicks vs impressions; CPC → spend vs clicks; conversions → clicks vs conversion rate), with a primary_driver (or 'mixed' when no single driver dominates), a confidence tier, and the underlying current/previous numbers — all from the two real windows, never inferred. Per source. If a source returns status 'insufficient_data', the change cannot be reliably attributed (windows not comparable, too little volume, or a zero input) — say so plainly and DO NOT guess a cause. Do NOT use get_root_cause for change questions: it is a single-window diagnosis and cannot explain a change over time.",
+    input_schema: {
+      type: "object",
+      properties: {
+        metric: {
+          type: "string",
+          enum: ["roas", "ctr", "cpc", "conversions"],
+          description:
+            "The headline metric whose change to explain. roas → revenue vs spend; ctr → clicks vs impressions; cpc → spend vs clicks; conversions → clicks vs conversion rate.",
+        },
+        period: {
+          type: "string",
+          enum: ["day", "week", "month"],
+          description:
+            "Comparison window length. day = yesterday vs the day before; week = last 7 days vs the prior 7; month = last 30 days vs the prior 30. Default week. Each period compares against the equal-length period immediately before it.",
+        },
+      },
+      required: ["metric"],
+    },
+  },
+  {
     name: "list_connected_providers",
     description:
       "List which data sources are connected to the current workspace and what metrics each can report. Use to answer 'what's connected' or before deciding which source to query.",
@@ -1195,6 +1314,77 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
     });
 
     return JSON.stringify({ dateRange: res.dateRange, providers });
+  },
+
+  // Sprint 12 Phase B: grounded change decomposition. Fetches current + previous
+  // equal-length account windows, gates comparability exactly like the trend
+  // path (both "ok" + windowUsed "range"), then runs the pure deriveChange engine
+  // per provider. deriveChange always returns a value (insufficient_data when the
+  // windows can't be trusted), so a thin/incomparable source is reported, never
+  // fabricated.
+  async get_change_analysis(input, ctx) {
+    const metric = asChangeMetric(input.metric);
+    const period = asChangePeriod(input.period);
+    const lookbackDays = CHANGE_PERIOD_DAYS[period];
+    const { current, previous } = changeWindows(ctx.todayISO, lookbackDays);
+
+    const [curRes, prevRes] = await Promise.all([
+      getMetricsWithFallback(ctx.workspaceId, {
+        dateRange: current,
+        granularity: "total",
+        level: "account",
+        mode: "range",
+      }),
+      getMetricsWithFallback(ctx.workspaceId, {
+        dateRange: previous,
+        granularity: "total",
+        level: "account",
+        mode: "range",
+      }),
+    ]);
+
+    const providers = new Set<MetricsProvider>();
+    for (const p of curRes.providers) providers.add(p.provider);
+    for (const p of prevRes.providers) providers.add(p.provider);
+
+    const out = [...providers].map((provider) => {
+      const cur = curRes.providers.find((p) => p.provider === provider);
+      const prev = prevRes.providers.find((p) => p.provider === provider);
+
+      // Comparable only when BOTH windows are "ok" and used the explicit range
+      // (a lifetime-fallback window is not comparable to a range window).
+      const comparable =
+        cur?.status === "ok" &&
+        prev?.status === "ok" &&
+        cur.windowUsed === "range" &&
+        prev.windowUsed === "range";
+
+      const change = deriveChange(
+        cur?.status === "ok" ? cur.metrics?.totals ?? null : null,
+        prev?.status === "ok" ? prev.metrics?.totals ?? null : null,
+        metric,
+        { comparable: !!comparable, lookbackDays }
+      );
+
+      return {
+        provider,
+        status: cur?.status ?? "no_data",
+        window_used: cur?.windowUsed ?? "range",
+        ...(cur?.status === "ok" && cur.metrics
+          ? { currency: cur.metrics.currency }
+          : {}),
+        change: serializeChange(change),
+      };
+    });
+
+    return JSON.stringify({
+      metric,
+      period,
+      lookback_days: lookbackDays,
+      dateRange: current,
+      previous_range: previous,
+      providers: out,
+    });
   },
 
   async list_connected_providers(_input, ctx) {

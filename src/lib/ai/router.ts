@@ -12,6 +12,10 @@
  */
 
 import type { RouterSignals, RouteDecision } from "@/lib/ai/types";
+import {
+  detectChangeIntent,
+  type ChangeIntent,
+} from "@/lib/ai/change/change-intent";
 
 const SONNET = "claude-sonnet-4-6" as const;
 const OPUS = "claude-opus-4-8" as const;
@@ -39,6 +43,19 @@ const OPUS_ESCALATED: Pick<RouteDecision, "model" | "thinking" | "effort"> = {
 };
 
 export function routeModel(signals: RouterSignals): RouteDecision {
+  // Sprint 12: detect a Change Intelligence question once, attach it to every
+  // decision, and treat it as a (plan-gated) escalation signal. Detection is
+  // deterministic; it never forces a tool here — the system-prompt guard routes
+  // the actual call to get_change_analysis (never get_root_cause).
+  const changeIntent = detectChangeIntent(signals.userMessage);
+  return { ...selectModel(signals, changeIntent !== null), changeIntent };
+}
+
+/** Pure model selection (Sonnet vs Opus). `isChangeIntent` is one escalation signal. */
+function selectModel(
+  signals: RouterSignals,
+  isChangeIntent: boolean
+): Omit<RouteDecision, "changeIntent"> {
   // Explicit override (admin/testing) wins, still honoring the plan gate.
   if (signals.explicitModel === OPUS && signals.opusAllowed) {
     return { ...OPUS_ESCALATED, escalated: true, reason: "explicit override → opus" };
@@ -63,6 +80,11 @@ export function routeModel(signals: RouterSignals): RouteDecision {
   }
   if (signals.approxInputTokens >= LARGE_INPUT_TOKENS) {
     return { ...OPUS_ESCALATED, escalated: true, reason: "large input" };
+  }
+  // Sprint 12: a change question is analysis — escalate so the decomposition is
+  // explained well (caught even when "why" is absent, e.g. "CTR increased this week").
+  if (isChangeIntent) {
+    return { ...OPUS_ESCALATED, escalated: true, reason: "change-analysis intent" };
   }
   if (COMPLEX_INTENT.test(signals.userMessage)) {
     return { ...OPUS_ESCALATED, escalated: true, reason: "complex-analysis intent" };

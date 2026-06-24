@@ -10,6 +10,7 @@
  */
 
 import { AiResponse } from "@/components/os/ai-response";
+import type { ActionRecommendation } from "@/lib/ai/types";
 
 export interface ChatMessageProps {
   role: "user" | "assistant";
@@ -18,9 +19,17 @@ export interface ChatMessageProps {
   streaming?: boolean;
   /** Interactive CTA handler for assistant recommendation cards. */
   onPrompt?: (text: string) => void;
+  /** Sprint 13B: structured recommendations for THIS assistant turn (or undefined). */
+  recommendations?: ActionRecommendation[];
 }
 
-export function ChatMessage({ role, content, streaming, onPrompt }: ChatMessageProps) {
+export function ChatMessage({
+  role,
+  content,
+  streaming,
+  onPrompt,
+  recommendations,
+}: ChatMessageProps) {
   if (role === "user") {
     return (
       <div className="flex justify-end">
@@ -34,7 +43,11 @@ export function ChatMessage({ role, content, streaming, onPrompt }: ChatMessageP
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] min-w-0">
-        <AiResponse content={content} onPrompt={onPrompt} />
+        <AiResponse
+          content={content}
+          onPrompt={onPrompt}
+          recommendations={recommendations}
+        />
         {streaming && (
           <span className="ml-0.5 animate-pulse text-foreground/70">▋</span>
         )}

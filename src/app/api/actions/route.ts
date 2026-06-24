@@ -21,13 +21,22 @@ import {
   createAction,
   type ActionStatus,
   type ActionPriority,
+  type ActionEntityLevel,
+  type ActionType,
 } from "@/lib/data/action-queue";
+import type { Json } from "@/types/database";
 
 export const runtime = "nodejs";
 
 const TITLE_MAX = 200;
 const STATUSES: readonly ActionStatus[] = ["pending", "approved", "dismissed"];
 const PRIORITIES: readonly ActionPriority[] = ["High", "Medium", "Low"];
+const ENTITY_LEVELS: readonly ActionEntityLevel[] = ["account", "campaign", "ad"];
+const ACTION_TYPES: readonly ActionType[] = [
+  "PAUSE_CAMPAIGN",
+  "RESUME_CAMPAIGN",
+  "ADJUST_BUDGET",
+];
 
 async function resolveWorkspaceId(): Promise<string | null> {
   const workspaces = await getUserWorkspaces();
@@ -86,6 +95,11 @@ export async function POST(request: Request) {
     expectedImpact?: unknown;
     priority?: unknown;
     status?: unknown;
+    provider?: unknown;
+    entityLevel?: unknown;
+    entityId?: unknown;
+    actionType?: unknown;
+    paramsJson?: unknown;
   } = {};
   try {
     body = (await request.json()) as typeof body;
@@ -112,6 +126,28 @@ export async function POST(request: Request) {
       ? (body.status as ActionStatus)
       : undefined;
 
+  // Sprint 13B: structured executable target — validated against controlled
+  // vocabularies. Anything malformed is simply dropped (the row persists
+  // text-only); never guessed or coerced.
+  const provider = str(body.provider);
+  const entityLevel =
+    typeof body.entityLevel === "string" &&
+    (ENTITY_LEVELS as readonly string[]).includes(body.entityLevel)
+      ? (body.entityLevel as ActionEntityLevel)
+      : undefined;
+  const entityId = str(body.entityId);
+  const actionType =
+    typeof body.actionType === "string" &&
+    (ACTION_TYPES as readonly string[]).includes(body.actionType)
+      ? (body.actionType as ActionType)
+      : undefined;
+  const paramsJson =
+    body.paramsJson != null &&
+    typeof body.paramsJson === "object" &&
+    !Array.isArray(body.paramsJson)
+      ? (body.paramsJson as Json)
+      : undefined;
+
   const action = await createAction({
     workspaceId,
     userId: user.id,
@@ -122,6 +158,11 @@ export async function POST(request: Request) {
     ...(expectedImpact ? { expectedImpact } : {}),
     ...(priority ? { priority } : {}),
     ...(status ? { status } : {}),
+    ...(provider ? { provider } : {}),
+    ...(entityLevel ? { entityLevel } : {}),
+    ...(entityId ? { entityId } : {}),
+    ...(actionType ? { actionType } : {}),
+    ...(paramsJson ? { paramsJson } : {}),
   });
   if (!action) {
     return NextResponse.json(

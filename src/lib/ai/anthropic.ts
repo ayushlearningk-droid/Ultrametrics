@@ -20,6 +20,7 @@ import type {
 import { routeModel } from "@/lib/ai/router";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import { buildTools, dispatchTool } from "@/lib/ai/tools";
+import { parseRecommendationsResult } from "@/lib/ai/structured-actions";
 
 /** Output cap per response. Streaming, so well under SDK HTTP timeout limits. */
 const MAX_OUTPUT_TOKENS = 4096;
@@ -170,6 +171,17 @@ export async function* streamWorkspaceChat(
           content: resultText,
           is_error: isError,
         });
+
+        // Sprint 13B: surface structured recommendations to the client so an
+        // approval can persist the real provider/entity/action — never parsed
+        // from the rendered prose. Grounded data only; emitted alongside the
+        // tool result, never affecting the model loop.
+        if (!isError && use.name === "get_recommendations") {
+          const items = parseRecommendationsResult(resultText);
+          if (items.length > 0) {
+            yield { type: "recommendations", items };
+          }
+        }
       }
 
       messages.push({ role: "assistant", content: final.content });

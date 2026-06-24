@@ -10,10 +10,14 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
-import type { ActionQueueRow } from "@/types/database";
+import type { ActionQueueRow, Json } from "@/types/database";
 
 export type ActionStatus = "pending" | "approved" | "dismissed";
 export type ActionPriority = "High" | "Medium" | "Low";
+
+/** Sprint 13A: structured executable-target vocabularies (nullable; not yet populated). */
+export type ActionEntityLevel = "account" | "campaign" | "ad";
+export type ActionType = "PAUSE_CAMPAIGN" | "RESUME_CAMPAIGN" | "ADJUST_BUDGET";
 
 /**
  * List the current user's actions in a workspace (RLS-scoped). Optionally filter
@@ -47,6 +51,13 @@ export async function createAction(input: {
   expectedImpact?: string | null;
   priority?: ActionPriority | null;
   status?: ActionStatus;
+  // Sprint 13A: structured executable target. Type-ready but not yet populated
+  // by any caller — the approval path still passes only the text fields above.
+  provider?: string | null;
+  entityLevel?: ActionEntityLevel | null;
+  entityId?: string | null;
+  actionType?: ActionType | null;
+  paramsJson?: Json | null;
 }): Promise<ActionQueueRow | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -63,6 +74,17 @@ export async function createAction(input: {
         : {}),
       ...(input.priority !== undefined ? { priority: input.priority } : {}),
       ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.provider !== undefined ? { provider: input.provider } : {}),
+      ...(input.entityLevel !== undefined
+        ? { entity_level: input.entityLevel }
+        : {}),
+      ...(input.entityId !== undefined ? { entity_id: input.entityId } : {}),
+      ...(input.actionType !== undefined
+        ? { action_type: input.actionType }
+        : {}),
+      ...(input.paramsJson !== undefined
+        ? { params_json: input.paramsJson }
+        : {}),
     })
     .select("*")
     .maybeSingle();

@@ -426,6 +426,16 @@ export type Database = {
           expected_impact: string | null;
           priority: "High" | "Medium" | "Low" | null;
           status: "pending" | "approved" | "dismissed";
+          // Sprint 13A: structured executable target (nullable, not yet populated).
+          provider: string | null;
+          entity_level: "account" | "campaign" | "ad" | null;
+          entity_id: string | null;
+          action_type:
+            | "PAUSE_CAMPAIGN"
+            | "RESUME_CAMPAIGN"
+            | "ADJUST_BUDGET"
+            | null;
+          params_json: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -440,6 +450,16 @@ export type Database = {
           expected_impact?: string | null;
           priority?: "High" | "Medium" | "Low" | null;
           status?: "pending" | "approved" | "dismissed";
+          // Sprint 13A: structured executable target (nullable, not yet populated).
+          provider?: string | null;
+          entity_level?: "account" | "campaign" | "ad" | null;
+          entity_id?: string | null;
+          action_type?:
+            | "PAUSE_CAMPAIGN"
+            | "RESUME_CAMPAIGN"
+            | "ADJUST_BUDGET"
+            | null;
+          params_json?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -454,6 +474,16 @@ export type Database = {
           expected_impact?: string | null;
           priority?: "High" | "Medium" | "Low" | null;
           status?: "pending" | "approved" | "dismissed";
+          // Sprint 13A: structured executable target (nullable, not yet populated).
+          provider?: string | null;
+          entity_level?: "account" | "campaign" | "ad" | null;
+          entity_id?: string | null;
+          action_type?:
+            | "PAUSE_CAMPAIGN"
+            | "RESUME_CAMPAIGN"
+            | "ADJUST_BUDGET"
+            | null;
+          params_json?: Json | null;
           created_at?: string;
           updated_at?: string;
         };

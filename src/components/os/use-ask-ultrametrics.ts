@@ -15,8 +15,22 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChatMessage, ChatStreamEvent } from "@/lib/ai/types";
+import type {
+  ChatMessage,
+  ChatStreamEvent,
+  ActionRecommendation,
+} from "@/lib/ai/types";
 import type { AiConversation, AiMessage } from "@/types/database";
+
+/**
+ * Sprint 13B: the structured recommendations for ONE assistant turn, tagged with
+ * the message index they belong to so the renderer attaches them only to that
+ * message (never to historical turns).
+ */
+export interface TurnRecommendations {
+  index: number;
+  items: ActionRecommendation[];
+}
 
 export interface UseAskUltrametrics {
   messages: ChatMessage[];
@@ -52,6 +66,8 @@ export interface UseAskUltrametrics {
   restoreConversation: (id: string) => Promise<void>;
   /** Lazily fetch the workspace's ARCHIVED conversations (for the Archived section). */
   loadArchived: () => Promise<AiConversation[]>;
+  /** Sprint 13B: structured recommendations for the latest assistant turn (or null). */
+  turnRecommendations: TurnRecommendations | null;
 }
 
 /** Title for a lazily-created conversation: the first user message, truncated. */
@@ -72,6 +88,9 @@ export function useAskUltrametrics(
   // freshly-created id within the same tick (no stale closure).
   const [conversationId, setConversationId] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  // Sprint 13B: structured recommendations for the latest assistant turn.
+  const [turnRecommendations, setTurnRecommendations] =
+    useState<TurnRecommendations | null>(null);
   // Sprint 2: the workspace's conversation list (powers the rail).
   const [conversations, setConversations] = useState<AiConversation[]>([]);
   // Sprint 5: search query (the rail debounces). A ref mirrors it so the
@@ -97,6 +116,7 @@ export function useAskUltrametrics(
     setConversationId(null);
     conversationIdRef.current = null;
     escalatedRef.current = false;
+    setTurnRecommendations(null);
   }, []);
 
   // U1 Step 4/5: fresh thread + forget the restored id so a refresh after New
@@ -205,6 +225,8 @@ export function useAskUltrametrics(
       conversationIdRef.current = id;
       setConversationId(id);
       setMessages(loaded);
+      // Sprint 13B: loaded history carries no live structured recs.
+      setTurnRecommendations(null);
     } catch {
       // Network error — leave the empty thread; never crash.
     }
@@ -395,6 +417,8 @@ export function useAskUltrametrics(
 
       setError(null);
       setStreaming(true);
+      // Sprint 13B: clear any prior turn's structured recommendations.
+      setTurnRecommendations(null);
 
       const history: ChatMessage[] = [
         ...messages,
@@ -402,6 +426,9 @@ export function useAskUltrametrics(
       ];
       // Show the user turn + an empty assistant turn we stream into.
       setMessages([...history, { role: "assistant", content: "" }]);
+      // The assistant placeholder's index — structured recs for this turn are
+      // tagged with it so the renderer attaches them only to this message.
+      const assistantIndex = history.length;
 
       const appendToAssistant = (delta: string) => {
         setMessages((prev) => {
@@ -463,6 +490,12 @@ export function useAskUltrametrics(
             if (generationRef.current !== gen) continue;
             if (event.type === "text") {
               appendToAssistant(event.delta);
+            } else if (event.type === "recommendations") {
+              // Sprint 13B: tag the structured recs to this assistant message.
+              setTurnRecommendations({
+                index: assistantIndex,
+                items: event.items,
+              });
             } else if (event.type === "done") {
               escalatedRef.current = event.escalated;
             } else if (event.type === "error") {
@@ -521,5 +554,6 @@ export function useAskUltrametrics(
     archiveConversation,
     restoreConversation,
     loadArchived,
+    turnRecommendations,
   };
 }
