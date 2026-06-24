@@ -36,6 +36,7 @@ import { MIN_IMPRESSIONS, MIN_SPEND, MIN_CLICKS } from "@/lib/ai/thresholds";
 import {
   deriveRecommendations,
   type Recommendation,
+  type RecommendationKind,
 } from "@/lib/ai/recommendations";
 import {
   deriveFunnelDiagnosis,
@@ -278,6 +279,83 @@ function changeWindows(
     current: { since: mid, until: todayISO },
     previous: { since: start, until: mid },
   };
+}
+
+/* ── Metric-aware diagnosis context (root cause / recommendations) ─────────── */
+
+/** Optional metric filter shared by get_root_cause / get_recommendations. */
+function asMetricFilter(value: unknown): ChangeMetric | undefined {
+  return value === "roas" || value === "ctr" || value === "cpc" || value === "conversions"
+    ? value
+    : undefined;
+}
+
+/**
+ * Base query for the metric-change-aware tools. When a valid `period` is given,
+ * use the SAME current window as get_change_analysis (so a "yesterday" change
+ * question diagnoses yesterday, not the 180-day default). Otherwise fall back to
+ * the standard buildQuery window.
+ */
+function changeAwareBaseQuery(
+  input: Record<string, unknown>,
+  todayISO: string
+): MetricsQuery {
+  const p = input.period;
+  if (p === "day" || p === "week" || p === "month") {
+    const { current } = changeWindows(todayISO, CHANGE_PERIOD_DAYS[p]);
+    return {
+      dateRange: current,
+      granularity: "total",
+      level: asLevel(input.level),
+      mode: "range",
+    };
+  }
+  return buildQuery(input, todayISO);
+}
+
+/**
+ * Recommendation kinds relevant to each headline metric. Used to focus
+ * get_recommendations on the metric a change question is about. NEVER suppresses
+ * everything: if the filter empties the list, the caller falls back to the full
+ * ranked set (so an answer is never dropped).
+ */
+const METRIC_REC_KINDS: Record<ChangeMetric, ReadonlySet<RecommendationKind>> = {
+  roas: new Set<RecommendationKind>([
+    "pause",
+    "scale",
+    "budget_concentration",
+    "budget_reallocation",
+    "tracking_issue",
+  ]),
+  ctr: new Set<RecommendationKind>([
+    "creative_refresh",
+    "low_ctr",
+    "best_traffic_campaign",
+    "worst_traffic_campaign",
+    "traffic_budget_reallocation",
+  ]),
+  cpc: new Set<RecommendationKind>(["bid_review", "high_cpc"]),
+  conversions: new Set<RecommendationKind>([
+    "tracking_issue",
+    "funnel_offer_problem",
+    "funnel_cart_friction",
+    "funnel_checkout_problem",
+    "pixel_not_detected",
+    "purchase_not_tracked",
+    "purchase_value_missing",
+    "partial_event_coverage",
+  ]),
+};
+
+/** Filter recs to those relevant to `metric`; fall back to all if none match. */
+function filterRecsByMetric(
+  recs: Recommendation[],
+  metric: ChangeMetric | undefined
+): Recommendation[] {
+  if (!metric) return recs;
+  const kinds = METRIC_REC_KINDS[metric];
+  const focused = recs.filter((r) => kinds.has(r.kind));
+  return focused.length > 0 ? focused : recs;
 }
 
 /** Capability-gated metric list for a provider's account trend. */
@@ -1045,12 +1123,22 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_recommendations",
     description:
-      "Get deterministic, grounded ACTION recommendations (scale / pause / creative refresh / budget concentration / bid review / tracking issue) for the workspace's campaigns AND ads. Use when the user asks 'what should I do', 'how do I improve', 'where am I wasting spend', or wants next steps. Each recommendation is computed from retrieved metrics versus that source's own account average; relay them verbatim (action, impact, cta, confidence) and NEVER claim to have taken an action — you can only advise. Omit since/until for the default window (last 180 days, with per-source all-time fallback). Returns up to 5 recommendations per source; an empty list means no clear action this window — say so rather than inventing one.",
+      "Get deterministic, grounded ACTION recommendations (scale / pause / creative refresh / budget concentration / bid review / tracking issue) for the workspace's campaigns AND ads. Use when the user asks 'what should I do', 'how do I improve', 'where am I wasting spend', or wants next steps. Each recommendation is computed from retrieved metrics versus that source's own account average; relay them verbatim (action, impact, cta, confidence) and NEVER claim to have taken an action — you can only advise. Omit since/until for the default window (last 180 days, with per-source all-time fallback). When answering a metric-change question, pass metric + period so the actions focus on that metric over the same window as get_change_analysis. Returns up to 5 recommendations per source; an empty list means no clear action this window — say so rather than inventing one.",
     input_schema: {
       type: "object",
       properties: {
         since: { type: "string", description: "Optional start date, inclusive (YYYY-MM-DD). Omit for the default window." },
         until: { type: "string", description: "Optional end date, inclusive (YYYY-MM-DD). Omit for the default window." },
+        metric: {
+          type: "string",
+          enum: ["roas", "ctr", "cpc", "conversions"],
+          description: "Optional. Focus the recommendations on the metric a change question is about (roas → scale/pause/budget; ctr → creative; cpc → bidding; conversions → tracking/funnel). Omit for all recommendations.",
+        },
+        period: {
+          type: "string",
+          enum: ["day", "week", "month"],
+          description: "Optional. Use the SAME window as get_change_analysis (day/week/month) so the actions cover the period the change occurred in. Omit for the default 180-day window.",
+        },
       },
     },
   },
@@ -1069,12 +1157,22 @@ export const metricsToolDefinitions: Anthropic.Tool[] = [
   {
     name: "get_root_cause",
     description:
-      "Get likely ROOT CAUSES for underperforming campaigns per source: tracking gaps, weak creative (low CTR), or inefficient bidding (high CPC). Use when the user asks WHY a campaign is underperforming, what's driving poor results, or for a diagnosis behind a recommendation. Returns up to 5 per source (highest-spend underperformers), each with primaryCause, confidence, severity, evidence, an ordered fixOrder, and any contributing causes. READ-ONLY ADVISORY: each cause is a grounded HYPOTHESIS, not a certainty — relay it as a likely cause with its confidence, never as proven. Omit since/until for the default window.",
+      "Get likely ROOT CAUSES for underperforming campaigns per source: tracking gaps, weak creative (low CTR), or inefficient bidding (high CPC). Use when the user asks WHY a campaign is underperforming, what's driving poor results, or for a diagnosis behind a recommendation. Returns up to 5 per source (underperformers), each with primaryCause, confidence, severity, evidence, an ordered fixOrder, and any contributing causes. When answering a metric-change question, pass metric + period so the diagnosis leads with the cause relevant to that metric over the same window as get_change_analysis. READ-ONLY ADVISORY: each cause is a grounded HYPOTHESIS, not a certainty — relay it as a likely cause with its confidence, never as proven. Omit since/until for the default window.",
     input_schema: {
       type: "object",
       properties: {
         since: { type: "string", description: "Optional start date, inclusive (YYYY-MM-DD). Omit for the default window." },
         until: { type: "string", description: "Optional end date, inclusive (YYYY-MM-DD). Omit for the default window." },
+        metric: {
+          type: "string",
+          enum: ["roas", "ctr", "cpc", "conversions"],
+          description: "Optional. Lead the diagnosis with the cause relevant to this metric (ctr → creative weakness; cpc → bidding inefficiency; conversions/roas → tracking gap). Omit to rank by spend only.",
+        },
+        period: {
+          type: "string",
+          enum: ["day", "week", "month"],
+          description: "Optional. Use the SAME window as get_change_analysis (day/week/month) so the diagnosis covers the period the change occurred in. Omit for the default 180-day window.",
+        },
       },
     },
   },
@@ -1145,7 +1243,10 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
   },
 
   async get_recommendations(input, ctx) {
-    const base = buildQuery(input, ctx.todayISO);
+    // Metric-change-aware: when period is supplied, diagnose the SAME window as
+    // get_change_analysis; when metric is supplied, focus the actions on it.
+    const base = changeAwareBaseQuery(input, ctx.todayISO);
+    const metric = asMetricFilter(input.metric);
     // Two fetches: campaign-level and ad-level. The rules run separately per
     // result (so a per-source lifetime-fallback window divergence can't blend
     // breakdowns), and the resulting lists are merged + capped afterward.
@@ -1173,7 +1274,9 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
       // Shared assembly: campaign + ad recs + funnel/pixel diagnoses with the
       // pixel-precedence suppression applied, ranked by opportunityScore.
       const { okSource, recs } = assembleProviderRecs(camp, ad, provider);
-      const ranked = recs.slice(0, REC_CAP);
+      // Focus on the change question's metric (falls back to all if none match),
+      // preserving the existing opportunityScore ranking within the focused set.
+      const ranked = filterRecsByMetric(recs, metric).slice(0, REC_CAP);
 
       return {
         provider,
@@ -1294,7 +1397,10 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
   // campaigns. Reuses the cached campaign-level fetch; the pure orchestrator
   // selects underperformers and caps to the Top 5 by spend.
   async get_root_cause(input, ctx) {
-    const base = buildQuery(input, ctx.todayISO);
+    // Metric-change-aware: period aligns the window with get_change_analysis;
+    // metric leads the diagnosis with the cause relevant to that metric.
+    const base = changeAwareBaseQuery(input, ctx.todayISO);
+    const metric = asMetricFilter(input.metric);
     const res = await getMetricsWithFallback(ctx.workspaceId, {
       ...base,
       level: "campaign",
@@ -1309,7 +1415,7 @@ export const metricsToolHandlers: Record<string, ReadToolHandler> = {
         provider: p.provider,
         status: p.status,
         currency: p.metrics.currency,
-        causes: deriveRootCauses(p.metrics),
+        causes: deriveRootCauses(p.metrics, metric),
       };
     });
 

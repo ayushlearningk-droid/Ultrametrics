@@ -166,6 +166,22 @@ export async function* streamWorkspaceChat(
           ) {
             toolInput = { ...toolInput, period: decision.changeIntent.period };
           }
+          // Thread the metric-change context into the co-invoked diagnosis tools
+          // so a ROAS question diagnoses ROAS (CTR→CTR, etc.) over the SAME
+          // window — deterministically, from the detected query path, not the
+          // model. Only the metric/period the query actually stated are injected.
+          if (
+            (use.name === "get_root_cause" ||
+              use.name === "get_recommendations") &&
+            decision.changeIntent
+          ) {
+            const ci = decision.changeIntent;
+            toolInput = {
+              ...toolInput,
+              ...(ci.metric ? { metric: ci.metric } : {}),
+              ...(ci.period ? { period: ci.period } : {}),
+            };
+          }
           resultText = await dispatchTool(use.name, toolInput, ctx);
         } catch (err) {
           isError = true;
