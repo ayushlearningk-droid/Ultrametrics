@@ -83,7 +83,10 @@ const GA4: ProviderCapabilities = {
   provider: "ga4",
   kind: "analytics",
   rawMetrics: ["sessions", "users", "engaged_sessions", "conversions", "revenue"],
-  derivedMetrics: ["engagement_rate"],
+  // engagement_rate is declared in the DerivedKey catalog but is NOT computed by
+  // derive.ts nor serialized by the metrics tools, so advertising it here caused
+  // the model to invent a value when asked. Removed until it is actually derived.
+  derivedMetrics: [],
   supportsDaily: true,
   supportsCampaignLevel: false,
   currency: "native",
