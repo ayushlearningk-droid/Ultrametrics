@@ -14,7 +14,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { fadeIn, DUR, EASE_OUT } from "@/lib/motion";
 import { ArrowRight, X } from "lucide-react";
 import { useAsk } from "@/components/os/ask-provider";
 import { ChatMessage } from "@/components/os/chat-message";
@@ -58,6 +59,7 @@ export function AskDrawer() {
     composerFocusSignal,
     turnRecommendations,
   } = useAsk();
+  const reduce = useReducedMotion();
 
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -137,10 +139,10 @@ export function AskDrawer() {
           {/* Backdrop — click to dismiss */}
           <motion.div
             className="fixed inset-0 z-[60] bg-black/40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            variants={fadeIn}
+            initial={reduce ? false : "hidden"}
+            animate="visible"
+            exit="exit"
             onClick={close}
             aria-hidden
           />
@@ -148,10 +150,10 @@ export function AskDrawer() {
           {/* Drawer panel */}
           <motion.aside
             className="fixed inset-y-0 right-0 z-[61] flex w-full border-l border-white/[0.08] bg-[hsl(var(--card))] shadow-2xl md:w-[720px]"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
+            initial={reduce ? false : { x: "100%", opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: "100%", opacity: 0 }}
+            transition={{ duration: DUR.base, ease: EASE_OUT }}
             role="dialog"
             aria-label="Ask Ultrametrics"
           >

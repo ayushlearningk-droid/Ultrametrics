@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { fadeIn, settle } from "@/lib/motion";
 import {
   BarChart3,
   CreditCard,
@@ -37,6 +38,7 @@ interface Command {
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const router = useRouter();
+  const reduce = useReducedMotion();
   const {
     open: openAsk,
     newChat,
@@ -293,20 +295,20 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           {/* Backdrop */}
           <motion.div
             className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            variants={fadeIn}
+            initial={reduce ? false : "hidden"}
+            animate="visible"
+            exit="exit"
             onClick={onClose}
           />
 
           {/* Panel */}
           <motion.div
             className="fixed left-1/2 top-[20%] z-[70] w-full max-w-lg -translate-x-1/2"
-            initial={{ opacity: 0, y: -16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.97 }}
-            transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+            variants={settle}
+            initial={reduce ? false : "hidden"}
+            animate="visible"
+            exit="exit"
           >
             <div className="overflow-hidden rounded-2xl border border-white/[0.1] bg-[hsl(222_44%_6%)] shadow-2xl shadow-black/60">
               {/* Search input */}

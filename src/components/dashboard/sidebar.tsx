@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
+import { slideUp, staggerChildren } from "@/lib/motion";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
@@ -187,6 +189,7 @@ function SidebarRail({
 }: RailProps) {
   const router = useRouter();
   const { open: openAsk, isOpen: isAskOpen } = useAsk();
+  const reduce = useReducedMotion();
 
   function selectWorkspace(id: string) {
     document.cookie = `workspace_id=${id};path=/;max-age=31536000;SameSite=Lax`;
@@ -300,21 +303,35 @@ function SidebarRail({
       </button>
 
       {/* ── Primary nav (Brief · Reports · Timeline · Connectors) ──── */}
-      <nav className="flex flex-col gap-0.5">
+      <motion.nav
+        className="flex flex-col gap-0.5"
+        variants={staggerChildren}
+        initial={reduce ? false : "hidden"}
+        animate="visible"
+      >
         {PRIMARY_NAV.map((item) => (
-          <NavItem key={item.href} {...item} onClose={onClose} />
+          <motion.div key={item.href} variants={slideUp}>
+            <NavItem {...item} onClose={onClose} />
+          </motion.div>
         ))}
-      </nav>
+      </motion.nav>
 
       {/* ── Connector group ───────────────────────────────────────── */}
       <div className="mt-4 px-3">
         <p className="type-eyebrow text-foreground-muted/70">Connectors</p>
       </div>
-      <nav className="mt-1 flex flex-col gap-0.5">
+      <motion.nav
+        className="mt-1 flex flex-col gap-0.5"
+        variants={staggerChildren}
+        initial={reduce ? false : "hidden"}
+        animate="visible"
+      >
         {CONNECTORS.map((c) => (
-          <ConnectorItem key={c.href} {...c} onClose={onClose} />
+          <motion.div key={c.href} variants={slideUp}>
+            <ConnectorItem {...c} onClose={onClose} />
+          </motion.div>
         ))}
-      </nav>
+      </motion.nav>
 
       <div className="flex-1" />
 

@@ -13,6 +13,8 @@
  */
 
 import { useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { staggerChildren, elevate } from "@/lib/motion";
 import {
   TrendingUp,
   Lightbulb,
@@ -1493,6 +1495,7 @@ export function AiResponse({
   recommendations,
 }: AiResponseProps) {
   const sections = parseSections(content);
+  const reduce = useReducedMotion();
 
   // Sprint 13B (Option C, safe persistence): attach a structured payload to the
   // Approve action ONLY when the association is GUARANTEED — exactly ONE
@@ -1538,7 +1541,12 @@ export function AiResponse({
   let recRank = 0;
 
   return (
-    <div className="space-y-4">
+    <motion.div
+      className="space-y-4"
+      variants={staggerChildren}
+      initial={reduce ? false : "hidden"}
+      animate="visible"
+    >
       {sections.map((section, i) => {
         // Phase A (AI-015): a "Root Cause:" block renders as a RootCauseCard,
         // independent of heading. Strip the block; render any leftover markdown.
@@ -1546,10 +1554,10 @@ export function AiResponse({
         if (rc) {
           const rest = stripRootCause(section.body);
           return (
-            <div key={i} className="space-y-3">
+            <motion.div key={i} variants={elevate} className="space-y-3">
               {rest && <Markdown>{rest}</Markdown>}
               <RootCauseCard data={rc} heading={section.heading} />
-            </div>
+            </motion.div>
           );
         }
 
@@ -1569,7 +1577,7 @@ export function AiResponse({
           const impact = parseImpact(section.body);
           const cardBody = impact ? stripImpactBlock(view.body) : view.body;
           return (
-            <div key={i}>
+            <motion.div key={i} variants={elevate}>
               <OpportunityCard
                 heading={view.heading}
                 rank={recRank}
@@ -1581,7 +1589,7 @@ export function AiResponse({
                 onPrompt={onPrompt}
                 structured={guaranteedRec}
               />
-            </div>
+            </motion.div>
           );
         }
 
@@ -1611,14 +1619,19 @@ export function AiResponse({
           return <Markdown>{reconstruct(view)}</Markdown>;
         })();
 
-        if (!bd) return <div key={i}>{primary}</div>;
+        if (!bd)
+          return (
+            <motion.div key={i} variants={elevate}>
+              {primary}
+            </motion.div>
+          );
         return (
-          <div key={i} className="space-y-3">
+          <motion.div key={i} variants={elevate} className="space-y-3">
             {primary}
             <BreakdownCard data={bd} />
-          </div>
+          </motion.div>
         );
       })}
-    </div>
+    </motion.div>
   );
 }
