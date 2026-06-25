@@ -68,6 +68,8 @@ export interface UseAskUltrametrics {
   loadArchived: () => Promise<AiConversation[]>;
   /** Sprint 13B: structured recommendations for the latest assistant turn (or null). */
   turnRecommendations: TurnRecommendations | null;
+  /** Sprint 36: raw name of the tool currently executing while streaming, or null. */
+  toolPhase: string | null;
 }
 
 /** Title for a lazily-created conversation: the first user message, truncated. */
@@ -83,6 +85,8 @@ export function useAskUltrametrics(
 ): UseAskUltrametrics {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
+  // Sprint 36: the current tool being called (raw name), for progressive status.
+  const [toolPhase, setToolPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // U1 Step 4: active conversation. A ref mirrors state so send() reads the
   // freshly-created id within the same tick (no stale closure).
@@ -417,6 +421,7 @@ export function useAskUltrametrics(
 
       setError(null);
       setStreaming(true);
+      setToolPhase(null);
       // Sprint 13B: clear any prior turn's structured recommendations.
       setTurnRecommendations(null);
 
@@ -489,7 +494,11 @@ export function useAskUltrametrics(
             // R3: drop any event from a stream that a workspace switch invalidated.
             if (generationRef.current !== gen) continue;
             if (event.type === "text") {
+              // Text means the final answer is streaming — thinking is done.
+              setToolPhase(null);
               appendToAssistant(event.delta);
+            } else if (event.type === "tool_call") {
+              setToolPhase(event.name);
             } else if (event.type === "recommendations") {
               // Sprint 13B: tag the structured recs to this assistant message.
               setTurnRecommendations({
@@ -512,6 +521,7 @@ export function useAskUltrametrics(
       } finally {
         if (generationRef.current === gen) {
           setStreaming(false);
+          setToolPhase(null);
         }
         // P1: after a clean FIRST response, fire-and-forget AI title generation.
         // Never blocks chat; failures are ignored; a workspace switch aborts the
@@ -555,5 +565,6 @@ export function useAskUltrametrics(
     restoreConversation,
     loadArchived,
     turnRecommendations,
+    toolPhase,
   };
 }

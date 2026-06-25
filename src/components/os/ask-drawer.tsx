@@ -58,6 +58,7 @@ export function AskDrawer() {
     send,
     composerFocusSignal,
     turnRecommendations,
+    toolPhase,
   } = useAsk();
   const reduce = useReducedMotion();
 
@@ -220,6 +221,13 @@ export function AskDrawer() {
                     streaming &&
                     m.role === "assistant" &&
                     i === messages.length - 1
+                  }
+                  toolPhase={
+                    streaming &&
+                    m.role === "assistant" &&
+                    i === messages.length - 1
+                      ? toolPhase
+                      : null
                   }
                   onPrompt={sendPrompt}
                   // Sprint 13B: attach structured recs ONLY to the exact message
