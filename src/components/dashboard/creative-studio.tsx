@@ -136,7 +136,7 @@ export function CreativeStudio({
       <Section label="Hook Ideas" copyText={hooksText}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {hooks.map((g) => (
-            <div key={g.category} className="card flex flex-col gap-2 p-4">
+            <div key={g.category} className="card card-hover flex flex-col gap-2 p-4">
               <span className="type-caption font-semibold text-brand">
                 {g.category}
               </span>
@@ -173,7 +173,7 @@ export function CreativeStudio({
       <Section label="Ad Variants (A/B/C)">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {copy.variants.map((v) => (
-            <div key={v.label} className="card flex flex-col gap-1.5 p-4">
+            <div key={v.label} className="card card-hover flex flex-col gap-1.5 p-4">
               <span className="type-caption font-semibold text-brand">
                 Variant {v.label} · {v.angle}
               </span>

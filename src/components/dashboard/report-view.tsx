@@ -30,7 +30,10 @@ function ReportSection({
   children: React.ReactNode;
 }) {
   return (
-    <motion.section variants={slideUp} className="report-section space-y-3">
+    <motion.section
+      variants={slideUp}
+      className="report-section flex flex-col gap-3 border-t border-white/[0.06] pt-8 first:border-0 first:pt-0"
+    >
       <div className="flex items-baseline gap-2">
         <span className="type-caption tabular-nums text-foreground-muted">
           {String(index).padStart(2, "0")}
@@ -105,7 +108,7 @@ export function ReportView({
       </header>
 
       <motion.div
-        className="space-y-8"
+        className="flex flex-col"
         variants={staggerChildren}
         initial={reduce ? false : "hidden"}
         animate="visible"

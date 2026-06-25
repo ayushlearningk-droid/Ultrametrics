@@ -293,7 +293,7 @@ function TimelineCard({ event: e }: { event: TimelineEvent }) {
         href={e.cta.href}
         data-tl-card
         aria-label={`${e.title} — ${status.label}. ${e.cta.label}`}
-        className={cn(base, "hover:border-white/[0.16]")}
+        className={cn(base, "card-hover card-interactive")}
       >
         {inner}
       </Link>

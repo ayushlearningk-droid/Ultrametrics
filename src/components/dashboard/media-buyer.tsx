@@ -52,7 +52,7 @@ function RecCard({
 }) {
   const Icon = CATEGORY_ICON[rec.category];
   return (
-    <div className="card flex flex-col gap-2 p-4">
+    <div className="card card-hover flex flex-col gap-2 p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 type-eyebrow text-foreground-muted">
           <Icon className="h-3.5 w-3.5 text-brand" />

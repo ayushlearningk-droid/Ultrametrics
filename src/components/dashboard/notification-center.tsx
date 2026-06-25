@@ -244,7 +244,7 @@ export function NotificationCenter({ open, onClose }: NotificationCenterProps) {
                         <div
                           onMouseEnter={() => unread && markRead(n.id)}
                           className={cn(
-                            "card flex items-start gap-3 p-3 transition-opacity",
+                            "card card-hover flex items-start gap-3 p-3 transition-opacity",
                             !unread && "opacity-65"
                           )}
                         >
