@@ -141,5 +141,5 @@ WORKSPACE CONTEXT:
 - Workspace: ${ctx.workspaceName}
 - Today: ${ctx.todayISO}
 - Connected sources:
-${providerLines}${memoryBlock}`;
+${providerLines}${memoryBlock}${ctx.contextBlock ?? ""}${ctx.retrievalPlan ?? ""}`;
 }

@@ -61,6 +61,12 @@ export interface WorkspaceContext {
   userId?: string;
   /** Sprint 31: durable workspace memory notes, injected for AI grounding. */
   memories?: string[];
+  /** Sprint 32: additive copilot-awareness block (recent activity/topics +
+   *  lazy-tool pointers) from the Context Aggregator. */
+  contextBlock?: string;
+  /** Sprint 32 Phase 2: per-turn retrieval plan (which tools to prefer/skip +
+   *  merge/dedupe directive) from the Retrieval Planner. */
+  retrievalPlan?: string;
 }
 
 /** Inputs the router uses to choose a model. Pure data, no I/O. */

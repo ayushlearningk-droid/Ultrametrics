@@ -21,6 +21,8 @@ import type { ActionExecutionRow, ActionAuditLogRow } from "@/types/database";
 import { ActionTimeline } from "@/components/dashboard/execution/action-timeline";
 import { DryRunDiff } from "@/components/dashboard/execution/dry-run-diff";
 import { isReversible } from "@/lib/actions/inverse";
+import { explainExecution } from "@/lib/actions/intelligence";
+import { cn } from "@/lib/utils";
 
 type ExecState = ActionExecutionRow["state"];
 type RollbackPhase = "idle" | "confirming" | "running" | "done" | "failed";
@@ -44,6 +46,17 @@ function formatDuration(ms: number | null | undefined): string {
   if (ms == null) return "—";
   if (ms < 1000) return `${ms} ms`;
   return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`;
+}
+
+/** A labelled explanation line; renders nothing when the value is empty. */
+function Detail({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="type-caption text-foreground-muted">{label}</dt>
+      <dd className="type-caption text-foreground/90">{value}</dd>
+    </div>
+  );
 }
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
@@ -185,6 +198,9 @@ export function ExecutionDetailsDrawer({
   // Retries = extra attempts of the latest attempt's lifecycle (attempt_no is
   // 1-based). Distinct dry-run vs. real rows are different modes, not retries.
   const retries = latest ? Math.max(0, latest.attempt_no - 1) : 0;
+
+  // Sprint 33: deterministic AI explanation derived from the execution row.
+  const insight = latest ? explainExecution(latest, action?.actionType ?? null) : null;
 
   const copyRequestId = () => {
     if (!requestId) return;
@@ -384,6 +400,52 @@ export function ExecutionDetailsDrawer({
                   <p className="mt-1 type-caption text-foreground/80">
                     {latest.error_message}
                   </p>
+                </div>
+              )}
+
+              {/* AI Explanation (deterministic, derived from the execution) */}
+              {insight && (
+                <div className="card space-y-3 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="type-eyebrow text-foreground-muted">
+                      AI explanation
+                    </span>
+                    <span
+                      className={cn(
+                        "chip",
+                        insight.confidence === "high"
+                          ? "chip-emerald"
+                          : "chip-slate"
+                      )}
+                    >
+                      {insight.confidence} confidence
+                    </span>
+                  </div>
+                  <p className="type-body font-semibold text-foreground">
+                    {insight.headline}
+                  </p>
+                  <dl className="space-y-2">
+                    <Detail label="What happened" value={insight.whatHappened} />
+                    <Detail label="Why" value={insight.whyHappened} />
+                    <Detail label="What changed" value={insight.whatChanged} />
+                    <Detail
+                      label="Rollback"
+                      value={
+                        insight.rollbackRecommended
+                          ? `Recommended — ${insight.rollbackReason ?? ""}`
+                          : insight.rollbackReason
+                      }
+                    />
+                    <Detail
+                      label="Retry"
+                      value={
+                        insight.retryRecommended
+                          ? `Recommended — ${insight.retryReason ?? ""}`
+                          : insight.retryReason
+                      }
+                    />
+                    <Detail label="Next action" value={insight.nextAction} />
+                  </dl>
                 </div>
               )}
 

@@ -37,7 +37,14 @@ import {
   getWorkspaceSettings,
   toSettingsValues,
 } from "@/lib/data/workspace-settings";
-import { listMemories } from "@/lib/data/workspace-memory";
+import {
+  aggregateWorkspaceContext,
+  signalsToPromptBlock,
+} from "@/lib/ai/context/aggregator";
+import {
+  planRetrieval,
+  planToPromptBlock,
+} from "@/lib/ai/planner/retrieval-planner";
 
 export const runtime = "nodejs";
 
@@ -161,8 +168,15 @@ export async function POST(request: Request) {
   const workspaceName =
     workspaces.find((w) => w.id === workspaceId)?.name ?? "your workspace";
 
-  // Sprint 31: durable workspace memory (user-saved notes) for AI grounding.
-  const memories = (await listMemories(workspaceId)).map((m) => m.content);
+  // Sprint 32: Universal Copilot context — one aggregator assembles durable
+  // memory (Sprint 31) + recent activity/topics awareness, cached + budgeted.
+  const signals = await aggregateWorkspaceContext(workspaceId);
+
+  // Sprint 32 Phase 2: deterministic retrieval plan for the latest user turn
+  // (which tools to prefer/skip + merge/dedupe directive). Steers the existing
+  // tool loop; never filters tools structurally.
+  const latestUserMessage = messages[messages.length - 1].content;
+  const plan = planRetrieval(latestUserMessage);
 
   const ctx: WorkspaceContext = {
     workspaceId,
@@ -170,7 +184,9 @@ export async function POST(request: Request) {
     connectedProviders,
     todayISO: new Date().toISOString().slice(0, 10),
     userId: access.userId,
-    memories,
+    memories: signals.memories,
+    contextBlock: signalsToPromptBlock(signals),
+    retrievalPlan: planToPromptBlock(plan),
   };
 
   const lastUser = messages[messages.length - 1].content;
