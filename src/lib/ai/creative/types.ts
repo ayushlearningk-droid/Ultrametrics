@@ -63,3 +63,49 @@ export interface CreativeBrief {
   successMetric: string;
   confidence: Confidence;
 }
+
+/* ── Creative Studio generators (Sprint 37) ────────────────────────────────
+ * Deterministic PLANNING output (text only). Hooks/copy are angle templates
+ * grounded in the diagnosed problem; bracketed [placeholders] mark where the
+ * user supplies product specifics. No image/video generation, no invented
+ * metrics. Future image/video models + the Media Buyer will consume these. */
+
+export type HookCategory =
+  | "Scroll Stopper"
+  | "Curiosity"
+  | "Problem"
+  | "Offer"
+  | "UGC"
+  | "Emotional";
+
+export interface HookGroup {
+  category: HookCategory;
+  hooks: string[];
+}
+
+export interface CopyVariant {
+  label: "A" | "B" | "C";
+  angle: string;
+  headline: string;
+  primaryText: string;
+  cta: string;
+}
+
+export interface CopySet {
+  headlines: string[];
+  primaryText: string[];
+  ctas: string[];
+  captions: string[];
+  variants: CopyVariant[];
+}
+
+export interface StoryboardScene {
+  label: string;
+  direction: string;
+}
+
+export interface Storyboard {
+  scenes: StoryboardScene[];
+  ending: string;
+  cta: string;
+}

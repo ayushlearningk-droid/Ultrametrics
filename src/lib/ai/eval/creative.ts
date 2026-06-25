@@ -11,6 +11,9 @@ import type { CreativeInput } from "../creative/types";
 import { computeCreativeSignals } from "../creative/intelligence";
 import { generateStrategy } from "../creative/strategy";
 import { generateCreativeBrief } from "../creative/brief";
+import { generateHooks } from "../creative/hooks";
+import { generateCopy } from "../creative/copy";
+import { generateStoryboard } from "../creative/storyboard";
 
 export interface CreativeCheck {
   name: string;
@@ -148,6 +151,57 @@ export function runCreativeEvaluation(): CreativeSummary {
         "Sparse input: low confidence, visual unknown",
         s.confidence === "low" && s.visualQuality === "unknown",
         `confidence=${s.confidence} visual=${s.visualQuality}`
+      )
+    );
+  }
+
+  // 9. Studio generators: hooks (6 categories), copy (A/B/C), storyboard.
+  {
+    const s = computeCreativeSignals({
+      frequency: 4.0,
+      ctrTrend: "declining",
+      causes: ["creative_fatigue"],
+    });
+    const st = generateStrategy(s);
+    const hooks = generateHooks(s);
+    const copy = generateCopy(s, st);
+    const story = generateStoryboard(s, st);
+    const allHookText = hooks.flatMap((g) => g.hooks).join(" ");
+    const allCopyText = [
+      ...copy.headlines,
+      ...copy.primaryText,
+      ...copy.captions,
+    ].join(" ");
+    results.push(
+      check(
+        "Studio: hooks cover 6 categories, all non-empty",
+        hooks.length === 6 && hooks.every((g) => g.hooks.length > 0),
+        `categories=${hooks.map((g) => g.category).join(",")}`
+      )
+    );
+    results.push(
+      check(
+        "Studio: copy has A/B/C variants + headlines",
+        copy.variants.length === 3 &&
+          copy.variants.map((v) => v.label).join("") === "ABC" &&
+          copy.headlines.length > 0,
+        `variants=${copy.variants.map((v) => v.label).join("")}`
+      )
+    );
+    results.push(
+      check(
+        "Studio: storyboard has 4 scenes + ending + CTA",
+        story.scenes.length === 4 &&
+          story.ending.length > 0 &&
+          story.cta.length > 0,
+        `scenes=${story.scenes.length}`
+      )
+    );
+    results.push(
+      check(
+        "Studio: no fabricated metrics in hooks/copy",
+        !/\d+%/.test(allHookText) && !/\d+%/.test(allCopyText),
+        "no \\d+% patterns present"
       )
     );
   }

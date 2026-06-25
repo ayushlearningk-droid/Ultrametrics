@@ -236,6 +236,15 @@ export function CommandPalette({
         action: () => goto("/dashboard/reports"),
       },
       {
+        id: "page-creative-studio",
+        label: "Creative Studio",
+        description: "AI creative brief, hooks & storyboard",
+        icon: Sparkles,
+        keywords: ["creative", "hooks", "copy", "ad", "storyboard"],
+        group: "page",
+        action: () => goto("/dashboard/creative-studio"),
+      },
+      {
         id: "page-actions",
         label: "Open Action Queue",
         description: "Approved actions & executions",
