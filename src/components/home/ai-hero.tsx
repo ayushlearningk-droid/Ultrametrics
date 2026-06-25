@@ -258,8 +258,6 @@ export function AIHero({
 
   const hasNoSources = connectors.length === 0;
   const headlineParts = buildHeadlineParts(findings, loading, hasNoSources);
-  const criticalCount = findings?.filter((f) => f.severity === "critical").length ?? 0;
-  const opportunityCount = findings?.filter((f) => f.severity === "opportunity").length ?? 0;
 
   /* ── No sources ── */
   if (hasNoSources) {

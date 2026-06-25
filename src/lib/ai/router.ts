@@ -12,17 +12,20 @@
  */
 
 import type { RouterSignals, RouteDecision } from "@/lib/ai/types";
-import {
-  detectChangeIntent,
-  type ChangeIntent,
-} from "@/lib/ai/change/change-intent";
+import { detectChangeIntent } from "@/lib/ai/change/change-intent";
 
 const SONNET = "claude-sonnet-4-6" as const;
 const OPUS = "claude-opus-4-8" as const;
 
-/** Conservative escalation triggers: deep analysis / reasoning intent. */
+/**
+ * Conservative escalation triggers: deep analysis / reasoning intent, plus
+ * marketing decision/diagnostic/ranking phrasings (scale, pause, wasted spend,
+ * worst/best performers, "which campaigns…", summaries) — these are analyst
+ * questions that benefit from Opus reasoning. Bare metric lookups ("what is my
+ * CTR") are deliberately NOT here so single-number questions stay on Sonnet.
+ */
 const COMPLEX_INTENT =
-  /\b(why|analy[sz]e|analysis|compare|comparison|forecast|predict|diagnos|explain the|root cause|optimi[sz]e|recommend|trend|correlat|attribut)\b/i;
+  /\b(why|analy[sz]e|analysis|compare|comparison|forecast|predict|diagnos|explain the|root cause|optimi[sz]e|recommend|trend|correlat|attribut|scale|pause|wast|underperform|worst|best[- ]?perform|summar|overview|big picture|which campaigns?|should i|saturat|fatigue)\b/i;
 
 /** Token estimate above which a turn is treated as heavy enough to escalate. */
 const LARGE_INPUT_TOKENS = 6000;

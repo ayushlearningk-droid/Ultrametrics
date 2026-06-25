@@ -51,9 +51,6 @@ const CHANGE_VERB =
 /** Explicit "what changed / what's changing" phrasing (metric may be unnamed). */
 const WHAT_CHANGED = /\bwhat(?:'s|s| has| have| is| are)?\s+chang\w*/i;
 
-/** "why" — a change question is usually "why did <metric> <verb>". */
-const WHY = /\bwhy\b/i;
-
 /** First metric named in the message, or null. */
 function detectMetric(message: string): ChangeMetric | null {
   for (const [pattern, metric] of METRIC_PATTERNS) {

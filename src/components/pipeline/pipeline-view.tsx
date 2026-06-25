@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Database, FileSpreadsheet, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Database, FileSpreadsheet, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { BRAND_ICON_MAP, GenericPlatformIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
 import type { SyncJobStatus } from "@/types/database";

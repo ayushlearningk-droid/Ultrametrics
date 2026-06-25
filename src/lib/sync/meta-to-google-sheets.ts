@@ -61,7 +61,7 @@ function normalizeMetaAccountId(accountId: string): string {
 function createSheetsClient(
   config: GoogleConnectorConfig,
   connectorId: string,
-  admin: ReturnType<typeof createAdminClient>
+  _admin: ReturnType<typeof createAdminClient>
 ) {
   const oauthConfig = requireGoogleOAuthConfig();
   const oauth2Client = new google.auth.OAuth2(

@@ -40,11 +40,12 @@ export interface DailyInsightRow {
   ctr: string;
 }
 
-/** Fetch day-by-day breakdown for the last `days` days (default 14). */
+/** Fetch day-by-day breakdown (uses date_preset=maximum; `_days` retained for
+ *  call-site compatibility). */
 export async function getAccountInsightsByDay(
   accessToken: string,
   accountId: string,
-  days = 14
+  _days = 14
 ): Promise<DailyInsightRow[]> {
   const fields = ["impressions", "clicks", "spend", "ctr"].join(",");
   const params = new URLSearchParams({

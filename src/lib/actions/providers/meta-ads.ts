@@ -35,12 +35,6 @@ const SUPPORTED: ReadonlySet<ActionType> = new Set<ActionType>([
   "ADJUST_BUDGET",
 ]);
 
-/** Only these two actions are ever executed in Sprint 14B.1. */
-const EXECUTABLE: ReadonlySet<ActionType> = new Set<ActionType>([
-  "PAUSE_CAMPAIGN",
-  "RESUME_CAMPAIGN",
-]);
-
 /** Meta campaign status target for each executable action. */
 const STATUS_FOR: Record<"PAUSE_CAMPAIGN" | "RESUME_CAMPAIGN", string> = {
   PAUSE_CAMPAIGN: "PAUSED",

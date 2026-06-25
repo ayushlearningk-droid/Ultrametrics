@@ -112,13 +112,128 @@ function metricLabel(m: string): string {
     ctr: "CTR",
     cpc: "CPC",
     cpm: "CPM",
+    roas: "ROAS",
+    spend: "Spend",
+    cpa: "CPA",
+    revenue: "Revenue",
+    clicks: "Clicks",
+    impressions: "Impressions",
     conversions: "Conversions",
+    conversion_rate: "Conv. rate",
   };
   return map[m] ?? m.toUpperCase();
 }
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+/** Humanize an engine cause key: "higher_cpc" → "Higher cpc". Idempotent on
+ *  already-readable text ("Higher CPC" stays "Higher CPC"). */
+function humanizeCause(raw: string): string {
+  const s = raw.replace(/[_-]+/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Severity ordering for picking the single highest-priority risk. */
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+function severityRank(c: CauseJson): number {
+  return SEVERITY_RANK[(c.severity ?? "").toLowerCase()] ?? 0;
+}
+
+/**
+ * Measurable-impact score for ranking recommendations. opportunity_score (0-100,
+ * the engine's grounded composite) dominates; the estimated-impact magnitude
+ * (largest projected % range) breaks ties. Both come from the tool result.
+ */
+function recImpactScore(r: RecJson): number {
+  const score = typeof r.opportunity_score === "number" ? r.opportunity_score : 0;
+  const maxHigh = (r.estimated_impact?.ranges ?? []).reduce(
+    (m, rg) => Math.max(m, rg.highPct ?? 0),
+    0
+  );
+  return score * 100 + maxHigh;
+}
+
+/** High / Medium / Low from the grounded opportunity_score. */
+function priorityFromScore(score?: number): "high" | "medium" | "low" {
+  if (typeof score !== "number") return "low";
+  if (score >= 70) return "high";
+  if (score >= 40) return "medium";
+  return "low";
+}
+
+/** Top measurable performance changes, phrased plainly (e.g. "CTR up 18%"). */
+function topChanges(metrics: TrendMetricJson[], n: number): string[] {
+  return [...metrics]
+    .filter((t) => t.status !== "stable" && Boolean(t.changeLabel))
+    .map((t) => {
+      const mag =
+        Math.abs(parseFloat(t.changeLabel.replace(/[^0-9.\-]/g, ""))) || 0;
+      return { t, mag };
+    })
+    .sort((a, b) => b.mag - a.mag)
+    .slice(0, n)
+    .map(({ t }) => {
+      const up = t.changeLabel.trim().startsWith("+");
+      const num = t.changeLabel.replace(/[+-]/, "").trim();
+      return `${metricLabel(t.metric)} ${up ? "up" : "down"} ${num}`;
+    });
+}
+
+/**
+ * CMO-grade executive summary — grounded, concise, actionable. Built only from
+ * the existing tool outputs (headline · trends · top cause · ranked recs). Each
+ * clause is omitted when its data is absent; no generic AI wording, nothing
+ * invented.
+ */
+function buildExecutiveSummary(args: {
+  headline: { spend: number; roas: number };
+  currency?: string;
+  trendMetrics: TrendMetricJson[];
+  topCause?: CauseJson;
+  rankedRecs: RecJson[];
+  watchOuts: string[];
+}): string {
+  const { headline, currency, trendMetrics, topCause, rankedRecs, watchOuts } =
+    args;
+  const parts: string[] = [];
+
+  parts.push(
+    `${money(headline.spend, currency)} spent at ROAS ${ratio(headline.roas)}.`
+  );
+
+  const changes = topChanges(trendMetrics, 2);
+  if (changes.length > 0) parts.push(`${changes.join(", ")}.`);
+
+  if (topCause) {
+    parts.push(
+      `Top risk: ${humanizeCause(topCause.primaryCause)}` +
+        (topCause.severity ? ` (${topCause.severity}).` : ".")
+    );
+  }
+
+  if (rankedRecs.length > 0) {
+    const high = rankedRecs.filter(
+      (r) => priorityFromScore(r.opportunity_score) === "high"
+    ).length;
+    parts.push(
+      `${rankedRecs.length} action${rankedRecs.length === 1 ? "" : "s"} ready` +
+        (high > 0 ? ` (${high} high-impact)` : "") +
+        ` — start with ${rankedRecs[0].action}.`
+    );
+  } else if (watchOuts.length > 0) {
+    parts.push(
+      `${watchOuts.length} watch-out${watchOuts.length === 1 ? "" : "s"} to review.`
+    );
+  }
+
+  return parts.join(" ");
 }
 
 /** Build the "## Recommendation — …" markdown for one rec (relay format). */
@@ -255,12 +370,28 @@ export async function composeBrief(input: {
     causeProviders.find((p) => p.provider === primary.provider)?.causes ?? [];
   const trendMetrics = primary.trends?.metrics ?? [];
 
-  // KPI strip — spend / ROAS / CTR (+ trend arrows where the engine has them).
-  const ctrTrend = trendMetrics.find((t) => t.metric === "ctr");
-  const convTrend = trendMetrics.find((t) => t.metric === "conversions");
+  // KPI strip — spend / ROAS / CTR / conversions, each with a trend arrow when
+  // the trend engine detected a change (surfaces spend↑↓, ROAS↑↓, CTR↑↓).
+  const trendFor = (m: string) => trendMetrics.find((t) => t.metric === m);
+  const spendTrend = trendFor("spend");
+  const roasTrend = trendFor("roas");
+  const ctrTrend = trendFor("ctr");
+  const convTrend = trendFor("conversions");
   const kpis: BriefKpi[] = [
-    { label: "Spend", value: money(primary.headline.spend, currency) },
-    { label: "ROAS", value: ratio(primary.headline.roas) },
+    {
+      label: "Spend",
+      value: money(primary.headline.spend, currency),
+      ...(spendTrend
+        ? { changeLabel: spendTrend.changeLabel, status: spendTrend.status }
+        : {}),
+    },
+    {
+      label: "ROAS",
+      value: ratio(primary.headline.roas),
+      ...(roasTrend
+        ? { changeLabel: roasTrend.changeLabel, status: roasTrend.status }
+        : {}),
+    },
     {
       label: "CTR",
       value: pct(primary.headline.ctr),
@@ -278,13 +409,23 @@ export async function composeBrief(input: {
     });
   }
 
-  // Deterministic, grounded one-line summary (no model call).
-  const watchCount = primary.watch_outs?.length ?? 0;
-  const summary =
-    `${money(primary.headline.spend, currency)} spent at ROAS ${ratio(primary.headline.roas)}. ` +
-    `${recs.length} recommended action${recs.length === 1 ? "" : "s"}, ` +
-    `${causes.length} root cause${causes.length === 1 ? "" : "s"} flagged` +
-    (watchCount > 0 ? `, ${watchCount} watch-out${watchCount === 1 ? "" : "s"}.` : ".");
+  // Impact-weighted recommendation ranking (opportunity_score, then estimated
+  // impact magnitude) — drives the Top Opportunity + the cards' High/Med/Low.
+  const rankedRecs = [...recs].sort(
+    (a, b) => recImpactScore(b) - recImpactScore(a)
+  );
+  // Top Risk = the highest-severity grounded cause (never just the first).
+  const topRisk = [...causes].sort((a, b) => severityRank(b) - severityRank(a))[0];
+
+  // CMO-grade executive summary, grounded in the tool outputs above.
+  const summary = buildExecutiveSummary({
+    headline: primary.headline,
+    currency,
+    trendMetrics,
+    topCause: topRisk,
+    rankedRecs,
+    watchOuts: primary.watch_outs ?? [],
+  });
 
   // Insight cards via relay markdown (reuses AiResponse cards).
   // Morning Brief V2 — Phase 1: order = Top Opportunity → Top Risk → Trend →
@@ -292,16 +433,13 @@ export async function composeBrief(input: {
   // the Top Opportunity (emitted first → the rank-1 OpportunityCard) and is
   // excluded from the remaining list so it never renders twice. Reuses the
   // existing recToMarkdown (recommendation heading → OpportunityCard).
-  const sortedRecs = [...recs].sort(
-    (a, b) => (b.opportunity_score ?? -1) - (a.opportunity_score ?? -1)
-  );
-  const [topOpportunity, ...restRecs] = sortedRecs;
+  const [topOpportunity, ...restRecs] = rankedRecs;
 
   // Per-section relay markdown (each rendered by its own <AiResponse>).
   const topOpportunityMarkdown = topOpportunity
     ? recToMarkdown(topOpportunity)
     : undefined;
-  const topRiskMarkdown = causes[0] ? causeToMarkdown(causes[0]) : undefined;
+  const topRiskMarkdown = topRisk ? causeToMarkdown(topRisk) : undefined;
   const trendMarkdown =
     trendMetrics.length > 0 ? trendsToMarkdown(trendMetrics) : undefined;
   const recBlocks = restRecs.slice(0, 2).map((r) => recToMarkdown(r));

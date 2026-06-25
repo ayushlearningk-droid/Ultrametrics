@@ -15,7 +15,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X, Play, Undo2, Loader2, Copy, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { fadeIn, DUR, EASE_OUT } from "@/lib/motion";
 import type { QueuedAction } from "@/lib/stores/action-queue";
 import type { ActionExecutionRow, ActionAuditLogRow } from "@/types/database";
