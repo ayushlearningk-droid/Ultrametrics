@@ -68,3 +68,42 @@ export const staggerChildren: Variants = {
     transition: { staggerChildren: 0.04, delayChildren: 0.03 },
   },
 };
+
+/* ── Sprint 40: additional reusable primitives ─────────────────────────────
+ * Same tween-only, ease-out language. Variants for entrances; plain target
+ * objects for `whileHover` / `whileTap` so any motion element can adopt the
+ * shared interaction feel without redefining it. */
+
+/** Fade + gentle scale-up entrance. Modals, hero media, focal cards. */
+export const scaleIn: Variants = {
+  hidden: { opacity: 0, scale: 0.96 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: DUR.base, ease: EASE_OUT },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.98,
+    transition: { duration: DUR.fast, ease: EASE_OUT },
+  },
+};
+
+/** Route-level transition (fade + small rise). For page wrappers. */
+export const pageTransition: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: DUR.slow, ease: EASE_OUT } },
+  exit: { opacity: 0, y: -6, transition: { duration: DUR.fast, ease: EASE_OUT } },
+};
+
+/** Shared `whileHover` target — a subtle premium lift. */
+export const hoverLift = {
+  y: -2,
+  transition: { duration: DUR.fast, ease: EASE_OUT },
+} as const;
+
+/** Shared `whileTap` target — a calm press (no bounce). */
+export const press = {
+  scale: 0.98,
+  transition: { duration: DUR.fast, ease: EASE_OUT },
+} as const;

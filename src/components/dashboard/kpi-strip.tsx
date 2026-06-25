@@ -34,7 +34,7 @@ export function KpiStrip({ kpis }: { kpis: BriefKpi[] }) {
         return (
           <div
             key={i}
-            className="card flex h-full flex-col justify-between gap-2 px-4 py-3"
+            className="card card-hover flex h-full flex-col justify-between gap-2 px-4 py-3"
           >
             <div className="truncate type-eyebrow text-foreground-muted">
               {k.label}

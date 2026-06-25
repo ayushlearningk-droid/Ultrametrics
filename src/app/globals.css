@@ -266,11 +266,24 @@
     border-radius: 12px;
   }
   .card-hover {
-    transition: border-color 180ms ease, background-color 180ms ease;
+    transition: border-color 180ms ease, background-color 180ms ease,
+      box-shadow 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
   }
+  /* Premium hover (Sprint 40): subtle lift + depth + brand-tinted edge. */
   .card-hover:hover {
-    border-color: hsl(0 0% 100% / 0.16);
+    border-color: hsl(var(--brand) / 0.28);
     background: hsl(0 0% 100% / 0.05);
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.05) inset,
+      0 10px 28px hsl(240 30% 1% / 0.45);
+  }
+  /* Clickable card: hover lift + a calm press. Pair with .card .card-hover. */
+  .card-interactive {
+    cursor: pointer;
+  }
+  .card-interactive:active {
+    transform: translateY(-1px) scale(0.992);
   }
 
   /* ── Chip / badge base + strict 3-colour status modifiers ──────
@@ -485,5 +498,8 @@
   .anim-settle { animation: none !important; }
   .panel,
   .panel-hover:hover { transition: border-color 180ms ease; transform: none; }
+  /* Sprint 40: collapse the premium card lift/press for reduced motion. */
+  .card-hover:hover,
+  .card-interactive:active { transform: none !important; }
   * { scroll-behavior: auto !important; }
 }
