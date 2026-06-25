@@ -24,8 +24,11 @@ const OPUS = "claude-opus-4-8" as const;
  * questions that benefit from Opus reasoning. Bare metric lookups ("what is my
  * CTR") are deliberately NOT here so single-number questions stay on Sonnet.
  */
+// Stem matcher: no trailing word boundary, so inflected forms match too
+// ("summar" → summarize/summary, "wast" → wasting, "scale" → scaling). Escalating
+// is the safe direction, so prefix matching here is intentional.
 const COMPLEX_INTENT =
-  /\b(why|analy[sz]e|analysis|compare|comparison|forecast|predict|diagnos|explain the|root cause|optimi[sz]e|recommend|trend|correlat|attribut|scale|pause|wast|underperform|worst|best[- ]?perform|summar|overview|big picture|which campaigns?|should i|saturat|fatigue)\b/i;
+  /\b(why|analy[sz]e|analysis|compare|comparison|forecast|predict|diagnos|explain the|root cause|optimi[sz]e|recommend|trend|correlat|attribut|scale|pause|wast|underperform|worst|best[- ]?perform|rank|summar|overview|big picture|which campaigns?|should i|saturat|fatigue)/i;
 
 /** Token estimate above which a turn is treated as heavy enough to escalate. */
 const LARGE_INPUT_TOKENS = 6000;

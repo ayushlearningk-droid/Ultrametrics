@@ -54,7 +54,7 @@ const RE = {
     /\b(summar(?:y|ise|ize)|overview|big picture|how(?:'s| is| are)\s+(?:my|the)\s+account|today'?s account)\b/i,
   recommend:
     /\b(recommend|what should i|should i\s+(?:scale|pause|cut|kill|do|fix)|wast(?:e|ing)|optimi[sz]e|improve|where.*(?:spend|budget))\b/i,
-  diagnose: /\b(why is|why are|root cause|underperform|diagnos|problem|issue|concern)\b/i,
+  diagnose: /\b(why is|why are|root cause|underperform\w*|diagnos\w*|problem|issue|concern)\b/i,
   rank: /\b(top|worst|best|highest|lowest|which campaigns?|high cpc|low ctr|low cpc|high ctr|rank)\b/i,
   factual:
     /\b(what(?:'s| is| are| was)|show(?: me)?|how much|how many)\b.*\b(ctr|cpc|cpm|roas|spend|clicks|impressions|conversions|revenue)\b/i,
