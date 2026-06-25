@@ -385,6 +385,36 @@
   50% { opacity: 1; }
 }
 
+/* ════════════════════════════════════════════════════════════════
+   PRINT — AI Reports export/print layout (Sprint 18)
+   Hide app chrome + toolbars; keep report cards intact across pages.
+   ════════════════════════════════════════════════════════════════ */
+@media print {
+  /* App chrome + anything explicitly excluded from export. */
+  [data-no-print],
+  .env-layer,
+  .env-vignette {
+    display: none !important;
+  }
+  /* Let the report own the page. */
+  .report-print {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  /* Don't split a section/card across a page break. */
+  .report-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Render surface colours faithfully (dark cards stay legible). */
+  .report-print,
+  .report-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .env-pool { animation: none !important; transform: none !important; }
   .anim-pulse,

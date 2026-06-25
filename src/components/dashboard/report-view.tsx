@@ -1,0 +1,153 @@
+"use client";
+
+/**
+ * AI Report view (Sprint 18).
+ *
+ * Export- and print-ready document built ENTIRELY from existing pieces: the
+ * server-composed BriefData (composeBrief), the existing <KpiStrip>, and the
+ * existing <AiResponse> card renderer. No new analytics or card components are
+ * introduced — this is a print/export LAYOUT over the same data the Morning
+ * Brief uses. Design tokens + motion.ts only.
+ *
+ * Sections: Executive Summary · KPI Overview · Performance Analysis · Root Cause
+ * · Opportunities · Recommendations.
+ */
+
+import { motion, useReducedMotion } from "framer-motion";
+import { Printer } from "lucide-react";
+import { AiResponse } from "@/components/os/ai-response";
+import { KpiStrip } from "@/components/dashboard/kpi-strip";
+import { staggerChildren, slideUp } from "@/lib/motion";
+import type { BriefData } from "@/lib/ai/brief/compose-brief";
+
+function ReportSection({
+  index,
+  label,
+  children,
+}: {
+  index: number;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.section variants={slideUp} className="report-section space-y-3">
+      <div className="flex items-baseline gap-2">
+        <span className="type-caption tabular-nums text-foreground-muted">
+          {String(index).padStart(2, "0")}
+        </span>
+        <h2 className="type-eyebrow text-foreground-muted">{label}</h2>
+      </div>
+      {children}
+    </motion.section>
+  );
+}
+
+/** Renders a section's relay markdown via the existing AiResponse, or a note. */
+function SectionBody({ markdown }: { markdown?: string }) {
+  if (!markdown) {
+    return (
+      <div className="card-muted px-4 py-5 text-center">
+        <p className="type-caption text-foreground-muted">
+          No data available for this section.
+        </p>
+      </div>
+    );
+  }
+  // Reports are READ ONLY — hide every interactive control (CTA / Approve /
+  // Action Queue). No onPrompt either (export-safe).
+  return <AiResponse content={markdown} readOnly />;
+}
+
+export function ReportView({
+  data,
+  workspaceName,
+}: {
+  data: BriefData;
+  workspaceName: string;
+}) {
+  const reduce = useReducedMotion();
+
+  return (
+    <div className="report-print mx-auto max-w-3xl space-y-8 px-4 py-8 md:px-6">
+      {/* Toolbar (hidden in print/export output) */}
+      <div
+        data-no-print
+        className="flex items-center justify-between gap-3"
+      >
+        <span className="type-eyebrow text-foreground-muted">AI Report</span>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.12] px-3 py-1.5 type-caption font-semibold text-foreground-muted transition-colors hover:border-white/[0.25] hover:text-foreground"
+        >
+          <Printer className="h-3.5 w-3.5" />
+          Print / Export PDF
+        </button>
+      </div>
+
+      {/* Document header */}
+      <header className="report-section space-y-2 border-b border-white/[0.08] pb-6">
+        <span className="type-eyebrow text-foreground-muted">
+          {workspaceName} · {data.dateLabel}
+        </span>
+        <h1 className="type-display text-foreground">Performance Report</h1>
+        {data.provider && (
+          <p className="type-caption text-foreground-muted">
+            Source: {data.provider}
+            {data.currency ? ` · ${data.currency}` : ""}
+          </p>
+        )}
+      </header>
+
+      <motion.div
+        className="space-y-8"
+        variants={staggerChildren}
+        initial={reduce ? false : "hidden"}
+        animate="visible"
+      >
+        {/* 1. Executive Summary */}
+        <ReportSection index={1} label="Executive Summary">
+          <p className="type-body leading-relaxed text-foreground/90">
+            {data.summary}
+          </p>
+        </ReportSection>
+
+        {/* 2. KPI Overview */}
+        <ReportSection index={2} label="KPI Overview">
+          {data.kpis.length > 0 ? (
+            <KpiStrip kpis={data.kpis} />
+          ) : (
+            <SectionBody />
+          )}
+        </ReportSection>
+
+        {/* 3. Performance Analysis */}
+        <ReportSection index={3} label="Performance Analysis">
+          <SectionBody markdown={data.trendMarkdown} />
+        </ReportSection>
+
+        {/* 4. Root Cause */}
+        <ReportSection index={4} label="Root Cause">
+          <SectionBody markdown={data.topRiskMarkdown} />
+        </ReportSection>
+
+        {/* 5. Opportunities */}
+        <ReportSection index={5} label="Opportunities">
+          <SectionBody markdown={data.topOpportunityMarkdown} />
+        </ReportSection>
+
+        {/* 6. Recommendations */}
+        <ReportSection index={6} label="Recommendations">
+          <SectionBody markdown={data.recommendationsMarkdown} />
+        </ReportSection>
+      </motion.div>
+
+      <footer
+        data-no-print
+        className="border-t border-white/[0.08] pt-4 type-caption text-foreground-muted"
+      >
+        Generated by Ultrametrics · grounded in your connected data.
+      </footer>
+    </div>
+  );
+}

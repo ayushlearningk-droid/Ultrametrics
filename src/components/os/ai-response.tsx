@@ -1022,9 +1022,11 @@ const SEVERITY_STYLES: Record<
 function RootCauseCard({
   data,
   heading,
+  readOnly = false,
 }: {
   data: RootCauseData;
   heading: string | null;
+  readOnly?: boolean;
 }) {
   const sev = data.severity ? SEVERITY_STYLES[data.severity] : null;
   return (
@@ -1089,16 +1091,18 @@ function RootCauseCard({
       )}
 
       {/* ── Action Center footer: Approve → shared Action Queue ── */}
-      <div className="mt-3.5 flex justify-end">
-        <ApproveButton
-          action={{
-            title: data.cause,
-            source: "Ask Ultrametrics",
-            type: "fix",
-            priority: severityToPriority(data.severity),
-          }}
-        />
-      </div>
+      {!readOnly && (
+        <div className="mt-3.5 flex justify-end">
+          <ApproveButton
+            action={{
+              title: data.cause,
+              source: "Ask Ultrametrics",
+              type: "fix",
+              priority: severityToPriority(data.severity),
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1205,6 +1209,7 @@ function OpportunityCard({
   body,
   onPrompt,
   structured,
+  readOnly = false,
 }: {
   heading: string | null;
   /** UI-inferred 1-based rank among recommendation cards in this answer. */
@@ -1219,6 +1224,8 @@ function OpportunityCard({
   onPrompt?: (text: string) => void;
   /** Sprint 13B: guaranteed structured recommendation for this card, or null. */
   structured?: ActionRecommendation | null;
+  /** Sprint 18.1: hide interactive controls (CTA + Approve) for reports. */
+  readOnly?: boolean;
 }) {
   const evidence = breakdown?.evidence ?? null;
   // CTA is rendered as a button even in the fallback path: parse it independently
@@ -1312,7 +1319,7 @@ function OpportunityCard({
               <span className="text-foreground">{priority}</span>
             </span>
           )}
-          {cta && (
+          {cta && !readOnly && (
             <button
               type="button"
               onClick={() => onPrompt?.(cta)}
@@ -1324,7 +1331,7 @@ function OpportunityCard({
             </button>
           )}
         </div>
-        <ApproveButton action={approveAction} />
+        {!readOnly && <ApproveButton action={approveAction} />}
       </div>
     </div>
   );
@@ -1468,6 +1475,9 @@ export interface AiResponseProps {
   onPrompt?: (text: string) => void;
   /** Sprint 13B: structured recommendations for THIS turn (grounded). */
   recommendations?: ActionRecommendation[];
+  /** Sprint 18.1: read-only render — hides all interactive controls (Approve /
+   *  CTA / Action Queue). Used by the AI Reports export/print layout. */
+  readOnly?: boolean;
 }
 
 /** Render an AI markdown answer as structured cards, with markdown fallback. */
@@ -1475,6 +1485,7 @@ export function AiResponse({
   content,
   onPrompt,
   recommendations,
+  readOnly = false,
 }: AiResponseProps) {
   const sections = parseSections(content);
   const reduce = useReducedMotion();
@@ -1538,7 +1549,7 @@ export function AiResponse({
           return (
             <motion.div key={i} variants={elevate} className="space-y-3">
               {rest && <Markdown>{rest}</Markdown>}
-              <RootCauseCard data={rc} heading={section.heading} />
+              <RootCauseCard data={rc} heading={section.heading} readOnly={readOnly} />
             </motion.div>
           );
         }
@@ -1570,6 +1581,7 @@ export function AiResponse({
                 body={cardBody}
                 onPrompt={onPrompt}
                 structured={guaranteedRec}
+                readOnly={readOnly}
               />
             </motion.div>
           );

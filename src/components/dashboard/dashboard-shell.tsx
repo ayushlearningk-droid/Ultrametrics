@@ -58,7 +58,8 @@ export function DashboardShell({
       <EnvironmentLayer />
 
       {/* ── L2 — Sidebar (sits in front of environment) ─────────── */}
-      <DashboardSidebar
+      <div data-no-print className="contents">
+        <DashboardSidebar
         workspaceName={workspaceName}
         workspaces={workspaces}
         currentWorkspaceId={currentWorkspaceId}
@@ -67,11 +68,15 @@ export function DashboardShell({
         onMobileOpenChange={setIsMobileOpen}
         onCommandOpen={() => setCmdOpen(true)}
         onNotifToggle={() => setNotifOpen((v) => !v)}
-      />
+        />
+      </div>
 
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile-only top strip */}
-        <div className="flex h-12 shrink-0 items-center gap-3 border-b border-white/[0.05] px-4 md:hidden">
+        <div
+          data-no-print
+          className="flex h-12 shrink-0 items-center gap-3 border-b border-white/[0.05] px-4 md:hidden"
+        >
           <button
             onClick={() => setIsMobileOpen(true)}
             className="text-foreground-muted hover:text-foreground"
@@ -98,7 +103,11 @@ export function DashboardShell({
         </main>
 
         {/* ── L3 — Command bar (Ask surface; hidden when AI Insights off) ── */}
-        {aiInsightsEnabled && <BottomCommandBar />}
+        {aiInsightsEnabled && (
+          <div data-no-print className="contents">
+            <BottomCommandBar />
+          </div>
+        )}
       </div>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
