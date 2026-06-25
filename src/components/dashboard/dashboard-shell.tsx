@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
 import { Menu, Search, Bell } from "lucide-react";
 import {
   useNotifications,
   hydrateNotifications,
 } from "@/lib/stores/notifications";
+import { pageTransition } from "@/lib/motion";
 import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
@@ -38,6 +40,8 @@ export function DashboardShell({
   aiInsightsEnabled = true,
 }: DashboardShellProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -132,9 +136,18 @@ export function DashboardShell({
           </button>
         </div>
 
-        {/* ── L1 — Canvas (transparent, scrolls over environment) ── */}
+        {/* ── L1 — Canvas (transparent, scrolls over environment) ──
+           Route-keyed wrapper replays a calm page reveal on every navigation
+           (Sprint 41), reusing the shared pageTransition. Reduced-motion safe. */}
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <motion.div
+            key={pathname}
+            variants={pageTransition}
+            initial={reduceMotion ? false : "hidden"}
+            animate="visible"
+          >
+            {children}
+          </motion.div>
         </main>
 
         {/* ── L3 — Command bar (Ask surface; hidden when AI Insights off) ── */}
