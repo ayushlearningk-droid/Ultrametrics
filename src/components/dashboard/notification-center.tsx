@@ -1,216 +1,301 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle2, XCircle, RefreshCw, Clock, Bell } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { BRAND_ICON_MAP, GenericPlatformIcon } from "@/components/ui/brand-icons";
+/**
+ * Notification Center (Sprint 22) — unified, filterable notification drawer.
+ *
+ * Reads the reactive notifications store (sync + actions, real data). Provides
+ * category filters, read/unread + severity states, bulk actions (mark all read /
+ * clear read), rich cards (icon · title · description · timestamp · CTA), and a
+ * token-only empty state. Motion exclusively from src/lib/motion.ts (no spring,
+ * no blur).
+ */
 
-interface Notification {
-  id: string;
-  type: "success" | "error" | "info" | "warning";
-  message: string;
-  connectorName: string;
-  provider: string;
-  status: string;
-  records: number;
-  createdAt: string;
-  completedAt: string | null;
-}
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+  Bell,
+  CheckCheck,
+  Trash2,
+  X,
+  RefreshCw,
+  ListChecks,
+  Sparkles,
+  FileText,
+  Building2,
+  CheckCircle2,
+  XCircle,
+  Clock3,
+  ArrowRight,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { fadeIn, slideUp, staggerChildren, DUR, EASE_OUT } from "@/lib/motion";
+import {
+  useNotifications,
+  hydrateNotifications,
+  markRead,
+  markAllRead,
+  clearRead,
+  type AppNotification,
+  type NotifCategory,
+} from "@/lib/stores/notifications";
 
 interface NotificationCenterProps {
   open: boolean;
   onClose: () => void;
 }
 
+type Filter = "all" | "unread" | "ai" | "sync" | "actions" | "reports";
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "unread", label: "Unread" },
+  { id: "ai", label: "AI" },
+  { id: "sync", label: "Sync" },
+  { id: "actions", label: "Actions" },
+  { id: "reports", label: "Reports" },
+];
+
+const CATEGORY_ICON: Record<NotifCategory, React.ElementType> = {
+  ai: Sparkles,
+  sync: RefreshCw,
+  actions: ListChecks,
+  reports: FileText,
+  workspace: Building2,
+};
+
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
+  if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-function StatusIcon({ type }: { type: Notification["type"] }) {
-  switch (type) {
-    case "success":
-      return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
-    case "error":
-      return <XCircle className="h-4 w-4 text-red-400" />;
-    case "info":
-      return <RefreshCw className="h-4 w-4 animate-spin text-brand" />;
-    default:
-      return <Clock className="h-4 w-4 text-muted-foreground" />;
-  }
+/** Severity badge — strict 3-colour: brand / muted-red / slate. */
+function SeverityIcon({ type }: { type: AppNotification["type"] }) {
+  if (type === "success")
+    return <CheckCircle2 className="h-3.5 w-3.5 text-brand" />;
+  if (type === "failed")
+    return <XCircle className="h-3.5 w-3.5 text-red-400/80" />;
+  if (type === "warning")
+    return <Clock3 className="h-3.5 w-3.5 text-red-400/80" />;
+  return <Clock3 className="h-3.5 w-3.5 text-slate-300" />;
 }
 
 export function NotificationCenter({ open, onClose }: NotificationCenterProps) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(false);
+  const reduce = useReducedMotion();
+  const { visible, readIds, unreadCount } = useNotifications();
+  const [filter, setFilter] = useState<Filter>("all");
 
+  // Hydrate on open; refresh ensures the latest sync/action events.
+  useEffect(() => {
+    if (open) void hydrateNotifications();
+  }, [open]);
+
+  // Lock background scroll while open.
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  // Close on Escape.
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((d) => setNotifications(d.notifications ?? []))
-      .catch(() => setNotifications([]))
-      .finally(() => setLoading(false));
-  }, [open]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
-  // Stop background scroll when panel is open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
+  const filtered = useMemo(() => {
+    switch (filter) {
+      case "all":
+        return visible;
+      case "unread":
+        return visible.filter((n) => !readIds.has(n.id));
+      default:
+        return visible.filter((n) => n.category === filter);
     }
-    return () => { document.body.style.overflow = ""; };
-  }, [open]);
+  }, [visible, readIds, filter]);
 
-  const grouped = notifications.reduce<Record<string, Notification[]>>((acc, n) => {
-    const day = new Date(n.createdAt).toLocaleDateString("en-US", {
-      month: "short", day: "numeric",
-    });
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(n);
-    return acc;
-  }, {});
+  const hasRead = visible.some((n) => readIds.has(n.id));
 
   return (
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-[60] bg-black/40"
+            variants={fadeIn}
+            initial={reduce ? false : "hidden"}
+            animate="visible"
+            exit="exit"
             onClick={onClose}
+            aria-hidden
           />
-
-          {/* Panel */}
-          <motion.div
-            className="fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-white/[0.08] bg-[hsl(222_44%_5%)] shadow-2xl shadow-black/60"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 400, damping: 38 }}
+          <motion.aside
+            className="fixed inset-y-0 right-0 z-[61] flex w-full flex-col border-l border-white/[0.08] bg-[hsl(var(--card))] shadow-2xl sm:w-[400px]"
+            initial={reduce ? false : { x: "100%", opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: "100%", opacity: 0 }}
+            transition={{ duration: DUR.base, ease: EASE_OUT }}
+            role="dialog"
+            aria-label="Notifications"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4">
-              <div className="flex items-center gap-2.5">
-                <Bell className="h-4 w-4 text-muted-foreground" />
-                <p className="font-semibold text-sm">Activity</p>
-                {notifications.length > 0 && (
-                  <span className="rounded-full bg-brand/20 px-2 py-0.5 text-[10px] font-semibold text-brand">
-                    {notifications.length}
+            <div className="flex items-center justify-between gap-2 border-b border-white/[0.07] px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-foreground-muted" />
+                <span className="type-body font-semibold text-foreground">
+                  Notifications
+                </span>
+                {unreadCount > 0 && (
+                  <span className="chip chip-emerald tabular-nums">
+                    {unreadCount}
                   </span>
                 )}
               </div>
               <button
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                aria-label="Close"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-white/[0.05] hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="space-y-1 p-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-14 animate-pulse rounded-lg bg-white/[0.03]"
-                      style={{ animationDelay: `${i * 60}ms` }}
-                    />
-                  ))}
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.025]">
-                    <Bell className="h-5 w-5 text-muted-foreground/60" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">No activity yet</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Sync events will appear here
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 space-y-4">
-                  {Object.entries(grouped).map(([day, items]) => (
-                    <div key={day}>
-                      <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-                        {day}
-                      </p>
-                      <ul className="space-y-1">
-                        {items.map((n, i) => {
-                          const BrandIcon = BRAND_ICON_MAP[n.provider];
-                          return (
-                            <motion.li
-                              key={n.id}
-                              initial={{ opacity: 0, x: 12 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: i * 0.04, duration: 0.2 }}
-                            >
-                              <div
-                                className={cn(
-                                  "flex items-start gap-3 rounded-lg border px-3 py-2.5",
-                                  n.type === "error"
-                                    ? "border-red-500/20 bg-red-500/[0.04]"
-                                    : "border-white/[0.06] bg-white/[0.02]"
-                                )}
-                              >
-                                <div className="shrink-0 mt-0.5">
-                                  {BrandIcon ? (
-                                    <BrandIcon className="h-7 w-7" />
-                                  ) : (
-                                    <GenericPlatformIcon className="h-7 w-7" />
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-xs font-medium leading-snug">
-                                    {n.message}
-                                  </p>
-                                  <div className="mt-0.5 flex items-center gap-1.5">
-                                    <StatusIcon type={n.type} />
-                                    <p className="text-[10px] text-muted-foreground">
-                                      {relativeTime(n.createdAt)}
-                                      {n.type === "success" && n.records > 0 && (
-                                        <> · {n.records.toLocaleString()} rows</>
-                                      )}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </motion.li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-white/[0.06] px-4 py-2.5">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  aria-pressed={filter === f.id}
+                  onClick={() => setFilter(f.id)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 type-caption font-semibold transition-colors",
+                    filter === f.id
+                      ? "border-brand/40 bg-brand/15 text-brand"
+                      : "border-white/[0.1] bg-white/[0.03] text-foreground-muted hover:text-foreground"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
 
-            {/* Footer */}
-            <div className="border-t border-white/[0.06] px-5 py-3">
-              <a
-                href="/dashboard/sync-jobs"
-                className="block text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+            {/* Bulk actions */}
+            <div className="flex items-center justify-end gap-2 border-b border-white/[0.06] px-4 py-2">
+              <button
+                type="button"
+                onClick={markAllRead}
+                disabled={unreadCount === 0}
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 type-caption font-semibold text-foreground-muted transition-colors hover:text-foreground disabled:opacity-40"
               >
-                View all sync jobs →
-              </a>
+                <CheckCheck className="h-3.5 w-3.5" />
+                Mark all read
+              </button>
+              <button
+                type="button"
+                onClick={clearRead}
+                disabled={!hasRead}
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 type-caption font-semibold text-foreground-muted transition-colors hover:text-foreground disabled:opacity-40"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Clear read
+              </button>
             </div>
-          </motion.div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto p-3">
+              {filtered.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03]">
+                    <Bell className="h-5 w-5 text-foreground-muted" />
+                  </div>
+                  <p className="type-body font-semibold text-foreground">
+                    {filter === "unread" ? "You're all caught up" : "Nothing here yet"}
+                  </p>
+                  <p className="max-w-[15rem] type-caption text-foreground-muted">
+                    {filter === "all"
+                      ? "Sync and action events will show up here."
+                      : "No notifications match this filter."}
+                  </p>
+                </div>
+              ) : (
+                <motion.ul
+                  className="flex flex-col gap-1.5"
+                  variants={staggerChildren}
+                  initial={reduce ? false : "hidden"}
+                  animate="visible"
+                >
+                  {filtered.map((n) => {
+                    const Icon = CATEGORY_ICON[n.category];
+                    const unread = !readIds.has(n.id);
+                    return (
+                      <motion.li key={n.id} variants={slideUp}>
+                        <div
+                          onMouseEnter={() => unread && markRead(n.id)}
+                          className={cn(
+                            "card flex items-start gap-3 p-3 transition-opacity",
+                            !unread && "opacity-65"
+                          )}
+                        >
+                          <div className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-foreground-muted">
+                            <Icon className="h-4 w-4" />
+                            {unread && (
+                              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate type-body font-semibold text-foreground">
+                              {n.title}
+                            </p>
+                            {n.description && (
+                              <p className="mt-0.5 line-clamp-2 type-caption text-foreground-muted">
+                                {n.description}
+                              </p>
+                            )}
+                            <div className="mt-1.5 flex items-center justify-between gap-2">
+                              <span className="flex items-center gap-1.5 type-caption text-foreground-muted">
+                                <SeverityIcon type={n.type} />
+                                <span
+                                  className="tabular-nums"
+                                  title={new Date(n.createdAt).toLocaleString()}
+                                >
+                                  {relativeTime(n.createdAt)}
+                                </span>
+                              </span>
+                              {n.cta && (
+                                <Link
+                                  href={n.cta.href}
+                                  onClick={() => {
+                                    markRead(n.id);
+                                    onClose();
+                                  }}
+                                  className="inline-flex shrink-0 items-center gap-1 type-caption font-semibold text-brand transition-colors hover:text-brand/80"
+                                >
+                                  {n.cta.label}
+                                  <ArrowRight className="h-3 w-3" />
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </motion.li>
+                    );
+                  })}
+                </motion.ul>
+              )}
+            </div>
+          </motion.aside>
         </>
       )}
     </AnimatePresence>

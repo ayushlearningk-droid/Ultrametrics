@@ -21,7 +21,7 @@ const STATUS_STYLE: Record<string, string> = {
 export function KpiStrip({ kpis }: { kpis: BriefKpi[] }) {
   if (kpis.length === 0) return null;
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+    <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-4">
       {kpis.map((k, i) => {
         const up = k.changeLabel?.startsWith("+");
         const Arrow =
@@ -32,18 +32,21 @@ export function KpiStrip({ kpis }: { kpis: BriefKpi[] }) {
               : TrendingDown;
         const statusColor = k.status ? STATUS_STYLE[k.status] : undefined;
         return (
-          <div key={i} className="card px-3.5 py-3">
-            <div className="type-eyebrow text-foreground-muted">
+          <div
+            key={i}
+            className="card flex h-full flex-col justify-between gap-2 px-4 py-3"
+          >
+            <div className="truncate type-eyebrow text-foreground-muted">
               {k.label}
             </div>
-            <div className="mt-1 flex items-baseline gap-2">
+            <div className="flex items-baseline justify-between gap-2">
               <span className="type-body font-semibold tabular-nums text-foreground">
                 {k.value}
               </span>
               {k.changeLabel && (
                 <span
                   className={cn(
-                    "flex items-center gap-0.5 type-caption font-semibold tabular-nums",
+                    "flex shrink-0 items-center gap-0.5 type-caption font-semibold tabular-nums",
                     statusColor ?? "text-foreground-muted"
                   )}
                 >

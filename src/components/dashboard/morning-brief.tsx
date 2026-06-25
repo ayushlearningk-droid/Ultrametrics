@@ -1,18 +1,23 @@
 "use client";
 
 /**
- * Morning Brief — home surface (Sprint 4 Phase B; V2 Phase 2 — labeled sections).
+ * Morning Brief — executive home surface (Sprint 19 composition).
  *
- * Renders the composed BriefData as labeled executive sections: Executive
- * Summary → Key Metrics (KPI strip) → Top Opportunity → Top Risk → Trend
- * Analysis → Recommendations. Each insight section feeds its OWN per-section
- * relay markdown to the EXISTING <AiResponse> renderer (reusing Opportunity /
- * Root Cause / Trend cards — no duplicate components). CTAs seed Ask + open the
- * drawer. Section labels are plain eyebrows rendered here (AiResponse turns
- * headings into cards, so labels must live outside it).
+ * AI-native, calm, executive layout. Composition only — reuses the existing
+ * <AiResponse> cards, <KpiStrip>, and <BriefActivityFeed>; the server-composed
+ * BriefData and all data/AI logic are untouched.
+ *
+ * Structure: Executive Hero (summary + greeting · date · workspace + executive
+ * stats) → fused KPI Command Center → Focus Grid (Opportunity | Risk) → Trend
+ * Analysis → Recommendations → Activity Rail → Executive Footer.
+ *
+ * Tokens only (type-*, .card); strict emerald/muted-red/slate; 8pt rhythm;
+ * motion exclusively from src/lib/motion.ts.
  */
 
 import type { ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Sparkles } from "lucide-react";
 import { AiResponse } from "@/components/os/ai-response";
 import { KpiStrip } from "@/components/dashboard/kpi-strip";
 import {
@@ -20,27 +25,91 @@ import {
   type ActivityItem,
 } from "@/components/dashboard/brief-activity-feed";
 import { useAsk } from "@/components/os/ask-provider";
+import { staggerChildren, slideUp } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import type { BriefData } from "@/lib/ai/brief/compose-brief";
 
-function Section({ label, children }: { label: string; children: ReactNode }) {
+function Section({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <section className="space-y-2">
-      <h2 className="px-0.5 type-eyebrow text-foreground-muted">{label}</h2>
+    <section className={cn("flex flex-col gap-2", className)}>
+      <h2 className="type-eyebrow text-foreground-muted">{label}</h2>
       {children}
     </section>
   );
 }
 
-/** A single executive stat chip in the hero meta row. */
-function HeroStat({ value, label }: { value: string | number; label: string }) {
+/** A single executive stat in the hero focus row. Tone colours the value when
+ *  non-zero: critical → muted red, positive → emerald, neutral → foreground. */
+function HeroStat({
+  value,
+  label,
+  tone = "neutral",
+}: {
+  value: number;
+  label: string;
+  tone?: "critical" | "positive" | "neutral";
+}) {
+  const valueColor =
+    value > 0 && tone === "critical"
+      ? "text-red-400/80"
+      : value > 0 && tone === "positive"
+        ? "text-brand"
+        : "text-foreground";
   return (
     <div className="flex items-baseline gap-1.5">
-      <span className="type-body font-semibold tabular-nums text-foreground">
+      <span className={cn("type-body font-semibold tabular-nums", valueColor)}>
         {value}
       </span>
       <span className="type-caption text-foreground-muted">{label}</span>
     </div>
   );
+}
+
+/** First name from a full name, for the greeting. */
+function firstNameOf(name: string | null | undefined): string | null {
+  const first = name?.trim().split(/\s+/)[0];
+  return first || null;
+}
+
+/** Humanize a snake/kebab cause key: "bidding_inefficiency" → "Bidding inefficiency". */
+function humanize(raw: string): string {
+  const s = raw.replace(/[_-]+/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Derive a one-line "AI Says" causal statement from the Top Risk relay markdown
+ * (Evidence preferred, else the Root Cause). Presentation-only parse — no AI or
+ * compose change. Falls back to the executive summary.
+ */
+function aiSaysLine(topRiskMarkdown: string | undefined, summary: string): string {
+  if (topRiskMarkdown) {
+    const evidence = /(?:^|\n)\s*Evidence:\s*(.+)/i.exec(topRiskMarkdown);
+    if (evidence?.[1]) return evidence[1].trim();
+    const cause = /(?:^|\n)\s*Root Cause:\s*(.+)/i.exec(topRiskMarkdown);
+    if (cause?.[1]) return humanize(cause[1].trim());
+  }
+  return summary;
+}
+
+/** Parse recommended action titles from the Recommendations relay markdown. */
+function recommendedTitles(recommendationsMarkdown: string | undefined): string[] {
+  if (!recommendationsMarkdown) return [];
+  const out: string[] = [];
+  const re = /^##\s*Recommendation\s*—\s*(.+)$/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(recommendationsMarkdown)) !== null) {
+    out.push(m[1].trim());
+  }
+  return out;
 }
 
 /** Most-recent sync timestamp from the activity feed, formatted as a label. */
@@ -62,11 +131,16 @@ function lastSyncLabel(activity: ActivityItem[]): string | null {
 export function MorningBrief({
   data,
   activity = [],
+  workspaceName = "Workspace",
+  userName = null,
 }: {
   data: BriefData;
   activity?: ActivityItem[];
+  workspaceName?: string;
+  userName?: string | null;
 }) {
   const { open, send } = useAsk();
+  const reduce = useReducedMotion();
 
   const onPrompt = (text: string) => {
     void send(text);
@@ -92,58 +166,109 @@ export function MorningBrief({
     : 0;
   const lastSync = lastSyncLabel(activity);
 
+  // Hero stack content (all derived from the existing brief).
+  const firstName = firstNameOf(userName);
+  const greeting = firstName ? `${data.greeting}, ${firstName}` : data.greeting;
+  const aiSays = hasInsights ? aiSaysLine(data.topRiskMarkdown, data.summary) : null;
+  const recommended = recommendedTitles(data.recommendationsMarkdown).slice(0, 5);
+
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 md:px-8">
-      {/* 1. AI Executive Summary — Morning Brief hero (KPI strip fused below) */}
-      <header className="space-y-5">
-        <div className="space-y-3">
+    <motion.div
+      className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-8 md:px-8"
+      variants={staggerChildren}
+      initial={reduce ? false : "hidden"}
+      animate="visible"
+    >
+      {/* ── Executive Hero — compact glance stack ── */}
+      <motion.header variants={slideUp} className="flex flex-col gap-6">
+        {/* Greeting */}
+        <div className="flex flex-col gap-2">
           <span className="type-eyebrow text-foreground-muted">
-            Executive Brief · {data.greeting} · {data.dateLabel}
+            {data.dateLabel} · {workspaceName}
           </span>
-          <h1 className="type-display max-w-3xl text-balance text-foreground">
-            {data.summary}
-          </h1>
-          {(opportunityCount > 0 ||
-            riskCount > 0 ||
-            actionCount > 0 ||
-            lastSync) && (
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
-              <HeroStat
-                value={opportunityCount}
-                label={opportunityCount === 1 ? "opportunity" : "opportunities"}
-              />
-              <HeroStat
-                value={riskCount}
-                label={riskCount === 1 ? "risk" : "risks"}
-              />
-              <HeroStat
-                value={actionCount}
-                label={actionCount === 1 ? "action" : "actions"}
-              />
-              {lastSync && (
-                <span className="type-caption text-foreground-muted">
-                  Last sync · {lastSync}
-                </span>
-              )}
-            </div>
-          )}
+          <h1 className="type-display text-foreground">{greeting}</h1>
         </div>
 
-        {/* 2. KPI Strip — fused directly under the hero (no section heading) */}
-        {data.kpis.length > 0 && <KpiStrip kpis={data.kpis} />}
-      </header>
+        {/* Yesterday — KPI deltas (fused KPI Command Center) */}
+        {data.kpis.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="type-eyebrow text-foreground-muted">Yesterday</span>
+            <KpiStrip kpis={data.kpis} />
+          </div>
+        )}
 
-      {/* Divider — separates the brief header from the insight body */}
-      <div className="h-px bg-white/[0.06]" />
+        {/* Today's Focus — counts */}
+        <div className="flex flex-col gap-2">
+          <span className="type-eyebrow text-foreground-muted">
+            Today&apos;s Focus
+          </span>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <HeroStat value={riskCount} label="critical" tone="critical" />
+            <HeroStat
+              value={opportunityCount}
+              label={opportunityCount === 1 ? "opportunity" : "opportunities"}
+              tone="positive"
+            />
+            <HeroStat
+              value={actionCount}
+              label={actionCount === 1 ? "action" : "actions"}
+            />
+            {lastSync && (
+              <span className="type-caption text-foreground-muted">
+                Last sync · {lastSync}
+              </span>
+            )}
+          </div>
+        </div>
 
-      {/* 3–6. Insight sections (each reuses the existing AiResponse cards) */}
+        {/* AI Says — one-line causal statement */}
+        {aiSays && (
+          <div className="flex flex-col gap-2">
+            <span className="type-eyebrow text-foreground-muted">AI Says</span>
+            <p className="type-body max-w-3xl text-balance text-foreground/90">
+              {aiSays}
+            </p>
+          </div>
+        )}
+
+        {/* Recommended — action titles (seed Ask on click) */}
+        {recommended.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="type-eyebrow text-foreground-muted">Recommended</span>
+            <ul className="flex flex-col gap-1">
+              {recommended.map((title, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    onClick={() => onPrompt(`Tell me more about: ${title}`)}
+                    className="group flex w-full items-baseline gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/[0.03]"
+                  >
+                    <span className="type-caption tabular-nums text-foreground-muted">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="type-body text-foreground/90 transition-colors group-hover:text-foreground">
+                      {title}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </motion.header>
+
+      <motion.div variants={slideUp} className="h-px bg-white/[0.06]" />
+
       {hasInsights ? (
-        <div className="space-y-8">
-          {/* 3–4. Opportunity | Risk — side-by-side on desktop */}
+        <>
+          {/* ── Focus Grid — Opportunity | Risk (equal height; stacks on mobile) ── */}
           {(data.topOpportunityMarkdown || data.topRiskMarkdown) && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+            <motion.div
+              variants={slideUp}
+              className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch"
+            >
               {data.topOpportunityMarkdown && (
-                <Section label="Top Opportunity">
+                <Section label="Top Opportunity" className="h-full">
                   <AiResponse
                     content={data.topOpportunityMarkdown}
                     onPrompt={onPrompt}
@@ -151,43 +276,65 @@ export function MorningBrief({
                 </Section>
               )}
               {data.topRiskMarkdown && (
-                <Section label="Top Risk">
+                <Section label="Top Risk" className="h-full">
                   <AiResponse content={data.topRiskMarkdown} onPrompt={onPrompt} />
                 </Section>
               )}
-            </div>
+            </motion.div>
           )}
 
-          {/* 5. Trend Analysis — full width */}
+          {/* ── Trend Analysis — full width ── */}
           {data.trendMarkdown && (
-            <Section label="Trend Analysis">
-              <AiResponse content={data.trendMarkdown} onPrompt={onPrompt} />
-            </Section>
+            <motion.div variants={slideUp}>
+              <Section label="Trend Analysis">
+                <AiResponse content={data.trendMarkdown} onPrompt={onPrompt} />
+              </Section>
+            </motion.div>
           )}
 
-          {/* 6. Recommendations — full width */}
+          {/* ── Recommendations — full width, primary ── */}
           {data.recommendationsMarkdown && (
-            <Section label="Recommendations">
-              <AiResponse
-                content={data.recommendationsMarkdown}
-                onPrompt={onPrompt}
-              />
-            </Section>
+            <motion.div variants={slideUp}>
+              <Section label="Recommendations">
+                <AiResponse
+                  content={data.recommendationsMarkdown}
+                  onPrompt={onPrompt}
+                />
+              </Section>
+            </motion.div>
           )}
-        </div>
+        </>
       ) : (
-        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 text-center">
-          <p className="type-body text-foreground-muted">
-            No insights yet — connect a source or wait for the next sync to
-            generate your brief.
+        <motion.div
+          variants={slideUp}
+          className="card flex flex-col items-center justify-center gap-2 px-6 py-16 text-center"
+        >
+          <Sparkles className="h-6 w-6 text-foreground-muted" />
+          <p className="type-body font-semibold text-foreground">
+            No insights yet
           </p>
-        </div>
+          <p className="max-w-sm type-caption text-foreground-muted">
+            Connect a source or wait for the next sync to generate your brief.
+          </p>
+        </motion.div>
       )}
 
-      {/* 7. Activity Feed — full width, below Recommendations */}
-      <Section label="Activity Feed">
-        <BriefActivityFeed items={activity} />
-      </Section>
-    </div>
+      {/* ── Activity Rail — recent syncs (timeline style) ── */}
+      <motion.div variants={slideUp}>
+        <Section label="Activity">
+          <BriefActivityFeed items={activity} />
+        </Section>
+      </motion.div>
+
+      {/* ── Executive Footer ── */}
+      <motion.footer
+        variants={slideUp}
+        className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-6 type-caption text-foreground-muted"
+      >
+        <span>Last updated · {lastSync ?? "just now"}</span>
+        <span>{workspaceName}</span>
+        <span>As of {data.dateLabel}</span>
+      </motion.footer>
+    </motion.div>
   );
 }

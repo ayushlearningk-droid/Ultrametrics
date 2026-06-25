@@ -72,7 +72,7 @@ export function BriefActivityFeed({ items }: { items: ActivityItem[] }) {
           {/* Timeline rail */}
           <li
             aria-hidden
-            className="pointer-events-none absolute bottom-7 left-[31px] top-7 w-px bg-white/[0.06]"
+            className="pointer-events-none absolute bottom-7 left-[30px] top-7 w-px bg-white/[0.06]"
           />
           {sliced.map((item) => (
             <li key={item.id} className="relative flex gap-3 pb-4 last:pb-0">
@@ -86,7 +86,10 @@ export function BriefActivityFeed({ items }: { items: ActivityItem[] }) {
                     {item.provider} · {item.records.toLocaleString()} records
                   </p>
                 </div>
-                <span className="shrink-0 type-caption text-foreground-muted">
+                <span
+                  className="shrink-0 type-caption tabular-nums text-foreground-muted"
+                  title={new Date(item.createdAt).toLocaleString()}
+                >
                   {relativeTime(item.createdAt)}
                 </span>
               </div>

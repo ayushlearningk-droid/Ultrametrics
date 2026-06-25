@@ -25,6 +25,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useAsk } from "@/components/os/ask-provider";
+import { useNotifications } from "@/lib/stores/notifications";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BRAND_ICON_MAP } from "@/components/ui/brand-icons";
 import {
@@ -189,6 +190,7 @@ function SidebarRail({
 }: RailProps) {
   const router = useRouter();
   const { open: openAsk, isOpen: isAskOpen, aiEnabled } = useAsk();
+  const { unreadCount } = useNotifications();
   const reduce = useReducedMotion();
 
   function selectWorkspace(id: string) {
@@ -345,8 +347,18 @@ function SidebarRail({
             onClick={onNotifToggle}
             className="flex items-center gap-3 rounded-lg px-3 py-2 type-body text-foreground-muted transition-colors hover:bg-white/[0.035] hover:text-foreground"
           >
-            <Bell className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
-            <span>Notifications</span>
+            <span className="relative shrink-0">
+              <Bell className="h-[17px] w-[17px]" strokeWidth={1.7} />
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-brand" />
+              )}
+            </span>
+            <span className="flex-1">Notifications</span>
+            {unreadCount > 0 && (
+              <span className="chip chip-emerald tabular-nums">
+                {unreadCount}
+              </span>
+            )}
           </button>
         )}
         {BOTTOM_NAV.map((item) => (

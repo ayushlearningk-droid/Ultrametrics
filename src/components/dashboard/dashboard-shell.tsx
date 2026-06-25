@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Search } from "lucide-react";
+import { Menu, Search, Bell } from "lucide-react";
+import {
+  useNotifications,
+  hydrateNotifications,
+} from "@/lib/stores/notifications";
 import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
@@ -38,6 +42,12 @@ export function DashboardShell({
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const { unreadCount } = useNotifications();
+
+  // Populate the notification bell badge on mount (reactive store).
+  useEffect(() => {
+    void hydrateNotifications();
+  }, []);
 
   // Global shortcuts reachable outside AskProvider: command palette, G-chord
   // nav, and the "?" help modal. (A / N / / / Shift+A live inside AskProvider.)
@@ -95,6 +105,20 @@ export function DashboardShell({
           >
             <Search className="h-4 w-4" />
           </button>
+          <button
+            onClick={() => setNotifOpen(true)}
+            className="relative text-foreground-muted hover:text-foreground"
+            aria-label={
+              unreadCount > 0
+                ? `Notifications, ${unreadCount} unread`
+                : "Notifications"
+            }
+          >
+            <Bell className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-brand" />
+            )}
+          </button>
         </div>
 
         {/* ── L1 — Canvas (transparent, scrolls over environment) ── */}
@@ -110,7 +134,12 @@ export function DashboardShell({
         )}
       </div>
 
-      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <CommandPalette
+        open={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        workspaces={workspaces}
+        currentWorkspaceId={currentWorkspaceId}
+      />
       <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
 

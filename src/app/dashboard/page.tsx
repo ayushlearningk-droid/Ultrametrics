@@ -100,5 +100,12 @@ export default async function DashboardPage() {
     });
   }
 
-  return <MorningBrief data={data} activity={activity} />;
+  return (
+    <MorningBrief
+      data={data}
+      activity={activity}
+      workspaceName={ws?.name ?? "Workspace"}
+      userName={context?.profile?.full_name ?? null}
+    />
+  );
 }
