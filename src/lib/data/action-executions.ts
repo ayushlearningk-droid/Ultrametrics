@@ -17,20 +17,6 @@ import type {
 } from "@/types/database";
 import type { ExecutionState } from "@/lib/actions/state-machine";
 
-/** Fetch a single execution attempt by id (RLS-scoped). */
-export async function getExecutionById(
-  id: string
-): Promise<ActionExecutionRow | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("action_executions")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return (data as ActionExecutionRow | null) ?? null;
-}
-
 /** Look up an execution attempt by its deterministic idempotency key (RLS-scoped). */
 export async function getExecutionByIdempotencyKey(
   idempotencyKey: string

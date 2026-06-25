@@ -22,7 +22,6 @@ import {
   getWorkspaceSettings,
   upsertWorkspaceSettings,
   toSettingsValues,
-  DEFAULT_WORKSPACE_SETTINGS,
   type WorkspaceSettingsValues,
   type DateFormat,
   type Environment,
@@ -122,10 +121,6 @@ export async function PUT(request: Request) {
   ) {
     next.environment = body.environment as Environment;
   }
-
-  // Guard against an empty/garbage body wiping nothing useful (no-op merge is
-  // still valid; defaults remain DEFAULT_WORKSPACE_SETTINGS for new workspaces).
-  void DEFAULT_WORKSPACE_SETTINGS;
 
   const row = await upsertWorkspaceSettings(workspaceId, next, user.id);
   if (!row) {

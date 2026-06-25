@@ -136,23 +136,32 @@ export async function rollbackExecution(
       | "rollback_failed",
     from: Parameters<typeof assertTransition>[0] | null,
     to: Parameters<typeof assertTransition>[1] | null,
-    detail?: Json
+    detail?: Json,
+    // The request is user-initiated; the lifecycle transitions are system-driven
+    // (mirrors the execute path's actor convention).
+    actorType: "user" | "system" = "system"
   ) =>
     appendAudit({
       ...base,
       executionId: rollback.id,
       event,
-      actorType: "user",
+      actorType,
       fromState: from,
       toState: to,
       ...(detail !== undefined ? { detail } : {}),
     });
 
-  await audit("rollback_requested", null, "rollback_requested", {
-    original_execution_id: original.id,
-    inverse_action_type: inverse,
-    reason,
-  } as Json);
+  await audit(
+    "rollback_requested",
+    null,
+    "rollback_requested",
+    {
+      original_execution_id: original.id,
+      inverse_action_type: inverse,
+      reason,
+    } as Json,
+    "user"
+  );
 
   // 3. rollback_requested → rolling_back
   assertTransition("rollback_requested", "rolling_back");

@@ -70,13 +70,17 @@ export async function POST(request: Request, { params }: RouteContext) {
     );
   }
 
-  // Refuse while an attempt is in flight.
+  // Refuse while a REAL attempt is in flight. Dry-run rows intentionally rest at
+  // `validating` forever (they never call a provider), so they must NOT count as
+  // in-flight — otherwise a prior dry run would block rolling back a succeeded
+  // real execution.
   const inFlight = executions.find(
     (e) =>
-      e.state === "running" ||
-      e.state === "rolling_back" ||
-      e.state === "validating" ||
-      e.state === "queued"
+      !e.dry_run &&
+      (e.state === "running" ||
+        e.state === "rolling_back" ||
+        e.state === "validating" ||
+        e.state === "queued")
   );
   if (inFlight) {
     return NextResponse.json(

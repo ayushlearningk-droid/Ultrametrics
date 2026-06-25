@@ -12,7 +12,7 @@
  * Design tokens only; motion from src/lib/motion.ts.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X, Play, Undo2, Loader2, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -70,9 +70,13 @@ export function ExecutionDetailsDrawer({
   const [rollbackError, setRollbackError] = useState<string | null>(null);
 
   const actionId = action?.id ?? null;
+  // Generation guard: a slow in-flight refresh from a previous action must not
+  // overwrite the current action's data when it resolves out of order.
+  const refreshGen = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!actionId) return;
+    const gen = ++refreshGen.current;
     setLoading(true);
     try {
       const [ex, au] = await Promise.all([
@@ -83,10 +87,11 @@ export function ExecutionDetailsDrawer({
           r.ok ? r.json() : { audit: [] }
         ),
       ]);
+      if (gen !== refreshGen.current) return; // superseded by a newer refresh
       setExecutions((ex.executions ?? []) as ActionExecutionRow[]);
       setAudit((au.audit ?? []) as ActionAuditLogRow[]);
     } finally {
-      setLoading(false);
+      if (gen === refreshGen.current) setLoading(false);
     }
   }, [actionId]);
 
