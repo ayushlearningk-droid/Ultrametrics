@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Check, X, Zap, Gauge } from "lucide-react";
+import { Check, X, Zap, Gauge, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useActionQueue,
@@ -20,60 +20,61 @@ import {
   type ActionStatus,
   type ActionPriority,
 } from "@/lib/stores/action-queue";
+import { ExecutionDetailsDrawer } from "@/components/dashboard/execution/execution-details-drawer";
 
+// Strict 3-colour system: High = risk (muted red), Medium/Low = neutral (slate).
 const PRIORITY_STYLE: Record<ActionPriority, string> = {
-  High: "border-red-400/25 bg-red-400/[0.08] text-red-300",
-  Medium: "border-amber-400/25 bg-amber-400/10 text-amber-200",
-  Low: "border-slate-400/25 bg-slate-400/10 text-slate-200",
+  High: "chip chip-red",
+  Medium: "chip chip-slate",
+  Low: "chip chip-slate",
 };
 
 const STATUS_STYLE: Record<
   Exclude<ActionStatus, "pending">,
   { label: string; chip: string }
 > = {
-  approved: { label: "Approved", chip: "bg-emerald-400/20 text-emerald-200" },
-  dismissed: { label: "Dismissed", chip: "bg-white/[0.06] text-foreground-muted" },
+  approved: { label: "Approved", chip: "chip chip-emerald" },
+  dismissed: { label: "Dismissed", chip: "chip chip-slate" },
 };
 
-function ActionCard({ action }: { action: QueuedAction }) {
+function ActionCard({
+  action,
+  onDetails,
+}: {
+  action: QueuedAction;
+  onDetails: (action: QueuedAction) => void;
+}) {
   const decided = action.status !== "pending";
   return (
     <div
       className={cn(
         "rounded-xl border p-4 transition-opacity",
         action.status === "approved"
-          ? "border-emerald-400/25 bg-emerald-400/[0.06]"
-          : "border-white/[0.08] bg-white/[0.025]",
+          ? "border-brand/25 bg-brand/[0.06]"
+          : "card",
         action.status === "dismissed" && "opacity-60"
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="rounded-md border border-white/[0.1] bg-white/[0.03] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground-muted">
-              {action.source}
-            </span>
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className="chip chip-slate uppercase">{action.source}</span>
             {action.priority && (
-              <span
-                className={cn(
-                  "rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
-                  PRIORITY_STYLE[action.priority]
-                )}
-              >
+              <span className={PRIORITY_STYLE[action.priority]}>
                 {action.priority} priority
               </span>
             )}
           </div>
-          <h3 className="text-[14px] font-semibold leading-snug text-foreground">
+          <h3 className="type-body font-semibold leading-snug text-foreground">
             {action.title}
           </h3>
           {action.rationale && (
-            <p className="mt-1 text-[12px] leading-relaxed text-foreground-muted">
+            <p className="mt-1 type-caption leading-relaxed text-foreground-muted">
               {action.rationale}
             </p>
           )}
           {action.expectedImpact && (
-            <p className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-medium text-emerald-200">
+            <p className="mt-1.5 inline-flex items-center gap-1 type-caption font-semibold text-brand">
               <Gauge className="h-3.5 w-3.5" />
               {action.expectedImpact}
             </p>
@@ -82,36 +83,52 @@ function ActionCard({ action }: { action: QueuedAction }) {
 
         {decided && (
           <span
-            className={cn(
-              "shrink-0 rounded-md px-2 py-1 text-[11px] font-medium",
-              STATUS_STYLE[action.status as Exclude<ActionStatus, "pending">].chip
-            )}
+            className={
+              STATUS_STYLE[action.status as Exclude<ActionStatus, "pending">]
+                .chip
+            }
           >
             {STATUS_STYLE[action.status as Exclude<ActionStatus, "pending">].label}
           </span>
         )}
       </div>
 
-      {!decided && (
-        <div className="mt-3.5 flex items-center justify-end gap-2">
+      <div className="mt-3.5 flex items-center justify-between gap-2">
+        {/* Details — opens the Execution Details drawer (approved actions only). */}
+        {action.status === "approved" ? (
           <button
             type="button"
-            onClick={() => setActionStatus(action.id, "dismissed")}
-            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.14] px-3 py-1.5 text-[12px] font-medium text-foreground-muted transition-colors hover:border-white/[0.25] hover:text-foreground"
+            onClick={() => onDetails(action)}
+            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.12] px-3 py-1.5 type-caption font-semibold text-foreground-muted transition-colors hover:border-white/[0.25] hover:text-foreground"
           >
-            <X className="h-3.5 w-3.5" />
-            Dismiss
+            <Activity className="h-3.5 w-3.5" />
+            Execution details
           </button>
-          <button
-            type="button"
-            onClick={() => setActionStatus(action.id, "approved")}
-            className="inline-flex items-center gap-1 rounded-lg bg-emerald-400/15 px-3 py-1.5 text-[12px] font-medium text-emerald-200 transition-colors hover:bg-emerald-400/25"
-          >
-            <Check className="h-3.5 w-3.5" />
-            Approve
-          </button>
-        </div>
-      )}
+        ) : (
+          <span />
+        )}
+
+        {!decided && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActionStatus(action.id, "dismissed")}
+              className="inline-flex items-center gap-1 rounded-lg border border-white/[0.14] px-3 py-1.5 type-caption font-semibold text-foreground-muted transition-colors hover:border-white/[0.25] hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+              Dismiss
+            </button>
+            <button
+              type="button"
+              onClick={() => setActionStatus(action.id, "approved")}
+              className="inline-flex items-center gap-1 rounded-lg bg-brand/15 px-3 py-1.5 type-caption font-semibold text-brand transition-colors hover:bg-brand/25"
+            >
+              <Check className="h-3.5 w-3.5" />
+              Approve
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -119,7 +136,14 @@ function ActionCard({ action }: { action: QueuedAction }) {
 export function PendingActions() {
   const actions = useActionQueue();
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<QueuedAction | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const count = actions.length;
+
+  const openDetails = (action: QueuedAction) => {
+    setSelected(action);
+    setDrawerOpen(true);
+  };
 
   // Sprint 10F: hydrate from the server on mount so the queue survives reloads.
   useEffect(() => {
@@ -137,15 +161,13 @@ export function PendingActions() {
     <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-6">
       <header className="space-y-1">
         <div className="flex items-center gap-2">
-          <Zap className="h-[18px] w-[18px] text-brand" />
-          <h1 className="text-[20px] font-semibold tracking-tight text-foreground">
-            Action Queue
-          </h1>
+          <Zap className="h-5 w-5 text-brand" />
+          <h1 className="type-display text-foreground">Action Queue</h1>
         </div>
         {count > 0 && (
-          <p className="text-[13px] text-foreground-muted">
-            {count} Action{count === 1 ? "" : "s"} — review and approve. This is a
-            demo surface; no changes are made to any account.
+          <p className="type-body text-foreground-muted">
+            {count} action{count === 1 ? "" : "s"} — review, approve, and open
+            execution details to run a dry run.
           </p>
         )}
       </header>
@@ -155,27 +177,33 @@ export function PendingActions() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="h-24 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
+              className="card h-24 animate-pulse"
             />
           ))}
         </div>
       ) : count === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-6 py-16 text-center">
+        <div className="card flex flex-col items-center justify-center px-6 py-16 text-center">
           <Zap className="mb-3 h-6 w-6 text-foreground-muted" />
-          <h2 className="text-[15px] font-semibold text-foreground">
+          <h2 className="type-body font-semibold text-foreground">
             No approved actions yet
           </h2>
-          <p className="mt-1 max-w-sm text-[13px] text-foreground-muted">
+          <p className="mt-1 max-w-sm type-caption text-foreground-muted">
             Approve recommendations from Ask Ultrametrics to add them here.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {actions.map((a) => (
-            <ActionCard key={a.id} action={a} />
+            <ActionCard key={a.id} action={a} onDetails={openDetails} />
           ))}
         </div>
       )}
+
+      <ExecutionDetailsDrawer
+        action={selected}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      />
     </div>
   );
 }

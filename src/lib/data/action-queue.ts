@@ -40,6 +40,20 @@ export async function listActions(
   return (data ?? []) as ActionQueueRow[];
 }
 
+/** Fetch a single action by id (RLS-scoped). Null when not visible to the caller. */
+export async function getActionById(
+  id: string
+): Promise<ActionQueueRow | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("action_queue")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as ActionQueueRow | null) ?? null;
+}
+
 /** Create an action owned by `userId` in `workspaceId`. Status defaults to 'approved'. */
 export async function createAction(input: {
   workspaceId: string;

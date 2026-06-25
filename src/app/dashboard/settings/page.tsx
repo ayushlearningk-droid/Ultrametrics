@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getUserProfile } from "@/lib/data/dashboard";
 import { ProfileForm } from "@/components/dashboard/profile-form";
+import { WorkspaceSettings } from "@/components/dashboard/workspace-settings";
 import {
   Card,
   CardContent,
@@ -39,6 +40,14 @@ export default async function SettingsPage() {
           {profile && <ProfileForm user={profile} />}
         </CardContent>
       </Card>
+
+      <div className="space-y-1">
+        <h2 className="text-2xl font-bold tracking-tight">Workspace</h2>
+        <p className="text-muted-foreground">
+          Feature flags, preferences, and notifications for this workspace.
+        </p>
+      </div>
+      <WorkspaceSettings />
     </div>
   );
 }

@@ -21,6 +21,8 @@ interface DashboardShellProps {
   workspaces: Workspace[];
   currentWorkspaceId: string;
   workspaceName: string;
+  /** Sprint 16.1: AI Insights flag — gates the Ask Ultrametrics surfaces. */
+  aiInsightsEnabled?: boolean;
 }
 
 export function DashboardShell({
@@ -29,6 +31,7 @@ export function DashboardShell({
   workspaces,
   currentWorkspaceId,
   workspaceName,
+  aiInsightsEnabled = true,
 }: DashboardShellProps) {
   const router = useRouter();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -49,7 +52,7 @@ export function DashboardShell({
   ]);
 
   return (
-    <AskProvider workspaceId={currentWorkspaceId}>
+    <AskProvider workspaceId={currentWorkspaceId} aiEnabled={aiInsightsEnabled}>
     <div className="relative flex h-screen overflow-hidden bg-surface-0">
       {/* ── L0 — Environment layer (ambient light + cursor parallax) ── */}
       <EnvironmentLayer />
@@ -94,19 +97,21 @@ export function DashboardShell({
           {children}
         </main>
 
-        {/* ── L3 — Command bar ────────────────────────────────────── */}
-        <BottomCommandBar />
+        {/* ── L3 — Command bar (Ask surface; hidden when AI Insights off) ── */}
+        {aiInsightsEnabled && <BottomCommandBar />}
       </div>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
 
-      {/* ── L4 — Ask Ultrametrics drawer (shared conversation) ──── */}
-      <AskDrawer />
-
-      {/* ── L3 — Floating Ask Orb (desktop; hidden when drawer open) ── */}
-      <AskOrb />
+      {/* ── L4 — Ask Ultrametrics (drawer + orb); hidden when AI Insights off ── */}
+      {aiInsightsEnabled && (
+        <>
+          <AskDrawer />
+          <AskOrb />
+        </>
+      )}
     </div>
     </AskProvider>
   );

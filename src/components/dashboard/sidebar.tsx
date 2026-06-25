@@ -188,7 +188,7 @@ function SidebarRail({
   collapsible,
 }: RailProps) {
   const router = useRouter();
-  const { open: openAsk, isOpen: isAskOpen } = useAsk();
+  const { open: openAsk, isOpen: isAskOpen, aiEnabled } = useAsk();
   const reduce = useReducedMotion();
 
   function selectWorkspace(id: string) {
@@ -285,22 +285,24 @@ function SidebarRail({
         </button>
       )}
 
-      {/* ── Ask (opens the drawer) ────────────────────────────────── */}
-      <button
-        onClick={() => {
-          openAsk();
-          onClose?.();
-        }}
-        className={cn(
-          "group relative flex items-center gap-3 rounded-lg border px-3 py-2 type-body transition-all duration-150",
-          isAskOpen
-            ? "border-brand/40 bg-brand/15 text-foreground shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
-            : "border-transparent text-foreground-muted hover:border-brand/30 hover:bg-brand/10 hover:text-foreground"
-        )}
-      >
-        <Sparkles className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
-        <span className="truncate">Ask</span>
-      </button>
+      {/* ── Ask (opens the drawer) — hidden when AI Insights is off ── */}
+      {aiEnabled && (
+        <button
+          onClick={() => {
+            openAsk();
+            onClose?.();
+          }}
+          className={cn(
+            "group relative flex items-center gap-3 rounded-lg border px-3 py-2 type-body transition-all duration-150",
+            isAskOpen
+              ? "border-brand/40 bg-brand/15 text-foreground shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
+              : "border-transparent text-foreground-muted hover:border-brand/30 hover:bg-brand/10 hover:text-foreground"
+          )}
+        >
+          <Sparkles className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+          <span className="truncate">Ask</span>
+        </button>
+      )}
 
       {/* ── Primary nav (Brief · Reports · Timeline · Connectors) ──── */}
       <motion.nav

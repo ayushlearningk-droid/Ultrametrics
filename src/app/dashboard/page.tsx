@@ -14,6 +14,10 @@ import {
 import { composeBrief, type BriefData } from "@/lib/ai/brief/compose-brief";
 import { MorningBrief } from "@/components/dashboard/morning-brief";
 import type { ActivityItem } from "@/components/dashboard/brief-activity-feed";
+import {
+  getWorkspaceSettings,
+  toSettingsValues,
+} from "@/lib/data/workspace-settings";
 
 export const metadata = { title: "Brief" };
 
@@ -39,6 +43,30 @@ export default async function DashboardPage() {
   const workspaces = context?.workspaces ?? [];
   const currentWorkspaceId = context?.currentWorkspaceId ?? null;
   const ws = workspaces.find((w) => w.id === currentWorkspaceId);
+
+  // Sprint 16.1: AI Insights feature flag. When disabled for this workspace, the
+  // Morning Brief (and its AI Opportunity/Risk cards) is hidden entirely.
+  const aiInsightsEnabled =
+    currentWorkspaceId && ws
+      ? toSettingsValues(await getWorkspaceSettings(currentWorkspaceId))
+          .ai_insights_enabled
+      : true;
+
+  if (!aiInsightsEnabled) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 md:px-6">
+        <div className="card flex flex-col items-center justify-center px-6 py-16 text-center">
+          <h1 className="type-body font-semibold text-foreground">
+            AI Insights are off for this workspace
+          </h1>
+          <p className="mt-1 max-w-sm type-caption text-foreground-muted">
+            Enable AI Insights in Settings → Workspace to see your Morning Brief,
+            opportunities, and recommendations.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const data: BriefData =
     currentWorkspaceId && ws

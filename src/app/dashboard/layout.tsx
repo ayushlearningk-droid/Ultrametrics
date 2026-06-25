@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { getDashboardContext } from "@/lib/data/workspaces";
+import {
+  getWorkspaceSettings,
+  toSettingsValues,
+} from "@/lib/data/workspace-settings";
 import type { User } from "@/types/database";
 
 const DEMO_USER: User = {
@@ -37,12 +41,19 @@ export default async function DashboardLayout({
   const currentWorkspace =
     workspaces.find((w) => w.id === currentWorkspaceId) ?? workspaces[0];
 
+  // Sprint 16.1: AI Insights feature flag — gates the Ask Ultrametrics surfaces.
+  const aiInsightsEnabled = currentWorkspaceId
+    ? toSettingsValues(await getWorkspaceSettings(currentWorkspaceId))
+        .ai_insights_enabled
+    : true;
+
   return (
     <DashboardShell
       user={profile ?? DEMO_USER}
       workspaces={workspaces}
       currentWorkspaceId={currentWorkspaceId ?? "demo"}
       workspaceName={currentWorkspace?.name ?? "Demo Workspace"}
+      aiInsightsEnabled={aiInsightsEnabled}
     >
       {children}
     </DashboardShell>

@@ -33,6 +33,10 @@ import {
   logUsage,
 } from "@/lib/ai/limits";
 import { appendMessage } from "@/lib/data/conversations";
+import {
+  getWorkspaceSettings,
+  toSettingsValues,
+} from "@/lib/data/workspace-settings";
 
 export const runtime = "nodejs";
 
@@ -86,6 +90,16 @@ export async function POST(request: Request) {
   const access = await requireWorkspaceRole(workspaceId, ["owner", "admin", "member"]);
   if (!access.ok) {
     return NextResponse.json({ error: "Forbidden" }, { status: access.status });
+  }
+
+  // Sprint 16.1: AI Insights feature flag — when disabled for this workspace,
+  // Ask Ultrametrics is unavailable (server-enforced, not just hidden in the UI).
+  const wsSettings = toSettingsValues(await getWorkspaceSettings(workspaceId));
+  if (!wsSettings.ai_insights_enabled) {
+    return NextResponse.json(
+      { error: "AI Insights are disabled for this workspace." },
+      { status: 403 }
+    );
   }
 
   let body: ChatRequestBody;

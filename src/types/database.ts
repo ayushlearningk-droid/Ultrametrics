@@ -488,6 +488,272 @@ export type Database = {
           updated_at?: string;
         };
       };
+      action_executions: {
+        Relationships: [];
+        Row: {
+          id: string;
+          action_id: string;
+          workspace_id: string;
+          user_id: string;
+          actor_type: "user" | "system" | "ai";
+          provider: string | null;
+          attempt_no: number;
+          idempotency_key: string | null;
+          state:
+            | "not_requested"
+            | "queued"
+            | "validating"
+            | "running"
+            | "succeeded"
+            | "failed"
+            | "cancelled"
+            | "rollback_requested"
+            | "rolling_back"
+            | "rolled_back"
+            | "rollback_failed";
+          dry_run: boolean;
+          request_payload: Json | null;
+          prior_state: Json | null;
+          result: Json | null;
+          provider_request_id: string | null;
+          error_code: string | null;
+          error_message: string | null;
+          error_class:
+            | "transient"
+            | "rate_limited"
+            | "auth"
+            | "validation"
+            | "permanent"
+            | null;
+          duration_ms: number | null;
+          original_execution_id: string | null;
+          rollback_execution_id: string | null;
+          rollback_reason: string | null;
+          rolled_back_at: string | null;
+          retryable: boolean;
+          next_retry_at: string | null;
+          started_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          action_id: string;
+          workspace_id: string;
+          user_id: string;
+          actor_type?: "user" | "system" | "ai";
+          provider?: string | null;
+          attempt_no?: number;
+          idempotency_key?: string | null;
+          state?:
+            | "not_requested"
+            | "queued"
+            | "validating"
+            | "running"
+            | "succeeded"
+            | "failed"
+            | "cancelled"
+            | "rollback_requested"
+            | "rolling_back"
+            | "rolled_back"
+            | "rollback_failed";
+          dry_run?: boolean;
+          request_payload?: Json | null;
+          prior_state?: Json | null;
+          result?: Json | null;
+          provider_request_id?: string | null;
+          error_code?: string | null;
+          error_message?: string | null;
+          error_class?:
+            | "transient"
+            | "rate_limited"
+            | "auth"
+            | "validation"
+            | "permanent"
+            | null;
+          duration_ms?: number | null;
+          original_execution_id?: string | null;
+          rollback_execution_id?: string | null;
+          rollback_reason?: string | null;
+          rolled_back_at?: string | null;
+          retryable?: boolean;
+          next_retry_at?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          action_id?: string;
+          workspace_id?: string;
+          user_id?: string;
+          actor_type?: "user" | "system" | "ai";
+          provider?: string | null;
+          attempt_no?: number;
+          idempotency_key?: string | null;
+          state?:
+            | "not_requested"
+            | "queued"
+            | "validating"
+            | "running"
+            | "succeeded"
+            | "failed"
+            | "cancelled"
+            | "rollback_requested"
+            | "rolling_back"
+            | "rolled_back"
+            | "rollback_failed";
+          dry_run?: boolean;
+          request_payload?: Json | null;
+          prior_state?: Json | null;
+          result?: Json | null;
+          provider_request_id?: string | null;
+          error_code?: string | null;
+          error_message?: string | null;
+          error_class?:
+            | "transient"
+            | "rate_limited"
+            | "auth"
+            | "validation"
+            | "permanent"
+            | null;
+          duration_ms?: number | null;
+          original_execution_id?: string | null;
+          rollback_execution_id?: string | null;
+          rollback_reason?: string | null;
+          rolled_back_at?: string | null;
+          retryable?: boolean;
+          next_retry_at?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      action_audit_log: {
+        Relationships: [];
+        Row: {
+          id: string;
+          action_id: string;
+          execution_id: string | null;
+          workspace_id: string;
+          user_id: string;
+          actor_type: "user" | "system" | "ai";
+          event:
+            | "execute_requested"
+            | "queued"
+            | "validating"
+            | "execution_started"
+            | "execution_succeeded"
+            | "execution_failed"
+            | "retry_scheduled"
+            | "cancelled"
+            | "rolled_back"
+            | "dry_run_halted"
+            | "rollback_requested"
+            | "rollback_started"
+            | "rollback_completed"
+            | "rollback_failed";
+          from_state: string | null;
+          to_state: string | null;
+          detail: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          action_id: string;
+          execution_id?: string | null;
+          workspace_id: string;
+          user_id: string;
+          actor_type?: "user" | "system" | "ai";
+          event:
+            | "execute_requested"
+            | "queued"
+            | "validating"
+            | "execution_started"
+            | "execution_succeeded"
+            | "execution_failed"
+            | "retry_scheduled"
+            | "cancelled"
+            | "rolled_back"
+            | "dry_run_halted"
+            | "rollback_requested"
+            | "rollback_started"
+            | "rollback_completed"
+            | "rollback_failed";
+          from_state?: string | null;
+          to_state?: string | null;
+          detail?: Json | null;
+          created_at?: string;
+        };
+        // No Update shape: the audit log is append-only (RLS denies UPDATE).
+        Update: Record<string, never>;
+      };
+      workspace_settings: {
+        Relationships: [];
+        Row: {
+          id: string;
+          workspace_id: string;
+          ai_insights_enabled: boolean;
+          action_engine_enabled: boolean;
+          scheduled_actions_enabled: boolean;
+          autonomous_ai_enabled: boolean;
+          beta_features_enabled: boolean;
+          timezone: string;
+          currency: string;
+          date_format: "YYYY-MM-DD" | "MM/DD/YYYY" | "DD/MM/YYYY" | "D MMM YYYY";
+          notify_email: boolean;
+          notify_in_app: boolean;
+          notify_failed_sync: boolean;
+          notify_ai_opportunities: boolean;
+          environment: "production" | "sandbox";
+          last_saved_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          ai_insights_enabled?: boolean;
+          action_engine_enabled?: boolean;
+          scheduled_actions_enabled?: boolean;
+          autonomous_ai_enabled?: boolean;
+          beta_features_enabled?: boolean;
+          timezone?: string;
+          currency?: string;
+          date_format?: "YYYY-MM-DD" | "MM/DD/YYYY" | "DD/MM/YYYY" | "D MMM YYYY";
+          notify_email?: boolean;
+          notify_in_app?: boolean;
+          notify_failed_sync?: boolean;
+          notify_ai_opportunities?: boolean;
+          environment?: "production" | "sandbox";
+          last_saved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          ai_insights_enabled?: boolean;
+          action_engine_enabled?: boolean;
+          scheduled_actions_enabled?: boolean;
+          autonomous_ai_enabled?: boolean;
+          beta_features_enabled?: boolean;
+          timezone?: string;
+          currency?: string;
+          date_format?: "YYYY-MM-DD" | "MM/DD/YYYY" | "DD/MM/YYYY" | "D MMM YYYY";
+          notify_email?: boolean;
+          notify_in_app?: boolean;
+          notify_failed_sync?: boolean;
+          notify_ai_opportunities?: boolean;
+          environment?: "production" | "sandbox";
+          last_saved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       ai_usage: {
         Relationships: [];
         Row: {
@@ -559,6 +825,22 @@ export type ActionQueueInsert =
   Database["public"]["Tables"]["action_queue"]["Insert"];
 export type ActionQueueUpdate =
   Database["public"]["Tables"]["action_queue"]["Update"];
+export type ActionExecutionRow =
+  Database["public"]["Tables"]["action_executions"]["Row"];
+export type ActionExecutionInsert =
+  Database["public"]["Tables"]["action_executions"]["Insert"];
+export type ActionExecutionUpdate =
+  Database["public"]["Tables"]["action_executions"]["Update"];
+export type ActionAuditLogRow =
+  Database["public"]["Tables"]["action_audit_log"]["Row"];
+export type ActionAuditLogInsert =
+  Database["public"]["Tables"]["action_audit_log"]["Insert"];
+export type WorkspaceSettingsRow =
+  Database["public"]["Tables"]["workspace_settings"]["Row"];
+export type WorkspaceSettingsInsert =
+  Database["public"]["Tables"]["workspace_settings"]["Insert"];
+export type WorkspaceSettingsUpdate =
+  Database["public"]["Tables"]["workspace_settings"]["Update"];
 export type AiUsageRow = Database["public"]["Tables"]["ai_usage"]["Row"];
 export type AiUsageInsert =
   Database["public"]["Tables"]["ai_usage"]["Insert"];

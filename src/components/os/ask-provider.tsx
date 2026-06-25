@@ -27,6 +27,8 @@ import {
 import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 
 interface AskContextValue extends UseAskUltrametrics {
+  /** Sprint 16.1: whether AI Insights (Ask) is enabled for this workspace. */
+  aiEnabled: boolean;
   /** Whether the AI drawer is open. */
   isOpen: boolean;
   open: () => void;
@@ -49,10 +51,13 @@ const AskContext = createContext<AskContextValue | null>(null);
 export function AskProvider({
   children,
   workspaceId,
+  aiEnabled = true,
 }: {
   children: React.ReactNode;
   /** U1 Step 5: scopes conversation hydration/persistence + switch reset. */
   workspaceId: string | null;
+  /** Sprint 16.1: AI Insights flag — when false, Ask cannot be opened. */
+  aiEnabled?: boolean;
 }) {
   const ask = useAskUltrametrics(workspaceId);
   const [isOpen, setIsOpen] = useState(false);
@@ -60,11 +65,13 @@ export function AskProvider({
   const [hasUnread, setHasUnread] = useState(false);
   const prevStreamingRef = useRef(false);
 
-  // Opening the drawer always marks everything as read.
+  // Opening the drawer always marks everything as read. When AI Insights is
+  // disabled for the workspace, opening is a no-op (the surfaces are hidden).
   const open = useCallback(() => {
+    if (!aiEnabled) return;
     setIsOpen(true);
     setHasUnread(false);
-  }, []);
+  }, [aiEnabled]);
   const close = useCallback(() => setIsOpen(false), []);
   const toggle = useCallback(() => setIsOpen((v) => !v), []);
 
@@ -124,6 +131,7 @@ export function AskProvider({
   const value = useMemo<AskContextValue>(
     () => ({
       ...ask,
+      aiEnabled,
       isOpen,
       open,
       close,
@@ -136,6 +144,7 @@ export function AskProvider({
     }),
     [
       ask,
+      aiEnabled,
       isOpen,
       open,
       close,
