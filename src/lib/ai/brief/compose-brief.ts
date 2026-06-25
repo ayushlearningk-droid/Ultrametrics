@@ -18,6 +18,13 @@ import { getConnectorsByWorkspace } from "@/lib/data/dashboard";
 import { CAPABILITIES } from "@/lib/metrics/capabilities";
 import type { WorkspaceContext } from "@/lib/ai/types";
 import type { MetricsProvider } from "@/lib/metrics/types";
+import { reason } from "@/lib/ai/reasoning/engine";
+import { rankRecommendations } from "@/lib/ai/reasoning/priority";
+import type {
+  RecInput,
+  CauseInput,
+  EvidenceLevel,
+} from "@/lib/ai/reasoning/types";
 
 export interface BriefKpi {
   label: string;
@@ -128,11 +135,35 @@ function greeting(): string {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-/** Humanize an engine cause key: "higher_cpc" → "Higher cpc". Idempotent on
- *  already-readable text ("Higher CPC" stays "Higher CPC"). */
-function humanizeCause(raw: string): string {
-  const s = raw.replace(/[_-]+/g, " ").trim();
-  return s.charAt(0).toUpperCase() + s.slice(1);
+/** Map a tool recommendation (RecJson) → the reasoning engine's RecInput. */
+function toRecInput(r: RecJson): RecInput {
+  return {
+    action: r.action,
+    impact: r.impact,
+    kind: r.kind,
+    opportunityScore: r.opportunity_score,
+    evidenceLevel: r.evidence_strength?.level as EvidenceLevel | undefined,
+    impactRanges:
+      r.estimated_impact?.status === "ok"
+        ? (r.estimated_impact.ranges ?? []).map((rg) => ({
+            metric: rg.metric,
+            direction: rg.direction as "increase" | "decrease" | "recover",
+            lowPct: rg.lowPct,
+            highPct: rg.highPct,
+          }))
+        : undefined,
+    impactAssumption: r.estimated_impact?.assumptions?.[0],
+  };
+}
+
+/** Map a tool root cause (CauseJson) → the reasoning engine's CauseInput. */
+function toCauseInput(c: CauseJson): CauseInput {
+  return {
+    primaryCause: c.primaryCause,
+    severity: c.severity,
+    confidence: c.confidence,
+    evidence: c.evidence,
+  };
 }
 
 /** Severity ordering for picking the single highest-priority risk. */
@@ -144,96 +175,6 @@ const SEVERITY_RANK: Record<string, number> = {
 };
 function severityRank(c: CauseJson): number {
   return SEVERITY_RANK[(c.severity ?? "").toLowerCase()] ?? 0;
-}
-
-/**
- * Measurable-impact score for ranking recommendations. opportunity_score (0-100,
- * the engine's grounded composite) dominates; the estimated-impact magnitude
- * (largest projected % range) breaks ties. Both come from the tool result.
- */
-function recImpactScore(r: RecJson): number {
-  const score = typeof r.opportunity_score === "number" ? r.opportunity_score : 0;
-  const maxHigh = (r.estimated_impact?.ranges ?? []).reduce(
-    (m, rg) => Math.max(m, rg.highPct ?? 0),
-    0
-  );
-  return score * 100 + maxHigh;
-}
-
-/** High / Medium / Low from the grounded opportunity_score. */
-function priorityFromScore(score?: number): "high" | "medium" | "low" {
-  if (typeof score !== "number") return "low";
-  if (score >= 70) return "high";
-  if (score >= 40) return "medium";
-  return "low";
-}
-
-/** Top measurable performance changes, phrased plainly (e.g. "CTR up 18%"). */
-function topChanges(metrics: TrendMetricJson[], n: number): string[] {
-  return [...metrics]
-    .filter((t) => t.status !== "stable" && Boolean(t.changeLabel))
-    .map((t) => {
-      const mag =
-        Math.abs(parseFloat(t.changeLabel.replace(/[^0-9.\-]/g, ""))) || 0;
-      return { t, mag };
-    })
-    .sort((a, b) => b.mag - a.mag)
-    .slice(0, n)
-    .map(({ t }) => {
-      const up = t.changeLabel.trim().startsWith("+");
-      const num = t.changeLabel.replace(/[+-]/, "").trim();
-      return `${metricLabel(t.metric)} ${up ? "up" : "down"} ${num}`;
-    });
-}
-
-/**
- * CMO-grade executive summary — grounded, concise, actionable. Built only from
- * the existing tool outputs (headline · trends · top cause · ranked recs). Each
- * clause is omitted when its data is absent; no generic AI wording, nothing
- * invented.
- */
-function buildExecutiveSummary(args: {
-  headline: { spend: number; roas: number };
-  currency?: string;
-  trendMetrics: TrendMetricJson[];
-  topCause?: CauseJson;
-  rankedRecs: RecJson[];
-  watchOuts: string[];
-}): string {
-  const { headline, currency, trendMetrics, topCause, rankedRecs, watchOuts } =
-    args;
-  const parts: string[] = [];
-
-  parts.push(
-    `${money(headline.spend, currency)} spent at ROAS ${ratio(headline.roas)}.`
-  );
-
-  const changes = topChanges(trendMetrics, 2);
-  if (changes.length > 0) parts.push(`${changes.join(", ")}.`);
-
-  if (topCause) {
-    parts.push(
-      `Top risk: ${humanizeCause(topCause.primaryCause)}` +
-        (topCause.severity ? ` (${topCause.severity}).` : ".")
-    );
-  }
-
-  if (rankedRecs.length > 0) {
-    const high = rankedRecs.filter(
-      (r) => priorityFromScore(r.opportunity_score) === "high"
-    ).length;
-    parts.push(
-      `${rankedRecs.length} action${rankedRecs.length === 1 ? "" : "s"} ready` +
-        (high > 0 ? ` (${high} high-impact)` : "") +
-        ` — start with ${rankedRecs[0].action}.`
-    );
-  } else if (watchOuts.length > 0) {
-    parts.push(
-      `${watchOuts.length} watch-out${watchOuts.length === 1 ? "" : "s"} to review.`
-    );
-  }
-
-  return parts.join(" ");
 }
 
 /** Build the "## Recommendation — …" markdown for one rec (relay format). */
@@ -409,23 +350,22 @@ export async function composeBrief(input: {
     });
   }
 
-  // Impact-weighted recommendation ranking (opportunity_score, then estimated
-  // impact magnitude) — drives the Top Opportunity + the cards' High/Med/Low.
-  const rankedRecs = [...recs].sort(
-    (a, b) => recImpactScore(b) - recImpactScore(a)
-  );
+  // Marketing Reasoning Engine (Sprint 34): grounded priority ranking + the
+  // executive narrative, derived deterministically from the tool outputs.
+  const recInputs = recs.map(toRecInput);
+  const rankedRecs = rankRecommendations(recInputs).map((i) => recs[i]);
   // Top Risk = the highest-severity grounded cause (never just the first).
   const topRisk = [...causes].sort((a, b) => severityRank(b) - severityRank(a))[0];
 
-  // CMO-grade executive summary, grounded in the tool outputs above.
-  const summary = buildExecutiveSummary({
+  const reasoning = reason({
     headline: primary.headline,
     currency,
-    trendMetrics,
-    topCause: topRisk,
-    rankedRecs,
+    trends: trendMetrics,
+    causes: causes.map(toCauseInput),
+    recommendations: recInputs,
     watchOuts: primary.watch_outs ?? [],
   });
+  const summary = reasoning.executiveSummary;
 
   // Insight cards via relay markdown (reuses AiResponse cards).
   // Morning Brief V2 — Phase 1: order = Top Opportunity → Top Risk → Trend →

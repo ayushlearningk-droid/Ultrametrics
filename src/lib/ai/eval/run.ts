@@ -7,11 +7,16 @@
  */
 
 import { runEvaluation, formatReport } from "./runner";
+import { runEngineEvaluation, formatEngineReport } from "./engine";
 
 function main(): number {
-  const summary = runEvaluation();
-  console.log(formatReport(summary));
-  return summary.failed === 0 ? 0 : 1;
+  const routing = runEvaluation();
+  console.log(formatReport(routing));
+
+  const engine = runEngineEvaluation();
+  console.log("\n" + formatEngineReport(engine));
+
+  return routing.failed === 0 && engine.failed === 0 ? 0 : 1;
 }
 
 process.exit(main());
