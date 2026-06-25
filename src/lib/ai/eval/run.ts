@@ -9,6 +9,7 @@
 import { runEvaluation, formatReport } from "./runner";
 import { runEngineEvaluation, formatEngineReport } from "./engine";
 import { runCreativeEvaluation, formatCreativeReport } from "./creative";
+import { runMediaBuyerEvaluation, formatMediaBuyerReport } from "./media-buyer";
 
 function main(): number {
   const routing = runEvaluation();
@@ -20,7 +21,13 @@ function main(): number {
   const creative = runCreativeEvaluation();
   console.log("\n" + formatCreativeReport(creative));
 
-  return routing.failed === 0 && engine.failed === 0 && creative.failed === 0
+  const mediaBuyer = runMediaBuyerEvaluation();
+  console.log("\n" + formatMediaBuyerReport(mediaBuyer));
+
+  return routing.failed === 0 &&
+    engine.failed === 0 &&
+    creative.failed === 0 &&
+    mediaBuyer.failed === 0
     ? 0
     : 1;
 }

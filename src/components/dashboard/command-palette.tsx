@@ -245,6 +245,15 @@ export function CommandPalette({
         action: () => goto("/dashboard/creative-studio"),
       },
       {
+        id: "page-media-buyer",
+        label: "Media Buyer",
+        description: "AI optimization plan (budget · audience · scaling)",
+        icon: BarChart3,
+        keywords: ["media buyer", "optimize", "budget", "scaling", "plan"],
+        group: "page",
+        action: () => goto("/dashboard/media-buyer"),
+      },
+      {
         id: "page-actions",
         label: "Open Action Queue",
         description: "Approved actions & executions",
