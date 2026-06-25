@@ -10,9 +10,11 @@ import { TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BriefKpi } from "@/lib/ai/brief/compose-brief";
 
+// Strict 3-colour status scale: emerald = positive, muted red = negative,
+// slate = neutral. (--danger is the muted red; brand is the emerald accent.)
 const STATUS_STYLE: Record<string, string> = {
-  improving: "text-emerald-300",
-  declining: "text-red-300",
+  improving: "text-brand",
+  declining: "text-red-400/80",
   stable: "text-slate-300",
 };
 
@@ -30,21 +32,18 @@ export function KpiStrip({ kpis }: { kpis: BriefKpi[] }) {
               : TrendingDown;
         const statusColor = k.status ? STATUS_STYLE[k.status] : undefined;
         return (
-          <div
-            key={i}
-            className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3"
-          >
-            <div className="text-[11px] font-medium uppercase tracking-wide text-foreground-muted">
+          <div key={i} className="card px-3.5 py-3">
+            <div className="type-eyebrow text-foreground-muted">
               {k.label}
             </div>
-            <div className="mt-0.5 flex items-baseline gap-2">
-              <span className="text-[18px] font-semibold tabular-nums text-foreground">
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="type-body font-semibold tabular-nums text-foreground">
                 {k.value}
               </span>
               {k.changeLabel && (
                 <span
                   className={cn(
-                    "flex items-center gap-0.5 text-[11px] font-medium tabular-nums",
+                    "flex items-center gap-0.5 type-caption font-semibold tabular-nums",
                     statusColor ?? "text-foreground-muted"
                   )}
                 >

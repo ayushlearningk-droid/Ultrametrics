@@ -235,7 +235,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     const startIdx = filtered.indexOf(cmds[0]);
     return (
       <li>
-        <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+        <p className="px-3 pb-1 pt-3 type-eyebrow text-foreground-muted">
           {heading}
         </p>
         <ul>
@@ -249,7 +249,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
                     globalI === activeIdx
                       ? "bg-brand/10 text-foreground"
-                      : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
+                      : "text-foreground-muted hover:bg-white/[0.04] hover:text-foreground"
                   )}
                   onMouseEnter={() => setActiveIdx(globalI)}
                   onClick={() => run(cmd)}
@@ -259,23 +259,23 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
                       globalI === activeIdx
                         ? "border-brand/30 bg-brand/10 text-brand"
-                        : "border-white/[0.08] bg-white/[0.04] text-muted-foreground"
+                        : "border-white/[0.08] bg-white/[0.04] text-foreground-muted"
                     )}
                   >
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">
+                    <p className="truncate type-body font-semibold text-foreground">
                       {cmd.label}
                     </p>
                     {cmd.description && (
-                      <p className="truncate text-xs text-muted-foreground">
+                      <p className="truncate type-caption text-foreground-muted">
                         {cmd.description}
                       </p>
                     )}
                   </div>
                   {cmd.shortcut && (
-                    <kbd className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    <kbd className="shrink-0 rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono type-caption text-foreground-muted">
                       {cmd.shortcut}
                     </kbd>
                   )}
@@ -294,7 +294,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         <>
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[70] bg-black/50"
             variants={fadeIn}
             initial={reduce ? false : "hidden"}
             animate="visible"
@@ -313,17 +313,17 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             <div className="overflow-hidden rounded-2xl border border-white/[0.1] bg-[hsl(222_44%_6%)] shadow-2xl shadow-black/60">
               {/* Search input */}
               <div className="flex items-center gap-3 border-b border-white/[0.08] px-4 py-3.5">
-                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <Search className="h-4 w-4 shrink-0 text-foreground-muted" />
                 <input
                   ref={inputRef}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search commands and pages…"
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+                  className="flex-1 bg-transparent type-body outline-none placeholder:text-foreground-muted"
                 />
                 <button
                   onClick={onClose}
-                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                  className="rounded-md p-1 text-foreground-muted transition-colors hover:bg-white/[0.06] hover:text-foreground"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -336,7 +336,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               >
                 {filtered.length === 0 ? (
                   <li className="flex h-20 items-center justify-center">
-                    <p className="text-sm text-muted-foreground/60">
+                    <p className="type-body text-foreground-muted">
                       No results for &ldquo;{query}&rdquo;
                     </p>
                   </li>
@@ -351,15 +351,15 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
               {/* Footer */}
               <div className="flex items-center gap-4 border-t border-white/[0.06] px-4 py-2">
-                <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                <span className="flex items-center gap-1 type-caption text-foreground-muted">
                   <kbd className="rounded border border-white/[0.1] bg-white/[0.04] px-1 py-0.5 font-mono">↑↓</kbd>
                   navigate
                 </span>
-                <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                <span className="flex items-center gap-1 type-caption text-foreground-muted">
                   <kbd className="rounded border border-white/[0.1] bg-white/[0.04] px-1 py-0.5 font-mono">↵</kbd>
                   open
                 </span>
-                <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                <span className="flex items-center gap-1 type-caption text-foreground-muted">
                   <kbd className="rounded border border-white/[0.1] bg-white/[0.04] px-1 py-0.5 font-mono">esc</kbd>
                   close
                 </span>

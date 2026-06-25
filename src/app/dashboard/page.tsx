@@ -7,8 +7,13 @@
  */
 
 import { getDashboardContext } from "@/lib/data/workspaces";
+import {
+  getConnectorsByWorkspace,
+  getSyncJobsByWorkspace,
+} from "@/lib/data/dashboard";
 import { composeBrief, type BriefData } from "@/lib/ai/brief/compose-brief";
 import { MorningBrief } from "@/components/dashboard/morning-brief";
+import type { ActivityItem } from "@/components/dashboard/brief-activity-feed";
 
 export const metadata = { title: "Brief" };
 
@@ -43,5 +48,29 @@ export default async function DashboardPage() {
         })
       : fallbackBrief();
 
-  return <MorningBrief data={data} />;
+  // Phase B — Activity Feed: join recent sync jobs with their connector
+  // (name/provider) for display. Reuses existing data fetchers; no DB/API
+  // changes. Empty when no workspace.
+  let activity: ActivityItem[] = [];
+  if (currentWorkspaceId && ws) {
+    const [jobs, connectors] = await Promise.all([
+      getSyncJobsByWorkspace(currentWorkspaceId, 8),
+      getConnectorsByWorkspace(currentWorkspaceId),
+    ]);
+    const byId = new Map(connectors.map((c) => [c.id, c]));
+    activity = jobs.map((j) => {
+      const c = byId.get(j.connector_id);
+      return {
+        id: j.id,
+        status: j.status,
+        name: c?.name ?? "Sync job",
+        provider: c?.provider ?? "—",
+        records: j.records_processed,
+        createdAt: j.created_at,
+        completedAt: j.completed_at,
+      };
+    });
+  }
+
+  return <MorningBrief data={data} activity={activity} />;
 }

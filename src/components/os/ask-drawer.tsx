@@ -170,8 +170,8 @@ export function AskDrawer() {
                 <span className="type-body font-semibold tracking-tight">
                   Ask Ultra<span className="text-brand">metrics</span>
                 </span>
-                <span className="flex items-center gap-1.5 text-[11px] font-medium text-foreground-muted">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_0] shadow-emerald-400/60" />
+                <span className="flex items-center gap-1.5 type-caption text-foreground-muted">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand shadow-[0_0_6px_0] shadow-brand/60" />
                   AI Online
                 </span>
               </div>
@@ -192,7 +192,7 @@ export function AskDrawer() {
             >
               {messages.length === 0 && !error && (
                 <div className="mt-6 space-y-4">
-                  <p className="text-[13px] font-medium text-foreground/70">
+                  <p className="type-body font-semibold text-foreground/70">
                     What would you like to look into?
                   </p>
                   <div className="grid grid-cols-2 gap-2.5">
@@ -202,7 +202,7 @@ export function AskDrawer() {
                         type="button"
                         onClick={() => sendPrompt(chip.prompt)}
                         disabled={streaming}
-                        className="rounded-xl border border-white/[0.08] bg-white/[0.025] px-3.5 py-3 text-left text-[13px] font-medium text-foreground/80 transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-foreground disabled:opacity-40"
+                        className="card card-hover px-3.5 py-3 text-left type-body font-semibold text-foreground/80 hover:text-foreground disabled:opacity-40"
                       >
                         {chip.label}
                       </button>
@@ -233,7 +233,7 @@ export function AskDrawer() {
               ))}
 
               {error && (
-                <div className="text-[12px] text-red-400/80">
+                <div className="type-caption text-red-400/80">
                   Couldn&apos;t complete that request: {error}
                 </div>
               )}
@@ -246,7 +246,7 @@ export function AskDrawer() {
               onSubmit={handleSubmit}
               className="shrink-0 border-t border-white/[0.07] p-3"
             >
-              <div className="flex items-end gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+              <div className="card flex items-end gap-2 px-3 py-2">
                 <textarea
                   ref={inputRef}
                   value={draft}
@@ -254,7 +254,7 @@ export function AskDrawer() {
                   onKeyDown={handleKeyDown}
                   rows={1}
                   placeholder="Reply to Ask Ultrametrics…"
-                  className="max-h-32 flex-1 resize-none bg-transparent py-1 text-[13px] leading-relaxed text-foreground outline-none placeholder:text-foreground-muted"
+                  className="max-h-32 flex-1 resize-none bg-transparent py-1 type-body leading-relaxed text-foreground outline-none placeholder:text-foreground-muted"
                 />
                 <button
                   type="submit"

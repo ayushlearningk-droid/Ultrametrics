@@ -250,6 +250,60 @@
     pointer-events: none;
   }
 
+  /* ── L2-lite flat card — the single inner content surface ──────
+     Absorbs every hand-rolled `rounded-xl border-white/[0.08]
+     bg-white/[0.03]` div across the dashboard so cards share one
+     radius (14px, = .panel), one border, one fill. No blur. */
+  .card {
+    background: hsl(0 0% 100% / 0.03);
+    border: 1px solid hsl(0 0% 100% / 0.08);
+    border-radius: 14px;
+  }
+  /* nested/secondary card (slightly recessed) */
+  .card-muted {
+    background: hsl(0 0% 100% / 0.02);
+    border: 1px solid hsl(0 0% 100% / 0.06);
+    border-radius: 12px;
+  }
+  .card-hover {
+    transition: border-color 180ms ease, background-color 180ms ease;
+  }
+  .card-hover:hover {
+    border-color: hsl(0 0% 100% / 0.16);
+    background: hsl(0 0% 100% / 0.05);
+  }
+
+  /* ── Chip / badge base + strict 3-colour status modifiers ──────
+     Emerald = interactive/positive · muted red = risk/negative ·
+     slate = neutral/diagnostic/informational. No amber, no sky. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    padding: 0.125rem 0.5rem;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .chip-emerald {
+    border-color: hsl(var(--brand) / 0.3);
+    background: hsl(var(--brand) / 0.1);
+    color: hsl(var(--brand));
+  }
+  .chip-red {
+    border-color: hsl(var(--danger) / 0.3);
+    background: hsl(var(--danger) / 0.1);
+    color: hsl(var(--danger));
+  }
+  .chip-slate {
+    border-color: hsl(0 0% 100% / 0.1);
+    background: hsl(0 0% 100% / 0.04);
+    color: hsl(var(--foreground-muted));
+  }
+
   /* command-bar focus bloom — Cursor/Runway-style elevated active state */
   .cmd-bloom {
     box-shadow:

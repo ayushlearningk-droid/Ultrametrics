@@ -275,11 +275,11 @@ function SidebarRail({
       {onCommandOpen && (
         <button
           onClick={onCommandOpen}
-          className="mb-2 flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 type-body text-foreground-muted transition-all duration-200 hover:border-brand/40 hover:bg-brand/15 hover:text-foreground hover:shadow-[0_0_0_1px_rgba(16,185,129,0.35)] active:border-brand/50 active:bg-brand/20 active:text-foreground active:shadow-[0_0_0_1px_rgba(16,185,129,0.45)]"
+          className="mb-2 flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 type-body text-foreground-muted transition-all duration-150 hover:border-brand/40 hover:bg-brand/15 hover:text-foreground hover:shadow-[0_0_0_1px_rgba(16,185,129,0.35)] active:border-brand/50 active:bg-brand/20 active:text-foreground active:shadow-[0_0_0_1px_rgba(16,185,129,0.45)]"
         >
           <Search className="h-[15px] w-[15px] shrink-0" strokeWidth={1.7} />
           <span className="flex-1 text-left">Ask Ultrametrics</span>
-          <kbd className="rounded border border-white/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-foreground-muted">
+          <kbd className="rounded border border-white/[0.08] px-1.5 py-0.5 font-mono type-caption text-foreground-muted">
             ⌘K
           </kbd>
         </button>
@@ -292,7 +292,7 @@ function SidebarRail({
           onClose?.();
         }}
         className={cn(
-          "group relative flex items-center gap-3 rounded-lg border px-3 py-2 type-body transition-all duration-200",
+          "group relative flex items-center gap-3 rounded-lg border px-3 py-2 type-body transition-all duration-150",
           isAskOpen
             ? "border-brand/40 bg-brand/15 text-foreground shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
             : "border-transparent text-foreground-muted hover:border-brand/30 hover:bg-brand/10 hover:text-foreground"

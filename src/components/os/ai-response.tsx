@@ -674,21 +674,18 @@ function MetricCards({ heading, metrics }: { heading: string | null; metrics: Me
   return (
     <div className="space-y-2">
       {heading && (
-        <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+        <div className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
           <TrendingUp className="h-3.5 w-3.5 text-brand" />
           {heading}
         </div>
       )}
       <div className="grid grid-cols-2 gap-2.5">
         {metrics.map((m, i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3"
-          >
-            <div className="text-[11px] font-medium uppercase tracking-wide text-foreground-muted">
+          <div key={i} className="card px-3.5 py-3">
+            <div className="type-eyebrow text-foreground-muted">
               {m.label}
             </div>
-            <div className="mt-0.5 text-[18px] font-semibold tabular-nums text-foreground">
+            <div className="mt-1 type-body font-semibold tabular-nums text-foreground">
               {m.value}
             </div>
           </div>
@@ -708,7 +705,7 @@ function LeaderboardCard({
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+      <div className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
         <Trophy className="h-3.5 w-3.5 text-brand" />
         {heading ?? table.nameLabel}
       </div>
@@ -718,14 +715,12 @@ function LeaderboardCard({
             key={i}
             className={cn(
               "flex items-center gap-3 rounded-xl border px-3.5 py-2.5",
-              i === 0
-                ? "border-brand/25 bg-brand/[0.06]"
-                : "border-white/[0.08] bg-white/[0.03]"
+              i === 0 ? "border-brand/25 bg-brand/[0.06]" : "card"
             )}
           >
             <span
               className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold tabular-nums",
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg type-caption font-semibold tabular-nums",
                 i === 0
                   ? "bg-brand/20 text-brand"
                   : "bg-white/[0.05] text-foreground-muted"
@@ -733,16 +728,16 @@ function LeaderboardCard({
             >
               {i + 1}
             </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+            <span className="min-w-0 flex-1 truncate type-body font-semibold text-foreground">
               {row.name}
             </span>
             <div className="flex shrink-0 items-center gap-3">
               {row.values.map((v, j) => (
                 <div key={j} className="text-right">
-                  <div className="text-[10px] uppercase tracking-wide text-foreground-muted">
+                  <div className="type-caption uppercase tracking-wide text-foreground-muted">
                     {v.label}
                   </div>
-                  <div className="text-[13px] font-semibold tabular-nums text-foreground">
+                  <div className="type-body font-semibold tabular-nums text-foreground">
                     {v.value}
                   </div>
                 </div>
@@ -768,28 +763,29 @@ const INSIGHT_STYLES: Record<
     fallbackLabel: string;
   }
 > = {
+  // Diagnostic = neutral/informational → slate (no decorative blue).
   diagnostic: {
     icon: Activity,
-    border: "border-sky-400/20",
-    bg: "bg-sky-400/[0.06]",
-    title: "text-sky-100",
-    iconColor: "text-sky-300",
+    border: "border-white/[0.1]",
+    bg: "bg-white/[0.03]",
+    title: "text-foreground",
+    iconColor: "text-slate-300",
     fallbackLabel: "Why it changed",
   },
   opportunity: {
     icon: TrendingUp,
-    border: "border-emerald-400/20",
-    bg: "bg-emerald-400/[0.06]",
-    title: "text-emerald-100",
-    iconColor: "text-emerald-300",
+    border: "border-brand/25",
+    bg: "bg-brand/[0.07]",
+    title: "text-foreground",
+    iconColor: "text-brand",
     fallbackLabel: "Opportunity",
   },
   risk: {
     icon: ShieldAlert,
-    border: "border-red-400/20",
+    border: "border-red-400/25",
     bg: "bg-red-400/[0.06]",
-    title: "text-red-100",
-    iconColor: "text-red-300",
+    title: "text-foreground",
+    iconColor: "text-red-400/80",
     fallbackLabel: "Risk",
   },
 };
@@ -807,7 +803,7 @@ function InsightCard({
   const Icon = s.icon;
   return (
     <div className={cn("rounded-xl border p-4", s.border, s.bg)}>
-      <div className={cn("mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold", s.title)}>
+      <div className={cn("mb-1.5 flex items-center gap-1.5 type-body font-semibold", s.title)}>
         <Icon className={cn("h-4 w-4", s.iconColor)} />
         {heading ?? s.fallbackLabel}
       </div>
@@ -822,20 +818,21 @@ const EVIDENCE_STYLES: Record<
   EvidenceLevel,
   { label: string; badge: string; bar: string }
 > = {
+  // Strong = positive (emerald); moderate/limited = neutral (slate). No amber.
   strong: {
     label: "Strong evidence",
-    badge: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-    bar: "bg-emerald-400/70",
+    badge: "border-brand/30 bg-brand/10 text-brand",
+    bar: "bg-brand/70",
   },
   moderate: {
     label: "Moderate evidence",
-    badge: "border-amber-400/30 bg-amber-400/10 text-amber-200",
-    bar: "bg-amber-400/70",
+    badge: "border-white/[0.12] bg-white/[0.04] text-slate-200",
+    bar: "bg-slate-400/70",
   },
   limited: {
     label: "Limited evidence",
-    badge: "border-slate-400/30 bg-slate-400/10 text-slate-200",
-    bar: "bg-slate-400/70",
+    badge: "border-white/[0.1] bg-white/[0.03] text-slate-300",
+    bar: "bg-slate-400/60",
   },
 };
 
@@ -843,12 +840,7 @@ const EVIDENCE_STYLES: Record<
 function EvidenceBadge({ level }: { level: EvidenceLevel }) {
   const ev = EVIDENCE_STYLES[level];
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-        ev.badge
-      )}
-    >
+    <span className={cn("chip", ev.badge)}>
       <ShieldCheck className="h-3 w-3" />
       {ev.label}
     </span>
@@ -866,7 +858,7 @@ function RankBadge({ rank }: { rank: number }) {
   return (
     <span
       className={cn(
-        "inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-lg border px-1.5 text-[12px] font-bold tabular-nums",
+        "inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-lg border px-1.5 type-caption font-semibold tabular-nums",
         tone
       )}
     >
@@ -878,7 +870,7 @@ function RankBadge({ rank }: { rank: number }) {
 /** 0-100 opportunity-score chip. */
 function ScoreChip({ score }: { score: number }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand">
+    <span className="chip chip-emerald tabular-nums">
       <Gauge className="h-3 w-3" />
       {score}
       <span className="font-normal text-brand/70">/100</span>
@@ -899,7 +891,7 @@ function FactorBars({
     <div className="space-y-2">
       {factors.map((f, i) => (
         <div key={i} className="space-y-1">
-          <div className="flex items-center justify-between text-[11px]">
+          <div className="flex items-center justify-between type-caption">
             <span className="capitalize text-foreground-muted">{f.label}</span>
             <span className="font-semibold tabular-nums text-foreground">
               {Math.round(f.percent)}%
@@ -921,16 +913,16 @@ function FactorBars({
  *  sections, e.g. opportunity insights). Renders only the provided parts. */
 function BreakdownCard({ data }: { data: BreakdownData }) {
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+    <div className="card p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+        <div className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
           <BarChart3 className="h-3.5 w-3.5 text-brand" />
           Why this ranks here
         </div>
         {data.evidence && <EvidenceBadge level={data.evidence} />}
       </div>
       {data.why && (
-        <p className="mb-3 text-[13px] leading-relaxed text-foreground/90">
+        <p className="mb-3 type-body leading-relaxed text-foreground/90">
           {data.why}
         </p>
       )}
@@ -958,8 +950,8 @@ function PotentialImpact({
   evidence: EvidenceLevel | null;
 }) {
   return (
-    <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+    <div className="card-muted mt-3 p-3">
+      <div className="mb-2 flex items-center gap-1.5 type-eyebrow text-foreground-muted">
         <Gauge className="h-3.5 w-3.5 text-brand" />
         Potential Impact
         <span className="font-normal normal-case tracking-normal text-foreground-muted/80">
@@ -971,9 +963,9 @@ function PotentialImpact({
           const Icon = IMPACT_ICON[r.direction];
           const sign = r.direction === "decrease" ? "−" : "+";
           return (
-            <div key={i} className="flex items-center justify-between text-[12px]">
+            <div key={i} className="flex items-center justify-between type-caption">
               <span className="flex items-center gap-1.5 capitalize text-foreground/90">
-                <Icon className="h-3.5 w-3.5 text-emerald-300" />
+                <Icon className="h-3.5 w-3.5 text-brand" />
                 {r.metric}
               </span>
               <span className="font-semibold tabular-nums text-foreground">
@@ -985,7 +977,7 @@ function PotentialImpact({
           );
         })}
       </div>
-      <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+      <p className="mt-2 flex items-start gap-1.5 type-caption leading-relaxed text-foreground-muted">
         <Info className="mt-px h-3 w-3 shrink-0" />
         <span>
           {data.assumption ? `${data.assumption} · ` : ""}Potential outcome — not
@@ -1002,24 +994,25 @@ const SEVERITY_STYLES: Record<
   CauseSeverity,
   { label: string; chip: string; accent: string }
 > = {
+  // Critical/high = risk (muted red); medium/low = neutral (slate). No amber.
   critical: {
     label: "Critical",
     chip: "border-red-400/30 bg-red-400/15 text-red-200",
-    accent: "text-red-300",
+    accent: "text-red-400/80",
   },
   high: {
     label: "High",
     chip: "border-red-400/25 bg-red-400/[0.08] text-red-300",
-    accent: "text-red-300",
+    accent: "text-red-400/80",
   },
   medium: {
     label: "Medium",
-    chip: "border-amber-400/25 bg-amber-400/10 text-amber-200",
-    accent: "text-amber-300",
+    chip: "border-white/[0.12] bg-white/[0.04] text-slate-200",
+    accent: "text-slate-300",
   },
   low: {
     label: "Low",
-    chip: "border-slate-400/25 bg-slate-400/10 text-slate-200",
+    chip: "border-white/[0.1] bg-white/[0.03] text-slate-300",
     accent: "text-slate-300",
   },
 };
@@ -1040,49 +1033,38 @@ function RootCauseCard({
         "rounded-xl border p-4",
         sev && (data.severity === "critical" || data.severity === "high")
           ? "border-red-400/25 bg-red-400/[0.06]"
-          : data.severity === "medium"
-            ? "border-amber-400/25 bg-amber-400/[0.06]"
-            : "border-white/[0.08] bg-white/[0.025]"
+          : "card"
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+        <div className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
           <ShieldAlert
             className={cn("h-3.5 w-3.5", sev?.accent ?? "text-foreground-muted")}
           />
           {heading ?? "Root Cause"}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {sev && (
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                sev.chip
-              )}
-            >
-              {sev.label}
-            </span>
-          )}
+          {sev && <span className={cn("chip", sev.chip)}>{sev.label}</span>}
           {data.confidence && (
-            <span className="inline-flex items-center rounded-full border border-white/[0.1] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium capitalize text-foreground-muted">
+            <span className="chip chip-slate capitalize">
               {data.confidence} confidence
             </span>
           )}
         </div>
       </div>
 
-      <div className="text-[14px] font-semibold text-foreground">
+      <div className="type-body font-semibold text-foreground">
         {data.cause}
       </div>
 
       {data.evidence && (
-        <p className="mt-1 text-[12px] leading-relaxed text-foreground-muted">
+        <p className="mt-1 type-caption leading-relaxed text-foreground-muted">
           {data.evidence}
         </p>
       )}
 
       {data.contributors.length > 0 && (
-        <p className="mt-1.5 text-[11px] text-foreground-muted/80">
+        <p className="mt-1.5 type-caption text-foreground-muted/80">
           Contributing: {data.contributors.join(", ")}
         </p>
       )}
@@ -1090,13 +1072,13 @@ function RootCauseCard({
       {data.fixOrder.length > 0 && (
         <>
           <div className="my-3 h-px bg-white/[0.06]" />
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+          <div className="mb-1.5 type-eyebrow text-foreground-muted">
             Fix order
           </div>
           <ol className="space-y-1.5">
             {data.fixOrder.map((step, i) => (
-              <li key={i} className="flex items-start gap-2 text-[12px] text-foreground/90">
-                <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded bg-brand/15 text-[10px] font-bold tabular-nums text-brand">
+              <li key={i} className="flex items-start gap-2 type-caption text-foreground/90">
+                <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded bg-brand/15 type-caption font-semibold tabular-nums text-brand">
                   {i + 1}
                 </span>
                 <span className="leading-snug">{step}</span>
@@ -1188,10 +1170,10 @@ function ApproveButton({ action }: { action?: ActionInput }) {
       aria-pressed={approved}
       onClick={toggle}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors",
+        "inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 type-caption font-semibold transition-colors",
         approved
-          ? "bg-emerald-400/20 text-emerald-200"
-          : "border border-white/[0.14] text-foreground-muted hover:border-emerald-400/40 hover:text-foreground"
+          ? "bg-brand/20 text-brand"
+          : "border border-white/[0.14] text-foreground-muted hover:border-brand/40 hover:text-foreground"
       )}
     >
       {approved ? (
@@ -1270,12 +1252,12 @@ function OpportunityCard({
   };
 
   return (
-    <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4">
+    <div className="rounded-xl border border-brand/25 bg-brand/[0.07] p-4">
       {/* ── Header: rank + title (left), score + evidence (right) ── */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2">
           {rank !== null && <RankBadge rank={rank} />}
-          <h4 className="min-w-0 text-[14px] font-semibold leading-snug text-foreground">
+          <h4 className="min-w-0 type-body font-semibold leading-snug text-foreground">
             {title}
           </h4>
         </div>
@@ -1283,7 +1265,7 @@ function OpportunityCard({
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             {score !== null && <ScoreChip score={score} />}
             {impactStr && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-200">
+              <span className="chip chip-emerald">
                 <Gauge className="h-3 w-3" />
                 {impactStr}
               </span>
@@ -1296,8 +1278,8 @@ function OpportunityCard({
       {/* ── Body: impact / markdown, divider, breakdown bars, why ── */}
       <div className="mt-3">
         {fields ? (
-          <p className="text-[12px] leading-relaxed text-foreground-muted">
-            <span className="font-medium text-emerald-300/90">Impact: </span>
+          <p className="type-caption leading-relaxed text-foreground-muted">
+            <span className="font-semibold text-brand">Impact: </span>
             {fields.impact}
           </p>
         ) : (
@@ -1312,7 +1294,7 @@ function OpportunityCard({
         ) : null}
 
         {breakdown?.why && (
-          <p className="mt-2.5 text-[12px] leading-relaxed text-foreground/75">
+          <p className="mt-2.5 type-caption leading-relaxed text-foreground/75">
             {breakdown.why}
           </p>
         )}
@@ -1325,7 +1307,7 @@ function OpportunityCard({
       <div className="mt-3.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {priority && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/[0.12] px-2 py-1 text-[11px] font-medium text-foreground-muted">
+            <span className="chip chip-slate">
               Priority:
               <span className="text-foreground">{priority}</span>
             </span>
@@ -1335,7 +1317,7 @@ function OpportunityCard({
               type="button"
               onClick={() => onPrompt?.(cta)}
               disabled={!onPrompt}
-              className="inline-flex min-w-0 items-center gap-1 rounded-lg bg-emerald-400/15 px-3 py-1.5 text-[12px] font-medium text-emerald-200 transition-colors hover:bg-emerald-400/25 disabled:cursor-default disabled:opacity-60"
+              className="inline-flex min-w-0 items-center gap-1 rounded-lg bg-brand/15 px-3 py-1.5 type-caption font-semibold text-brand transition-colors hover:bg-brand/25 disabled:cursor-default disabled:opacity-60"
             >
               <span className="truncate">{cta}</span>
               <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
@@ -1354,8 +1336,8 @@ const TREND_STATUS_STYLES: Record<
   TrendStatus,
   { text: string; label: string }
 > = {
-  improving: { text: "text-emerald-300", label: "Improving" },
-  declining: { text: "text-red-300", label: "Declining" },
+  improving: { text: "text-brand", label: "Improving" },
+  declining: { text: "text-red-400/80", label: "Declining" },
   stable: { text: "text-slate-300", label: "Stable" },
 };
 
@@ -1369,8 +1351,8 @@ function TrendOverview({
   entries: TrendEntry[];
 }) {
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
-      <div className="mb-2.5 flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+    <div className="card p-4">
+      <div className="mb-2.5 flex items-center gap-1.5 type-eyebrow text-foreground-muted">
         <TrendingUp className="h-3.5 w-3.5 text-brand" />
         {heading ?? "Trend Overview"}
       </div>
@@ -1386,17 +1368,17 @@ function TrendOverview({
           return (
             <div
               key={i}
-              className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2"
+              className="card-muted flex items-center justify-between px-3 py-2"
             >
-              <span className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+              <span className="flex items-center gap-2 type-body font-semibold text-foreground">
                 <Arrow className={cn("h-3.5 w-3.5", s.text)} />
                 {e.metric}
               </span>
               <span className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold tabular-nums text-foreground">
+                <span className="type-body font-semibold tabular-nums text-foreground">
                   {e.changeLabel}
                 </span>
-                <span className={cn("text-[11px] font-medium", s.text)}>
+                <span className={cn("type-caption font-semibold", s.text)}>
                   {s.label}
                 </span>
               </span>
@@ -1412,9 +1394,9 @@ const TONE_STYLES: Record<
   StatusTone,
   { dot: string; label: string }
 > = {
-  ok: { dot: "bg-emerald-400 shadow-emerald-400/60", label: "text-emerald-300" },
-  warn: { dot: "bg-amber-400 shadow-amber-400/60", label: "text-amber-300" },
-  error: { dot: "bg-red-400 shadow-red-400/60", label: "text-red-300" },
+  ok: { dot: "bg-brand shadow-brand/60", label: "text-brand" },
+  warn: { dot: "bg-slate-400 shadow-slate-400/50", label: "text-slate-300" },
+  error: { dot: "bg-red-400/80 shadow-red-400/50", label: "text-red-400/80" },
 };
 
 function StatusCards({
@@ -1427,7 +1409,7 @@ function StatusCards({
   return (
     <div className="space-y-2">
       {heading && (
-        <div className="text-[12px] font-semibold uppercase tracking-wide text-foreground-muted">
+        <div className="type-eyebrow text-foreground-muted">
           {heading}
         </div>
       )}
@@ -1443,7 +1425,7 @@ function StatusCards({
           return (
             <div
               key={i}
-              className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5"
+              className="card flex items-center justify-between px-3.5 py-2.5"
             >
               <div className="flex items-center gap-2.5">
                 <span
@@ -1452,13 +1434,13 @@ function StatusCards({
                     tone.dot
                   )}
                 />
-                <span className="text-[13px] font-medium capitalize text-foreground">
+                <span className="type-body font-semibold capitalize text-foreground">
                   {s.provider}
                 </span>
               </div>
               <span
                 className={cn(
-                  "flex items-center gap-1 text-[12px] font-medium capitalize",
+                  "flex items-center gap-1 type-caption font-semibold capitalize",
                   tone.label
                 )}
               >
