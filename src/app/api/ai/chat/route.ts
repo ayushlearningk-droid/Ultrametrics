@@ -37,6 +37,7 @@ import {
   getWorkspaceSettings,
   toSettingsValues,
 } from "@/lib/data/workspace-settings";
+import { listMemories } from "@/lib/data/workspace-memory";
 
 export const runtime = "nodejs";
 
@@ -160,11 +161,16 @@ export async function POST(request: Request) {
   const workspaceName =
     workspaces.find((w) => w.id === workspaceId)?.name ?? "your workspace";
 
+  // Sprint 31: durable workspace memory (user-saved notes) for AI grounding.
+  const memories = (await listMemories(workspaceId)).map((m) => m.content);
+
   const ctx: WorkspaceContext = {
     workspaceId,
     workspaceName,
     connectedProviders,
     todayISO: new Date().toISOString().slice(0, 10),
+    userId: access.userId,
+    memories,
   };
 
   const lastUser = messages[messages.length - 1].content;

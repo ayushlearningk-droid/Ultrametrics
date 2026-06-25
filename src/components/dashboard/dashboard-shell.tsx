@@ -44,9 +44,20 @@ export function DashboardShell({
   const [helpOpen, setHelpOpen] = useState(false);
   const { unreadCount } = useNotifications();
 
-  // Populate the notification bell badge on mount (reactive store).
+  // Populate the notification bell badge on mount, and re-hydrate when the tab
+  // regains focus/visibility so the badge stays consistent after the user
+  // returns from another tab (no backend realtime; poll-on-focus only).
   useEffect(() => {
     void hydrateNotifications();
+    const refresh = () => {
+      if (document.visibilityState === "visible") void hydrateNotifications();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   // Global shortcuts reachable outside AskProvider: command palette, G-chord

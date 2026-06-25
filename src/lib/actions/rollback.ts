@@ -236,6 +236,14 @@ export async function rollbackExecution(
   }
 
   assertTransition("rolling_back", "rollback_failed");
+  console.error("[action.rollback] provider rollback failed", {
+    action_id: action.id,
+    original_execution_id: original.id,
+    provider: action.provider,
+    inverse_action_type: inverse,
+    error_code: result.errorCode ?? null,
+    error_class: result.errorClass ?? null,
+  });
   const row = await setExecutionState(rollback.id, "rollback_failed", {
     completedAt: done,
     durationMs,

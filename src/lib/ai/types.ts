@@ -57,6 +57,10 @@ export interface WorkspaceContext {
   connectedProviders: MetricsProvider[];
   /** ISO date (YYYY-MM-DD) injected once, appended LAST in the system prompt. */
   todayISO: string;
+  /** Sprint 31: the acting user's id (for the memory-write tool's created_by). */
+  userId?: string;
+  /** Sprint 31: durable workspace memory notes, injected for AI grounding. */
+  memories?: string[];
 }
 
 /** Inputs the router uses to choose a model. Pure data, no I/O. */

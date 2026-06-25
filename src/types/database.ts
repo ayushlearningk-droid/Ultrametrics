@@ -691,6 +691,36 @@ export type Database = {
         // No Update shape: the audit log is append-only (RLS denies UPDATE).
         Update: Record<string, never>;
       };
+      workspace_memory: {
+        Relationships: [];
+        Row: {
+          id: string;
+          workspace_id: string;
+          content: string;
+          source: "user" | "ai";
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          content: string;
+          source?: "user" | "ai";
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          content?: string;
+          source?: "user" | "ai";
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       workspace_settings: {
         Relationships: [];
         Row: {
@@ -835,6 +865,8 @@ export type ActionAuditLogRow =
   Database["public"]["Tables"]["action_audit_log"]["Row"];
 export type ActionAuditLogInsert =
   Database["public"]["Tables"]["action_audit_log"]["Insert"];
+export type WorkspaceMemoryRow =
+  Database["public"]["Tables"]["workspace_memory"]["Row"];
 export type WorkspaceSettingsRow =
   Database["public"]["Tables"]["workspace_settings"]["Row"];
 export type WorkspaceSettingsInsert =

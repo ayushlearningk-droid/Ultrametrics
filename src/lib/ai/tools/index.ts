@@ -19,6 +19,10 @@ import {
   metricsToolHandlers,
   type ReadToolHandler,
 } from "@/lib/ai/tools/metrics-tools";
+import {
+  rememberToolDefinition,
+  rememberToolHandler,
+} from "@/lib/ai/tools/memory-tools";
 
 /**
  * Tool category. Phase 1 ships "read" only.
@@ -35,12 +39,21 @@ interface RegisteredTool {
   category: ToolCategory;
 }
 
-/** The active catalog. Read-only by construction in Phase 1. */
-const CATALOG: RegisteredTool[] = metricsToolDefinitions.map((definition) => ({
-  definition,
-  handler: metricsToolHandlers[definition.name],
-  category: "read" as const,
-}));
+/** The active catalog: read-only metrics tools + the scoped memory-write tool
+ *  (Sprint 31). `remember_fact` is the only writer and touches ONLY
+ *  workspace_memory — never marketing data, connectors, budgets, or campaigns. */
+const CATALOG: RegisteredTool[] = [
+  ...metricsToolDefinitions.map((definition) => ({
+    definition,
+    handler: metricsToolHandlers[definition.name],
+    category: "read" as const,
+  })),
+  {
+    definition: rememberToolDefinition,
+    handler: rememberToolHandler,
+    category: "advise" as const,
+  },
+];
 
 const BY_NAME = new Map<string, RegisteredTool>(
   CATALOG.map((t) => [t.definition.name, t])

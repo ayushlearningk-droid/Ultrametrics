@@ -307,6 +307,16 @@ export async function executeAction(
   }
 
   assertTransition("running", "failed");
+  // Server-side observability for a real provider failure (response payload is
+  // also persisted to action_executions.result).
+  console.error("[action.execute] provider execution failed", {
+    action_id: action.id,
+    provider: action.provider,
+    action_type: action.action_type,
+    error_code: result.errorCode ?? null,
+    error_class: result.errorClass ?? null,
+    provider_request_id: result.providerRequestId ?? null,
+  });
   const row = await setExecutionState(execution.id, "failed", {
     completedAt,
     durationMs,

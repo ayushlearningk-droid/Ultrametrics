@@ -49,7 +49,18 @@ export function buildSystemPrompt(ctx: WorkspaceContext): string {
           })
           .join("\n");
 
+  const memories = ctx.memories ?? [];
+  const memoryBlock =
+    memories.length > 0
+      ? `\n\nWORKSPACE MEMORY (durable notes the user saved — treat as their preferences/goals/rules, NOT as metric data; still source every number from tools):\n${memories
+          .map((m) => `- ${m}`)
+          .join("\n")}`
+      : "";
+
   return `${BASE_PROMPT}
+
+MEMORY:
+- You may save a durable workspace note with the remember_fact tool ONLY when the user explicitly asks you to remember / save / note something (a preference, goal, or rule). That is the SOLE write you can make — you remain strictly read-only for all marketing data, budgets, connectors, and campaigns, and must never claim to have changed any of those.
 
 RESPONSE STRUCTURE (default):
 - For recommendations, optimization, diagnostics, root-cause analysis, and account overviews/summaries, you MUST answer using the Executive Brief structure detailed below, with these EXACT top-level headings in order: "## Executive Summary", "## Top Opportunity", "## Top Risk", "## Recommended Actions", "## Supporting Evidence". Do not invent other top-level headings for these questions.
@@ -130,5 +141,5 @@ WORKSPACE CONTEXT:
 - Workspace: ${ctx.workspaceName}
 - Today: ${ctx.todayISO}
 - Connected sources:
-${providerLines}`;
+${providerLines}${memoryBlock}`;
 }

@@ -386,32 +386,94 @@
 }
 
 /* ════════════════════════════════════════════════════════════════
-   PRINT — AI Reports export/print layout (Sprint 18)
-   Hide app chrome + toolbars; keep report cards intact across pages.
+   PRINT — AI Reports export/print layout (Sprint 18 · polished Sprint 27)
+   Professional white-paper PDF: hide app chrome, flip the report to a
+   light theme with readable type, clean borders, and safe page breaks.
+   Screen rendering is untouched (all rules are @media print + scoped).
    ════════════════════════════════════════════════════════════════ */
 @media print {
+  /* A4-ish margins with room for the running brand band. */
+  @page {
+    margin: 16mm 14mm;
+  }
+
   /* App chrome + anything explicitly excluded from export. */
   [data-no-print],
   .env-layer,
   .env-vignette {
     display: none !important;
   }
-  /* Let the report own the page. */
+
+  /* Force a clean white page regardless of the dark app theme. */
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  /* The report owns the page and flips to a light, document palette by
+     re-pointing the design tokens — children using text-foreground /
+     foreground-muted inherit the print-safe colours automatically. */
   .report-print {
     max-width: 100% !important;
-    padding: 0 !important;
     margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    --foreground: 222 47% 11%;
+    --foreground-muted: 220 9% 40%;
+    --card: 0 0% 100%;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-  /* Don't split a section/card across a page break. */
+  .report-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Solid white surfaces with light hairline borders + no glow/shadow. */
+  .report-print .card,
+  .report-print .card-muted,
+  .report-print [class*="surface-elevated"] {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  /* Dividers / hairlines visible on white. */
+  .report-print [class*="border-white"] {
+    border-color: #e5e7eb !important;
+  }
+  /* Tinted insight cards (emerald/red) → quiet light tints for print. */
+  .report-print [class*="bg-brand/"],
+  .report-print [class*="bg-emerald"] {
+    background: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+  }
+  .report-print [class*="bg-red-"] {
+    background: #fef2f2 !important;
+    border-color: #fecaca !important;
+  }
+
+  /* Running brand band (hidden on screen via hidden/print:block). */
+  .report-brand {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #111827;
+    border-bottom: 2px solid #111827;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+  .report-brand span {
+    color: hsl(var(--brand));
+  }
+
+  /* Keep a section (heading + its card) whole; avoid orphan headings. */
   .report-section {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  /* Render surface colours faithfully (dark cards stay legible). */
-  .report-print,
-  .report-print * {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  .report-footer {
+    color: #6b7280 !important;
   }
 }
 

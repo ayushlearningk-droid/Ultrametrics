@@ -39,6 +39,13 @@ const STATE_CHIP: Record<ExecState, { label: string; chip: string }> = {
   rollback_failed: { label: "Rollback failed", chip: "chip chip-red" },
 };
 
+/** Human-friendly execution duration ("428 ms" / "1.2 s" / "—"). */
+function formatDuration(ms: number | null | undefined): string {
+  if (ms == null) return "—";
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`;
+}
+
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="card-muted px-3 py-2.5">
@@ -336,10 +343,7 @@ export function ExecutionDetailsDrawer({
               {/* Summary stats */}
               <div className="grid grid-cols-2 gap-2.5">
                 <Stat label="Provider" value={provider} />
-                <Stat
-                  label="Duration"
-                  value={durationMs != null ? `${durationMs} ms` : "—"}
-                />
+                <Stat label="Duration" value={formatDuration(durationMs)} />
                 <Stat label="Retry count" value={retries} />
                 <Stat
                   label="Attempts"

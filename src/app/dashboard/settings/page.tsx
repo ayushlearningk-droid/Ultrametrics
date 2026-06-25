@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getUserProfile } from "@/lib/data/dashboard";
 import { ProfileForm } from "@/components/dashboard/profile-form";
 import { WorkspaceSettings } from "@/components/dashboard/workspace-settings";
+import { WorkspaceMemoryPanel } from "@/components/dashboard/workspace-memory-panel";
 import {
   Card,
   CardContent,
@@ -48,6 +49,7 @@ export default async function SettingsPage() {
         </p>
       </div>
       <WorkspaceSettings />
+      <WorkspaceMemoryPanel />
     </div>
   );
 }
