@@ -21,10 +21,13 @@
  * come from a 0..1 table; objective severities are 0..1 literals), so unifying
  * the clamp does not move any existing score.
  *
- * Pure data + arithmetic — no imports, no I/O.
+ * Pure data + arithmetic — type-only imports (erased at build), no I/O.
  */
 
-export type Confidence = "high" | "medium" | "low";
+import type { Confidence } from "@/lib/ai/reasoning/types";
+
+/** Single shared confidence union (canonical source: reasoning/types). */
+export type { Confidence };
 
 /** Confidence dampening multiplier (not zeroing). Shared by every engine. */
 export const CONFIDENCE_WEIGHT: Record<Confidence, number> = {

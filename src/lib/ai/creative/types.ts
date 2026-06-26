@@ -9,8 +9,11 @@
  * no image/video generation.
  */
 
+import type { Confidence } from "@/lib/ai/reasoning/types";
+
 export type Quality = "strong" | "moderate" | "weak" | "unknown";
-export type Confidence = "high" | "medium" | "low";
+/** Single shared confidence union (canonical source: reasoning/types). */
+export type { Confidence };
 export type CreativeAngle = "Emotional" | "Educational" | "UGC" | "Comparison";
 
 export interface CreativeInput {
