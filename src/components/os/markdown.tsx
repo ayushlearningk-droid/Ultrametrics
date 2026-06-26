@@ -64,11 +64,11 @@ const components: Components = {
     </a>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="my-2 border-l-2 border-white/15 pl-3 text-[13px] italic text-foreground-muted">
+    <blockquote className="my-2 border-l-2 border-brand/40 pl-3 text-[13px] italic text-foreground-muted">
       {children}
     </blockquote>
   ),
-  hr: () => <hr className="my-3 border-white/[0.08]" />,
+  hr: () => <hr className="my-3 border-border" />,
   code: ({ className, children }) => {
     // Block code carries a `language-*` class (from ```lang fences); inline
     // code does not. Block code renders bare and inherits the <pre> box below.
@@ -77,27 +77,27 @@ const components: Components = {
       return <code className={cn("font-mono text-[12px]", className)}>{children}</code>;
     }
     return (
-      <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[12px] text-foreground">
+      <code className="rounded bg-[hsl(var(--card-fill-strong))] px-1.5 py-0.5 font-mono text-[12px] text-foreground">
         {children}
       </code>
     );
   },
   pre: ({ children }) => (
-    <pre className="my-2 overflow-x-auto rounded-lg border border-white/[0.07] bg-white/[0.03] p-3 text-[12px] leading-relaxed text-foreground/80">
+    <pre className="my-2 overflow-x-auto rounded-lg border border-border bg-[hsl(var(--card-fill))] p-3 text-[12px] leading-relaxed text-foreground/80">
       {children}
     </pre>
   ),
   table: ({ children }) => (
-    <div className="my-2 overflow-x-auto rounded-lg border border-white/[0.08]">
+    <div className="my-2 overflow-x-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-[12px]">{children}</table>
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="bg-white/[0.04] text-foreground">{children}</thead>
+    <thead className="bg-[hsl(var(--card-fill-strong))] text-foreground">{children}</thead>
   ),
   tbody: ({ children }) => <tbody>{children}</tbody>,
   tr: ({ children }) => (
-    <tr className="border-b border-white/[0.06] last:border-0">{children}</tr>
+    <tr className="border-b border-border last:border-0">{children}</tr>
   ),
   th: ({ children }) => (
     <th className="px-3 py-2 text-left font-semibold">{children}</th>

@@ -76,6 +76,12 @@ const config: Config = {
       backgroundSize: {
         grid: "48px 48px",
       },
+      transitionTimingFunction: {
+        // Shared product easing (mirrors EASE_OUT in src/lib/motion.ts).
+        // Used as `ease-premium` so the curve lives in one named token instead
+        // of repeated arbitrary `ease-[cubic-bezier(...)]` classes.
+        premium: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

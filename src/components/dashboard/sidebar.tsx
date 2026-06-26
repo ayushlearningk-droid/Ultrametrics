@@ -465,7 +465,7 @@ export function DashboardSidebar({
       {/* Desktop — expandable layered nav (recessed into the scene) */}
       <aside
         className={cn(
-          "relative z-[1] hidden shrink-0 flex-col bg-sidebar/80 transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex",
+          "relative z-[1] hidden shrink-0 flex-col bg-sidebar/80 transition-[width] duration-300 ease-premium md:flex",
           "shadow-[inset_-12px_0_24px_-12px_rgba(0,0,0,0.6)] border-r border-white/[0.04]",
           collapsed ? "w-[60px]" : "w-[248px]"
         )}
