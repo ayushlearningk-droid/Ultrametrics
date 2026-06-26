@@ -16,6 +16,7 @@ import {
   formatCommandCenterReport,
 } from "./command-center";
 import { runDecisionEvaluation, formatDecisionReport } from "./decision";
+import { runSkillsEvaluation, formatSkillsReport } from "./skills";
 
 function main(): number {
   const routing = runEvaluation();
@@ -39,13 +40,17 @@ function main(): number {
   const decision = runDecisionEvaluation();
   console.log("\n" + formatDecisionReport(decision));
 
+  const skills = runSkillsEvaluation();
+  console.log("\n" + formatSkillsReport(skills));
+
   return routing.failed === 0 &&
     engine.failed === 0 &&
     creative.failed === 0 &&
     mediaBuyer.failed === 0 &&
     brain.failed === 0 &&
     commandCenter.failed === 0 &&
-    decision.failed === 0
+    decision.failed === 0 &&
+    skills.failed === 0
     ? 0
     : 1;
 }
