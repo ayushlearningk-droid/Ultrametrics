@@ -10,6 +10,7 @@
  */
 
 import { FileText, AlertTriangle } from "lucide-react";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { getDashboardContext } from "@/lib/data/workspaces";
 import { composeBrief, type BriefData } from "@/lib/ai/brief/compose-brief";
 import {
@@ -22,13 +23,13 @@ export const metadata = { title: "Reports" };
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-16 md:px-6">
-      <div className="card flex flex-col items-center justify-center px-6 py-16 text-center">
-        <FileText className="mb-3 h-6 w-6 text-foreground-muted" />
-        <h1 className="type-body font-semibold text-foreground">{title}</h1>
-        <p className="mt-1 max-w-sm type-caption text-foreground-muted">{body}</p>
-      </div>
-    </div>
+    <DashboardEmptyState
+      icon={FileText}
+      title={title}
+      description={body}
+      actionLabel="Open settings"
+      actionHref="/dashboard/settings"
+    />
   );
 }
 
@@ -68,18 +69,13 @@ export default async function ReportsPage() {
     });
   } catch {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 md:px-6">
-        <div className="rounded-xl border border-red-400/25 bg-red-400/[0.06] px-6 py-16 text-center">
-          <AlertTriangle className="mx-auto mb-3 h-6 w-6 text-red-400/80" />
-          <h1 className="type-body font-semibold text-foreground">
-            Couldn&apos;t generate this report
-          </h1>
-          <p className="mx-auto mt-1 max-w-sm type-caption text-foreground-muted">
-            Something went wrong while analysing your data. Please try again
-            shortly.
-          </p>
-        </div>
-      </div>
+      <DashboardEmptyState
+        icon={AlertTriangle}
+        title="Couldn't generate this report"
+        description="Something went wrong while analysing your data. Please try again shortly."
+        actionLabel="Reload"
+        actionHref="/dashboard/reports"
+      />
     );
   }
 

@@ -153,7 +153,7 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8 md:px-6">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8 md:px-6 lg:py-10">
       {/* Header */}
       <header className="flex flex-col gap-2">
         <span className="type-eyebrow text-foreground-muted">Activity</span>
@@ -161,7 +161,7 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
       </header>
 
       {/* Search */}
-      <div className="card flex items-center gap-2.5 px-3.5 py-2.5">
+      <div className="surface-glass flex items-center gap-2.5 px-3.5 py-2.5">
         <Search className="h-4 w-4 shrink-0 text-foreground-muted" />
         <input
           value={query}

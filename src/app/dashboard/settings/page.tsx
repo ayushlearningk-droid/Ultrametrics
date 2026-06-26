@@ -24,15 +24,18 @@ export default async function SettingsPage() {
   const profile = await getUserProfile(user!.id);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-        <p className="text-muted-foreground">
+    <div className="mx-auto max-w-3xl space-y-6 px-4 py-2 md:px-6 lg:py-4">
+      <header className="space-y-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
+        <p className="type-eyebrow text-foreground-muted">Workspace controls</p>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+          Settings
+        </h2>
+        <p className="max-w-2xl text-sm text-foreground-muted">
           Manage your profile and account preferences.
         </p>
-      </div>
+      </header>
 
-      <Card>
+      <Card className="border-white/[0.08] bg-white/[0.03] shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
         <CardHeader>
           <CardTitle>Profile</CardTitle>
           <CardDescription>Update your personal information</CardDescription>
@@ -42,9 +45,11 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      <div className="space-y-1">
-        <h2 className="text-2xl font-bold tracking-tight">Workspace</h2>
-        <p className="text-muted-foreground">
+      <div className="space-y-1 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
+        <h2 className="text-xl font-semibold tracking-tight text-foreground">
+          Workspace
+        </h2>
+        <p className="text-sm text-foreground-muted">
           Feature flags, preferences, and notifications for this workspace.
         </p>
       </div>

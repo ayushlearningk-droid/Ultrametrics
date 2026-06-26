@@ -27,13 +27,16 @@ export default async function BillingPage({
   const currentPlan = PLANS.find((p) => p.id === subscription?.plan_id) ?? PLANS[0];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Billing</h2>
-        <p className="text-muted-foreground">
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-2 md:px-6 lg:py-4">
+      <header className="space-y-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
+        <p className="type-eyebrow text-foreground-muted">Subscription</p>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+          Billing
+        </h2>
+        <p className="max-w-2xl text-sm text-foreground-muted">
           Manage your subscription and payment methods.
         </p>
-      </div>
+      </header>
 
       {params.success && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
@@ -46,7 +49,7 @@ export default async function BillingPage({
         </div>
       )}
 
-      <Card>
+      <Card className="border-white/[0.08] bg-white/[0.03] shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
         <CardHeader>
           <CardTitle>Current plan</CardTitle>
           <CardDescription>Your workspace subscription details</CardDescription>
@@ -78,7 +81,7 @@ export default async function BillingPage({
         {PLANS.filter((p) => p.id !== "enterprise").map((plan) => (
           <Card
             key={plan.id}
-            className={plan.id === currentPlan.id ? "border-brand ring-1 ring-brand" : ""}
+            className={plan.id === currentPlan.id ? "border-brand/40 bg-brand/[0.07] ring-1 ring-brand/30" : "border-white/[0.08] bg-white/[0.03]"}
           >
             <CardHeader>
               <CardTitle className="text-lg">{plan.name}</CardTitle>

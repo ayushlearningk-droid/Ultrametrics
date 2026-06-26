@@ -16,6 +16,7 @@ import { buildOptimizationContext } from "@/lib/ai/media-buyer/context";
 import { buildMarketingBrain } from "@/lib/ai/brain";
 import { MorningBrief } from "@/components/dashboard/morning-brief";
 import { ExecutiveDashboard } from "@/components/dashboard/executive-dashboard";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import type { ActivityItem } from "@/components/dashboard/brief-activity-feed";
 import {
   getWorkspaceSettings,
@@ -57,17 +58,13 @@ export default async function DashboardPage() {
 
   if (!aiInsightsEnabled) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 md:px-6">
-        <div className="card flex flex-col items-center justify-center px-6 py-16 text-center">
-          <h1 className="type-body font-semibold text-foreground">
-            AI Insights are off for this workspace
-          </h1>
-          <p className="mt-1 max-w-sm type-caption text-foreground-muted">
-            Enable AI Insights in Settings → Workspace to see your Morning Brief,
-            opportunities, and recommendations.
-          </p>
-        </div>
-      </div>
+      <DashboardEmptyState
+        icon={"Sparkles" as never}
+        title="AI Insights are off for this workspace"
+        description="Enable AI Insights in Settings → Workspace to see your Morning Brief, opportunities, and recommendations."
+        actionLabel="Open settings"
+        actionHref="/dashboard/settings"
+      />
     );
   }
 

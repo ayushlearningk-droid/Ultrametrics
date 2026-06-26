@@ -7,6 +7,7 @@
  */
 
 import { FileText } from "lucide-react";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { getDashboardContext } from "@/lib/data/workspaces";
 import {
   getWorkspaceSettings,
@@ -19,15 +20,7 @@ import { MediaBuyer } from "@/components/dashboard/media-buyer";
 export const metadata = { title: "Media Buyer" };
 
 function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-16 md:px-6">
-      <div className="card flex flex-col items-center justify-center px-6 py-16 text-center">
-        <FileText className="mb-3 h-6 w-6 text-foreground-muted" />
-        <h1 className="type-body font-semibold text-foreground">{title}</h1>
-        <p className="mt-1 max-w-sm type-caption text-foreground-muted">{body}</p>
-      </div>
-    </div>
-  );
+  return <DashboardEmptyState icon={FileText} title={title} description={body} />;
 }
 
 export default async function MediaBuyerPage() {

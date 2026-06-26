@@ -100,7 +100,7 @@ export function DashboardShell({
         {/* Mobile-only top strip */}
         <div
           data-no-print
-          className="flex h-12 shrink-0 items-center gap-3 border-b border-white/[0.05] px-4 md:hidden"
+          className="flex h-12 shrink-0 items-center gap-3 border-b border-white/[0.08] bg-background/70 px-4 backdrop-blur-sm md:hidden"
         >
           <button
             onClick={() => setIsMobileOpen(true)}
