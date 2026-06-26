@@ -15,6 +15,7 @@ import {
   runCommandCenterEvaluation,
   formatCommandCenterReport,
 } from "./command-center";
+import { runDecisionEvaluation, formatDecisionReport } from "./decision";
 
 function main(): number {
   const routing = runEvaluation();
@@ -35,12 +36,16 @@ function main(): number {
   const commandCenter = runCommandCenterEvaluation();
   console.log("\n" + formatCommandCenterReport(commandCenter));
 
+  const decision = runDecisionEvaluation();
+  console.log("\n" + formatDecisionReport(decision));
+
   return routing.failed === 0 &&
     engine.failed === 0 &&
     creative.failed === 0 &&
     mediaBuyer.failed === 0 &&
     brain.failed === 0 &&
-    commandCenter.failed === 0
+    commandCenter.failed === 0 &&
+    decision.failed === 0
     ? 0
     : 1;
 }

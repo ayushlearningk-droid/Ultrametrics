@@ -32,9 +32,37 @@
     --input: 214 32% 91%;
     --ring: 221 83% 53%;
     --radius: 0.625rem;
-    --brand: 158 64% 52%;
+    --brand: 158 64% 42%;
     --brand-foreground: 158 80% 6%;
     --brand-muted: 158 40% 92%;
+
+    /* ── Sprint 46: complete LIGHT theme token set ─────────────────
+       Mirrors the dark token contract so every shared surface resolves
+       coherently in light mode. */
+    --surface-0: 220 24% 97%;   /* app canvas base */
+    --surface-1: 0 0% 100%;     /* panels */
+    --surface-2: 220 16% 94%;   /* hover / raised */
+    --foreground-muted: 220 9% 46%;
+
+    --success: 158 64% 38%;
+    --warn: 38 92% 45%;
+    --danger: 0 72% 51%;
+
+    /* Environmental light (L0) — soft, bright, premium (not heavy). */
+    --amb-blue: 224 90% 70%;
+    --amb-violet: 256 90% 76%;
+    --amb-emerald: 158 64% 62%;
+
+    /* Theme-aware shared surfaces (resolve per theme, used by utilities). */
+    --card-fill: 220 20% 30% / 0.03;
+    --card-fill-strong: 220 20% 30% / 0.05;
+    --card-border: 220 16% 30% / 0.12;
+    --card-border-muted: 220 16% 30% / 0.08;
+    --hairline: 220 16% 30% / 0.1;
+    --env-top: 220 30% 99%;
+    --env-mid: 220 26% 97%;
+    --env-bot: 220 22% 93%;
+    --vignette: 220 24% 70% / 0.2;
   }
 
   .dark {
@@ -81,6 +109,19 @@
     --input: 240 10% 14%;
     --ring: 158 70% 52%;
     --sidebar: 240 20% 3%;
+
+    /* ── Sprint 46: theme-aware shared surfaces (dark values) ──────
+       Preserve the existing white-alpha look exactly, now via tokens so
+       the same utility classes adapt across themes. */
+    --card-fill: 0 0% 100% / 0.03;
+    --card-fill-strong: 0 0% 100% / 0.05;
+    --card-border: 0 0% 100% / 0.08;
+    --card-border-muted: 0 0% 100% / 0.06;
+    --hairline: 0 0% 100% / 0.06;
+    --env-top: 240 20% 6%;
+    --env-mid: 240 18% 4%;
+    --env-bot: 240 22% 2.5%;
+    --vignette: 240 24% 1.5% / 0.55;
   }
 }
 
@@ -98,6 +139,23 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "ss01" 1, "cv01" 1, "tnum" 0;
+  }
+
+  /* ── Sprint 46: smooth theme transition ───────────────────────────
+     A calm cross-fade of canvas + shared surfaces when the theme flips.
+     Scoped to colour properties only (no transform/layout) so it never
+     interferes with hover/press motion. Disabled for reduced motion. */
+  body,
+  .env-layer,
+  .env-vignette,
+  .card,
+  .card-muted,
+  .panel,
+  .surface-ai,
+  .surface-glass,
+  .surface-floating {
+    transition: background-color 0.4s ease, border-color 0.4s ease,
+      color 0.4s ease;
   }
 
   /* ── Type scale: exactly 3 sizes, 2 weights ──────────────────── */
@@ -153,7 +211,7 @@
     pointer-events: none;
     overflow: hidden;
     background:
-      radial-gradient(120% 120% at 50% 0%, hsl(240 20% 6%) 0%, hsl(240 18% 4%) 45%, hsl(240 22% 2.5%) 100%);
+      radial-gradient(120% 120% at 50% 0%, hsl(var(--env-top)) 0%, hsl(var(--env-mid)) 45%, hsl(var(--env-bot)) 100%);
   }
 
   /* ambient light pools — real elements so cursor parallax can transform them */
@@ -198,7 +256,7 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    background: radial-gradient(130% 100% at 50% 40%, transparent 55%, hsl(240 24% 1.5% / 0.55) 100%);
+    background: radial-gradient(130% 100% at 50% 40%, transparent 55%, hsl(var(--vignette)) 100%);
   }
 
   /* ── L2 panel — translucent pseudo-glass, NO backdrop blur ───── */
@@ -267,14 +325,14 @@
      bg-white/[0.03]` div across the dashboard so cards share one
      radius (14px, = .panel), one border, one fill. No blur. */
   .card {
-    background: hsl(0 0% 100% / 0.03);
-    border: 1px solid hsl(0 0% 100% / 0.08);
+    background: hsl(var(--card-fill));
+    border: 1px solid hsl(var(--card-border));
     border-radius: 14px;
   }
   /* nested/secondary card (slightly recessed) */
   .card-muted {
-    background: hsl(0 0% 100% / 0.02);
-    border: 1px solid hsl(0 0% 100% / 0.06);
+    background: hsl(var(--card-fill));
+    border: 1px solid hsl(var(--card-border-muted));
     border-radius: 12px;
   }
   .card-hover {
@@ -284,7 +342,7 @@
   /* Premium hover (Sprint 40): subtle lift + depth + brand-tinted edge. */
   .card-hover:hover {
     border-color: hsl(var(--brand) / 0.28);
-    background: hsl(0 0% 100% / 0.05);
+    background: hsl(var(--card-fill-strong));
     transform: translateY(-2px);
     box-shadow:
       0 1px 0 0 hsl(0 0% 100% / 0.05) inset,
@@ -374,8 +432,8 @@
 
   /* Glass surface — light translucent fill, hairline border, no heavy blur. */
   .surface-glass {
-    background: hsl(0 0% 100% / 0.04);
-    border: 1px solid hsl(0 0% 100% / 0.09);
+    background: hsl(var(--card-fill-strong));
+    border: 1px solid hsl(var(--card-border));
     border-radius: 14px;
   }
 
@@ -417,7 +475,7 @@
   }
 
   /* Soft divider — the one hairline rule used between sections. */
-  .divider-soft { border-color: hsl(0 0% 100% / 0.06); }
+  .divider-soft { border-color: hsl(var(--hairline)); }
 
   /* Floating shadow — the one elevation shadow for lifted surfaces. */
   .shadow-floating {
@@ -623,5 +681,15 @@
   .surface-interactive:active { transform: none !important; }
   .skeleton::after { animation: none !important; }
   .anim-float { animation: none !important; }
+  /* Sprint 46: no theme cross-fade under reduced motion. */
+  body,
+  .env-layer,
+  .env-vignette,
+  .card,
+  .card-muted,
+  .panel,
+  .surface-ai,
+  .surface-glass,
+  .surface-floating { transition: none !important; }
   * { scroll-behavior: auto !important; }
 }
