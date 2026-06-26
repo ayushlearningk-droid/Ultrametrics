@@ -1,5 +1,11 @@
 export const APP_NAME = "Ultrametrics";
 export const COPYRIGHT_YEAR = 2026;
+
+/** Contact endpoints used across the app and legal pages. */
+export const CONTACT_EMAIL = "support@ultrametrics.app";
+export const PRIVACY_EMAIL = "privacy@ultrametrics.app";
+/** Effective/last-updated date shown on the legal documents. */
+export const LEGAL_LAST_UPDATED = "June 26, 2026";
 export const APP_DESCRIPTION =
   "Connect your marketing data sources, automate syncs, and unify analytics in one workspace.";
 

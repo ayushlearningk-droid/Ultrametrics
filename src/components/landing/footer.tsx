@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
-import { APP_DESCRIPTION, COPYRIGHT_YEAR } from "@/lib/constants";
+import { APP_DESCRIPTION, COPYRIGHT_YEAR, CONTACT_EMAIL } from "@/lib/constants";
 
 export function LandingFooter() {
   return (
@@ -46,14 +46,22 @@ export function LandingFooter() {
               <h4 className="text-sm font-semibold">Legal</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Privacy
+                  <Link href="/privacy" className="hover:text-foreground">
+                    Privacy Policy
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Terms
+                  <Link href="/terms" className="hover:text-foreground">
+                    Terms of Service
                   </Link>
+                </li>
+                <li>
+                  <a
+                    href={`mailto:${CONTACT_EMAIL}`}
+                    className="hover:text-foreground"
+                  >
+                    Contact
+                  </a>
                 </li>
               </ul>
             </div>
