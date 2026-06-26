@@ -2,7 +2,7 @@ export const APP_NAME = "Ultrametrics";
 export const COPYRIGHT_YEAR = 2026;
 
 /** Contact endpoints used across the app and legal pages. */
-export const CONTACT_EMAIL = "support@ultrametrics.app";
+export const CONTACT_EMAIL = "ultrametrics.ai@gmail.com";
 export const PRIVACY_EMAIL = "privacy@ultrametrics.app";
 /** Effective/last-updated date shown on the legal documents. */
 export const LEGAL_LAST_UPDATED = "June 26, 2026";

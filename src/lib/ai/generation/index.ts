@@ -47,3 +47,18 @@ export {
   AdapterRegistry,
   createDefaultAdapterRegistry,
 } from "./adapter-registry";
+
+// Sprint 54 — pure orchestration layer (selection / routing / queue planning).
+export {
+  rankProviders,
+  selectProvider,
+  planBatch,
+  planQueue,
+  materializePlan,
+  type RoutingStrategy,
+  type OrchestratorOptions,
+  type ProviderCandidate,
+  type SelectionResult,
+  type PlannedJob,
+  type OrchestrationPlan,
+} from "./orchestrator";

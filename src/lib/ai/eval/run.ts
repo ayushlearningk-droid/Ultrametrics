@@ -25,6 +25,10 @@ import {
   runGenerationAdapterEvaluation,
   formatGenerationAdapterReport,
 } from "./generation-adapters";
+import {
+  runGenerationOrchestratorEvaluation,
+  formatGenerationOrchestratorReport,
+} from "./generation-orchestrator";
 
 function main(): number {
   const routing = runEvaluation();
@@ -57,6 +61,9 @@ function main(): number {
   const generationAdapters = runGenerationAdapterEvaluation();
   console.log("\n" + formatGenerationAdapterReport(generationAdapters));
 
+  const generationOrchestrator = runGenerationOrchestratorEvaluation();
+  console.log("\n" + formatGenerationOrchestratorReport(generationOrchestrator));
+
   return routing.failed === 0 &&
     engine.failed === 0 &&
     creative.failed === 0 &&
@@ -66,7 +73,8 @@ function main(): number {
     decision.failed === 0 &&
     skills.failed === 0 &&
     generation.failed === 0 &&
-    generationAdapters.failed === 0
+    generationAdapters.failed === 0 &&
+    generationOrchestrator.failed === 0
     ? 0
     : 1;
 }
