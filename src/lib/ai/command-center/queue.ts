@@ -9,12 +9,13 @@
 import type {
   Command,
   CommandCategory,
+  Confidence,
   Priority,
   ApprovalState,
 } from "./types";
 
 const PRIORITY_RANK: Record<Priority, number> = { High: 3, Medium: 2, Low: 1 };
-const CONFIDENCE_RANK = { high: 3, medium: 2, low: 1 } as const;
+const CONFIDENCE_RANK: Record<Confidence, number> = { high: 3, medium: 2, low: 1 };
 
 /** Stable sort key: priority desc, then confidence desc (ties keep input order). */
 function recommendationScore(c: Command): number {

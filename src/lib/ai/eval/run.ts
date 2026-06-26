@@ -11,6 +11,10 @@ import { runEngineEvaluation, formatEngineReport } from "./engine";
 import { runCreativeEvaluation, formatCreativeReport } from "./creative";
 import { runMediaBuyerEvaluation, formatMediaBuyerReport } from "./media-buyer";
 import { runBrainEvaluation, formatBrainReport } from "./brain";
+import {
+  runCommandCenterEvaluation,
+  formatCommandCenterReport,
+} from "./command-center";
 
 function main(): number {
   const routing = runEvaluation();
@@ -28,11 +32,15 @@ function main(): number {
   const brain = runBrainEvaluation();
   console.log("\n" + formatBrainReport(brain));
 
+  const commandCenter = runCommandCenterEvaluation();
+  console.log("\n" + formatCommandCenterReport(commandCenter));
+
   return routing.failed === 0 &&
     engine.failed === 0 &&
     creative.failed === 0 &&
     mediaBuyer.failed === 0 &&
-    brain.failed === 0
+    brain.failed === 0 &&
+    commandCenter.failed === 0
     ? 0
     : 1;
 }

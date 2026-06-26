@@ -7,7 +7,8 @@
  * future UI and the (separate) Action Engine execution path consume these.
  */
 
-import type { Confidence, Priority, Severity } from "@/lib/ai/brain/types";
+import type { Priority, Severity } from "@/lib/ai/brain/types";
+import type { Confidence } from "@/lib/ai/reasoning/types";
 
 export type { Confidence, Priority, Severity };
 
