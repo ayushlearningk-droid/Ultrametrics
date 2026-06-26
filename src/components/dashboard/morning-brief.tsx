@@ -179,8 +179,11 @@ export function MorningBrief({
       initial={reduce ? false : "hidden"}
       animate="visible"
     >
-      {/* ── Executive Hero — compact glance stack ── */}
-      <motion.header variants={slideUp} className="flex flex-col gap-6">
+      {/* ── Executive Hero — elevated AI surface, the first visual focus ── */}
+      <motion.header
+        variants={slideUp}
+        className="surface-ai shadow-floating flex flex-col gap-6 p-6 md:p-8"
+      >
         {/* Greeting */}
         <div className="flex flex-col gap-2">
           <span className="type-eyebrow text-foreground-muted">

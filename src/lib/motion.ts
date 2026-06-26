@@ -107,3 +107,54 @@ export const press = {
   scale: 0.98,
   transition: { duration: DUR.fast, ease: EASE_OUT },
 } as const;
+
+/* ── Sprint 42: AI-OS motion primitives ────────────────────────────────────
+ * Same tween-only, ease-out language. Reusable across surfaces; consumers gate
+ * entrance variants with `useReducedMotion()` and skip looping ones entirely. */
+
+/** Content reveal — fade + a slightly larger rise than slideUp. Sections/heroes. */
+export const reveal: Variants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { duration: DUR.slow, ease: EASE_OUT } },
+  exit: { opacity: 0, y: 8, transition: { duration: DUR.fast, ease: EASE_OUT } },
+};
+
+/** Horizontal slide-in (e.g. drawer/panel content). */
+export const slideIn: Variants = {
+  hidden: { opacity: 0, x: 12 },
+  visible: { opacity: 1, x: 0, transition: { duration: DUR.base, ease: EASE_OUT } },
+  exit: { opacity: 0, x: 8, transition: { duration: DUR.fast, ease: EASE_OUT } },
+};
+
+/** Smooth height/opacity expand for collapsible regions. */
+export const expand: Variants = {
+  hidden: { opacity: 0, height: 0 },
+  visible: { opacity: 1, height: "auto", transition: { duration: DUR.base, ease: EASE_OUT } },
+  exit: { opacity: 0, height: 0, transition: { duration: DUR.fast, ease: EASE_OUT } },
+};
+
+/** Panel-level transition (slightly softer than the route pageTransition). */
+export const panelTransition: Variants = {
+  hidden: { opacity: 0, y: 8, scale: 0.99 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: DUR.base, ease: EASE_OUT } },
+  exit: { opacity: 0, y: -4, scale: 0.99, transition: { duration: DUR.fast, ease: EASE_OUT } },
+};
+
+/** Perpetual idle float — apply directly as `animate`. Skip under reduced motion. */
+export const floatLoop = {
+  y: [0, -4, 0],
+  transition: { duration: 6, ease: "easeInOut", repeat: Infinity },
+} as const;
+
+/** Magnetic hover target — lift + a hair of scale. For premium buttons/cards. */
+export const magneticHover = {
+  y: -2,
+  scale: 1.01,
+  transition: { duration: DUR.fast, ease: EASE_OUT },
+} as const;
+
+/** Subtle hover scale only (no lift) — chips, icons, compact controls. */
+export const hoverScale = {
+  scale: 1.03,
+  transition: { duration: DUR.fast, ease: EASE_OUT },
+} as const;

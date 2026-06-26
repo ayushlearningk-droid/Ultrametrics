@@ -12,7 +12,10 @@ import {
   getSyncJobsByWorkspace,
 } from "@/lib/data/dashboard";
 import { composeBrief, type BriefData } from "@/lib/ai/brief/compose-brief";
+import { buildOptimizationContext } from "@/lib/ai/media-buyer/context";
+import { buildMarketingBrain } from "@/lib/ai/brain";
 import { MorningBrief } from "@/components/dashboard/morning-brief";
+import { ExecutiveDashboard } from "@/components/dashboard/executive-dashboard";
 import type { ActivityItem } from "@/components/dashboard/brief-activity-feed";
 import {
   getWorkspaceSettings,
@@ -98,6 +101,31 @@ export default async function DashboardPage() {
         completedAt: j.completed_at,
       };
     });
+  }
+
+  // Sprint 43 — Executive AI Dashboard: when there is enough grounded data,
+  // compose the existing Marketing Brain (health · opportunity/risk graphs ·
+  // executive intelligence · daily pulse) from the SAME read-only context the
+  // Media Buyer uses, and render the executive layout. Falls back to the proven
+  // Morning Brief when the Brain can't be grounded. Additive — no engine,
+  // connector, OAuth, DB, or Action-Engine changes.
+  if (currentWorkspaceId && ws && data.status === "ok") {
+    const optCtx = await buildOptimizationContext(currentWorkspaceId, ws.name);
+    if (optCtx) {
+      const brain = buildMarketingBrain(
+        optCtx.creativeInput,
+        optCtx.reasoningInput
+      );
+      return (
+        <ExecutiveDashboard
+          data={data}
+          brain={brain}
+          activity={activity}
+          workspaceName={ws.name}
+          userName={context?.profile?.full_name ?? null}
+        />
+      );
+    }
   }
 
   return (

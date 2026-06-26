@@ -14,6 +14,7 @@ import { useEffect, useRef } from "react";
 export function EnvironmentLayer() {
   const blueRef = useRef<HTMLDivElement>(null);
   const violetRef = useRef<HTMLDivElement>(null);
+  const emeraldRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -49,6 +50,10 @@ export function EnvironmentLayer() {
         // violet drifts slightly more — parallax separation between layers
         violetRef.current.style.transform = `translate3d(${cx * 1.6}px, ${cy * 1.6}px, 0)`;
       }
+      if (emeraldRef.current) {
+        // emerald is the deepest layer — drifts least (parallax separation)
+        emeraldRef.current.style.transform = `translate3d(${cx * 0.5}px, ${cy * 0.5}px, 0)`;
+      }
       // keep settling until close enough
       if (Math.abs(tx - cx) > 0.1 || Math.abs(ty - cy) > 0.1) {
         raf = requestAnimationFrame(tick);
@@ -65,6 +70,7 @@ export function EnvironmentLayer() {
   return (
     <>
       <div className="env-layer" aria-hidden>
+        <div ref={emeraldRef} className="env-pool env-pool-emerald" />
         <div ref={blueRef} className="env-pool env-pool-blue" />
         <div ref={violetRef} className="env-pool env-pool-violet" />
       </div>

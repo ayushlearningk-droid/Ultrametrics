@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { fadeIn, DUR, EASE_OUT } from "@/lib/motion";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight, Sparkles, X } from "lucide-react";
 import { useAsk } from "@/components/os/ask-provider";
 import { ChatMessage } from "@/components/os/chat-message";
 import { ConversationRail } from "@/components/os/conversation-rail";
@@ -193,9 +193,18 @@ export function AskDrawer() {
             >
               {messages.length === 0 && !error && (
                 <div className="mt-6 space-y-4">
-                  <p className="type-body font-semibold text-foreground/70">
-                    What would you like to look into?
-                  </p>
+                  <div className="flex flex-col gap-2">
+                    <span className="surface-ai flex h-10 w-10 items-center justify-center rounded-xl text-brand">
+                      <Sparkles className="h-5 w-5" />
+                    </span>
+                    <p className="type-body font-semibold text-foreground">
+                      What would you like to look into?
+                    </p>
+                    <p className="type-caption text-foreground-muted">
+                      Ask anything about your performance — grounded in your
+                      connected data. Start with one of these:
+                    </p>
+                  </div>
                   <div className="grid grid-cols-2 gap-2.5">
                     {PROMPT_CHIPS.map((chip) => (
                       <button
