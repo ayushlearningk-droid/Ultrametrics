@@ -17,6 +17,10 @@ import {
 } from "./command-center";
 import { runDecisionEvaluation, formatDecisionReport } from "./decision";
 import { runSkillsEvaluation, formatSkillsReport } from "./skills";
+import {
+  runGenerationEvaluation,
+  formatGenerationReport,
+} from "./generation";
 
 function main(): number {
   const routing = runEvaluation();
@@ -43,6 +47,9 @@ function main(): number {
   const skills = runSkillsEvaluation();
   console.log("\n" + formatSkillsReport(skills));
 
+  const generation = runGenerationEvaluation();
+  console.log("\n" + formatGenerationReport(generation));
+
   return routing.failed === 0 &&
     engine.failed === 0 &&
     creative.failed === 0 &&
@@ -50,7 +57,8 @@ function main(): number {
     brain.failed === 0 &&
     commandCenter.failed === 0 &&
     decision.failed === 0 &&
-    skills.failed === 0
+    skills.failed === 0 &&
+    generation.failed === 0
     ? 0
     : 1;
 }
