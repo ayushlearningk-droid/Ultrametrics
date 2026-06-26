@@ -22,3 +22,28 @@ export {
   type TransitionResult,
 } from "./queue";
 export { BUILT_IN_PROVIDERS } from "./providers";
+
+// Sprint 53 — adapter layer (pure normalization/validation/estimation).
+export {
+  estimateImageCredits,
+  estimateVideoCredits,
+  estimateExpectedDuration,
+  type CostEstimate,
+  type DurationEstimate,
+} from "./cost-estimator";
+export {
+  validatePromptText,
+  validateAspectRatioFor,
+  validateProviderCompatibility,
+  validateRequest,
+} from "./validation";
+export {
+  BaseGenerationAdapter,
+  BUILT_IN_ADAPTERS,
+  type CapabilityFlag,
+  type RawProviderOutcome,
+} from "./adapters";
+export {
+  AdapterRegistry,
+  createDefaultAdapterRegistry,
+} from "./adapter-registry";
