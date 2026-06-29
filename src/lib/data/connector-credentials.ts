@@ -16,6 +16,12 @@ import {
   decryptToken,
   type EncryptedToken,
 } from "@/lib/crypto/token-vault";
+import { recordCredentialAccess } from "@/lib/data/credential-access-log";
+
+/** Optional context used only for audit logging (never affects behavior). */
+export interface CredentialAuditContext {
+  workspaceId?: string | null;
+}
 
 /**
  * Raised when a credential operation targets a connector that does not belong to
@@ -51,7 +57,16 @@ export async function assertConnectorInWorkspace(
     .eq("workspace_id", workspaceId)
     .maybeSingle<{ id: string }>();
 
-  if (!data) throw new CredentialAuthorizationError(connectorId, workspaceId);
+  if (!data) {
+    await recordCredentialAccess({
+      connectorId,
+      workspaceId,
+      action: "authorize",
+      success: false,
+      reason: "connector does not belong to workspace",
+    });
+    throw new CredentialAuthorizationError(connectorId, workspaceId);
+  }
 }
 
 export interface StoreTokenInput {
@@ -76,7 +91,8 @@ export interface ResolvedToken {
  * reconnect / refresh.
  */
 export async function storeConnectorToken(
-  input: StoreTokenInput
+  input: StoreTokenInput,
+  audit: CredentialAuditContext = {}
 ): Promise<void> {
   const admin = createAdminClient();
 
@@ -102,6 +118,15 @@ export async function storeConnectorToken(
     { onConflict: "connector_id" }
   );
 
+  await recordCredentialAccess({
+    connectorId: input.connectorId,
+    workspaceId: audit.workspaceId,
+    action: "store",
+    success: !error,
+    reason: error ? "upsert failed" : null,
+    keyVersion: access.keyVersion,
+  });
+
   if (error) {
     throw new Error(`Failed to store connector credentials: ${error.message}`);
   }
@@ -116,7 +141,8 @@ export async function storeConnectorToken(
  * should catch and mark the connector as needing reconnection.
  */
 export async function getConnectorToken(
-  connectorId: string
+  connectorId: string,
+  audit: CredentialAuditContext = {}
 ): Promise<ResolvedToken | null> {
   const admin = createAdminClient();
 
@@ -149,37 +175,69 @@ export async function getConnectorToken(
     keyVersion: data.key_version,
   };
 
-  let refreshToken: string | null = null;
-  if (
-    data.refresh_token_ciphertext &&
-    data.refresh_token_iv &&
-    data.refresh_token_tag
-  ) {
-    refreshToken = decryptToken({
-      ciphertext: data.refresh_token_ciphertext,
-      iv: data.refresh_token_iv,
-      tag: data.refresh_token_tag,
+  try {
+    let refreshToken: string | null = null;
+    if (
+      data.refresh_token_ciphertext &&
+      data.refresh_token_iv &&
+      data.refresh_token_tag
+    ) {
+      refreshToken = decryptToken({
+        ciphertext: data.refresh_token_ciphertext,
+        iv: data.refresh_token_iv,
+        tag: data.refresh_token_tag,
+        keyVersion: data.key_version,
+      });
+    }
+
+    const resolved: ResolvedToken = {
+      accessToken: decryptToken(accessEnvelope),
+      refreshToken,
+      tokenExpiresAt: data.token_expires_at,
+      keyVersion: data.key_version,
+    };
+
+    await recordCredentialAccess({
+      connectorId,
+      workspaceId: audit.workspaceId,
+      action: "read",
+      success: true,
       keyVersion: data.key_version,
     });
-  }
 
-  return {
-    accessToken: decryptToken(accessEnvelope),
-    refreshToken,
-    tokenExpiresAt: data.token_expires_at,
-    keyVersion: data.key_version,
-  };
+    return resolved;
+  } catch (err) {
+    // Decryption / auth-tag failure (tamper or wrong key). Audit, then rethrow.
+    await recordCredentialAccess({
+      connectorId,
+      workspaceId: audit.workspaceId,
+      action: "read",
+      success: false,
+      reason: "decryption failed",
+      keyVersion: data.key_version,
+    });
+    throw err;
+  }
 }
 
 /** Delete a connector's stored credentials (e.g. on disconnect). */
 export async function deleteConnectorToken(
-  connectorId: string
+  connectorId: string,
+  audit: CredentialAuditContext = {}
 ): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin
     .from("connector_credentials")
     .delete()
     .eq("connector_id", connectorId);
+
+  await recordCredentialAccess({
+    connectorId,
+    workspaceId: audit.workspaceId,
+    action: "delete",
+    success: !error,
+    reason: error ? "delete failed" : null,
+  });
 
   if (error) {
     throw new Error(`Failed to delete connector credentials: ${error.message}`);
@@ -202,7 +260,7 @@ export async function storeConnectorTokenForWorkspace(
   input: StoreTokenInput
 ): Promise<void> {
   await assertConnectorInWorkspace(input.connectorId, workspaceId);
-  return storeConnectorToken(input);
+  return storeConnectorToken(input, { workspaceId });
 }
 
 /** Fetch + decrypt token(s) for a connector after verifying workspace ownership. */
@@ -211,7 +269,7 @@ export async function getConnectorTokenForWorkspace(
   workspaceId: string
 ): Promise<ResolvedToken | null> {
   await assertConnectorInWorkspace(connectorId, workspaceId);
-  return getConnectorToken(connectorId);
+  return getConnectorToken(connectorId, { workspaceId });
 }
 
 /** Delete a connector's credentials after verifying workspace ownership. */
@@ -220,5 +278,5 @@ export async function deleteConnectorTokenForWorkspace(
   workspaceId: string
 ): Promise<void> {
   await assertConnectorInWorkspace(connectorId, workspaceId);
-  return deleteConnectorToken(connectorId);
+  return deleteConnectorToken(connectorId, { workspaceId });
 }
