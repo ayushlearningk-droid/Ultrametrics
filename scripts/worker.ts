@@ -17,6 +17,7 @@ import {
   registerShutdownHandlers,
   getRedisConnection,
 } from "@/lib/queue";
+import { startWorkerHeartbeat } from "@/lib/observability";
 
 async function main(): Promise<void> {
   console.info("Worker starting...");
@@ -29,6 +30,9 @@ async function main(): Promise<void> {
   // Reuse the existing runtime — one BullMQ Worker per queue.
   startWorkers();
   console.info("Workers started");
+
+  // Publish the cross-process heartbeat the observability API reads (Sprint 57).
+  await startWorkerHeartbeat();
 
   // Reuse the existing SIGINT/SIGTERM drain → close workers/queues/connection.
   registerShutdownHandlers();
