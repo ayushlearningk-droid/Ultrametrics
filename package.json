@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "ai:eval": "npx -y tsx src/lib/ai/eval/run.ts"
+    "ai:eval": "npx -y tsx src/lib/ai/eval/run.ts",
+    "worker": "npx -y tsx scripts/worker.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",
