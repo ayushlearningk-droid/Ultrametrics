@@ -40,6 +40,9 @@ import {
   X,
 } from "lucide-react";
 import { useAsk } from "@/components/os/ask-provider";
+import { useUniversalSearch } from "@/lib/hooks/use-universal-search";
+import { searchResultHref } from "@/lib/search/result-routing";
+import type { SearchResult, SearchCategory } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { Workspace } from "@/types/database";
 
@@ -51,7 +54,12 @@ export interface CommandPaletteProps {
 }
 
 type CommandGroup = "ai" | "page" | "action" | "setting" | "workspace";
-type Bucket = "pinned" | "recent" | CommandGroup;
+/** Buckets for live Universal Search results (Sprint 59). */
+type SearchBucket =
+  | "search_conversations"
+  | "search_workspace_memory"
+  | "search_connectors";
+type Bucket = "pinned" | "recent" | CommandGroup | SearchBucket;
 
 interface Command {
   id: string;
@@ -60,8 +68,23 @@ interface Command {
   icon: React.ElementType;
   shortcut?: string;
   keywords?: string[];
-  group: CommandGroup;
+  group: CommandGroup | SearchBucket;
   action: () => void;
+}
+
+/** Map a search category to its render bucket (null = not surfaced yet). */
+function searchBucketFor(category: SearchCategory): SearchBucket | null {
+  if (category === "conversations") return "search_conversations";
+  if (category === "workspace_memory") return "search_workspace_memory";
+  if (category === "connectors") return "search_connectors";
+  return null;
+}
+
+/** Icon for a search category. */
+function searchIconFor(category: SearchCategory): React.ElementType {
+  if (category === "conversations") return MessageSquare;
+  if (category === "connectors") return Plug;
+  return FileText;
 }
 
 const ASK_FALLBACK_ID = "ai-ask-fallback";
@@ -77,6 +100,10 @@ const BUCKET_ORDER: Bucket[] = [
   "action",
   "setting",
   "workspace",
+  // Live Universal Search results render beneath the command groups.
+  "search_conversations",
+  "search_workspace_memory",
+  "search_connectors",
 ];
 const BUCKET_LABEL: Record<Bucket, string> = {
   pinned: "Pinned",
@@ -86,6 +113,9 @@ const BUCKET_LABEL: Record<Bucket, string> = {
   action: "Actions",
   setting: "Settings",
   workspace: "Workspaces",
+  search_conversations: "Conversations",
+  search_workspace_memory: "Workspace Memory",
+  search_connectors: "Connectors",
 };
 
 /** Keyword/label match score; 0 = no match (filtered out). */
@@ -124,7 +154,14 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const router = useRouter();
   const reduce = useReducedMotion();
-  const { open: openAsk, send, newChat, focusSearch, focusComposer } = useAsk();
+  const {
+    open: openAsk,
+    send,
+    newChat,
+    focusSearch,
+    focusComposer,
+    selectConversation,
+  } = useAsk();
 
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
@@ -151,6 +188,48 @@ export function CommandPalette({
     },
     [router]
   );
+
+  // ── Live Universal Search (Sprint 58 API) ──
+  const {
+    data: searchData,
+    loading: searchLoading,
+    active: searchActive,
+  } = useUniversalSearch(query);
+
+  const runSearchResult = useCallback(
+    (result: SearchResult) => {
+      if (result.category === "conversations") {
+        // Conversations open in the Ask drawer rather than navigating.
+        openAsk();
+        void selectConversation(result.id);
+        return;
+      }
+      const href = searchResultHref(result);
+      if (href) goto(href);
+    },
+    [openAsk, selectConversation, goto]
+  );
+
+  const searchCommands = useMemo<Command[]>(() => {
+    if (!searchData) return [];
+    const out: Command[] = [];
+    (Object.keys(searchData.results) as SearchCategory[]).forEach((category) => {
+      const bucket = searchBucketFor(category);
+      if (!bucket) return;
+      const icon = searchIconFor(category);
+      for (const result of searchData.results[category] ?? []) {
+        out.push({
+          id: `search:${category}:${result.id}`,
+          label: result.title,
+          description: result.subtitle ?? result.snippet ?? undefined,
+          icon,
+          group: bucket,
+          action: () => runSearchResult(result),
+        });
+      }
+    });
+    return out;
+  }, [searchData, runSearchResult]);
 
   // ── Universal command registry (covers every surface) ──
   const registry = useMemo<Command[]>(() => {
@@ -410,6 +489,10 @@ export function CommandPalette({
     const realCount = cands.length;
     if (q) cands.push({ cmd: askFallback(query.trim()), s: 1 });
 
+    // Live Universal Search results (already query-matched server-side) join the
+    // candidates in their own buckets, beneath the command groups.
+    for (const sc of searchCommands) cands.push({ cmd: sc, s: 1 });
+
     const bucketOf = (cmd: Command): Bucket => {
       if (pinnedSet.has(cmd.id)) return "pinned";
       if (!q && recentIds.includes(cmd.id)) return "recent";
@@ -435,11 +518,15 @@ export function CommandPalette({
       }
       out.push(...arr.map((x) => x.cmd));
     }
-    return { ordered: out, hasRealMatch: realCount > 0 };
-  }, [query, registry, pinnedSet, recentIds, askFallback]);
+    return {
+      ordered: out,
+      hasRealMatch: realCount > 0 || searchCommands.length > 0,
+    };
+  }, [query, registry, pinnedSet, recentIds, askFallback, searchCommands]);
 
   const recordRecent = useCallback((id: string) => {
-    if (id === ASK_FALLBACK_ID) return;
+    // Skip the Ask fallback and ephemeral live-search results.
+    if (id === ASK_FALLBACK_ID || id.startsWith("search:")) return;
     setRecentIds((prev) => {
       const next = [id, ...prev.filter((x) => x !== id)].slice(0, MAX_RECENT);
       writeIds(RECENT_KEY, next);
@@ -564,12 +651,19 @@ export function CommandPalette({
 
               {/* Results */}
               <ul ref={listRef} className="max-h-80 overflow-y-auto p-1.5 pb-2">
-                {query.trim() && !hasRealMatch && (
+                {query.trim() && !hasRealMatch && !searchLoading && (
                   <li className="flex flex-col items-center gap-1 px-4 pb-2 pt-5 text-center">
                     <Sparkles className="h-5 w-5 text-foreground-muted" />
                     <p className="type-caption text-foreground-muted">
                       No commands match — ask Ultrametrics instead.
                     </p>
+                  </li>
+                )}
+
+                {searchActive && searchLoading && (
+                  <li className="flex items-center gap-2 px-4 py-2 type-caption text-foreground-muted">
+                    <Search className="h-3.5 w-3.5 animate-pulse" />
+                    Searching your workspace…
                   </li>
                 )}
 
@@ -581,7 +675,8 @@ export function CommandPalette({
                   const active = i === activeIdx;
                   const Icon = cmd.icon;
                   const pinned = pinnedSet.has(cmd.id);
-                  const pinnable = cmd.id !== ASK_FALLBACK_ID;
+                  const pinnable =
+                    cmd.id !== ASK_FALLBACK_ID && !cmd.id.startsWith("search:");
                   return (
                     <li key={cmd.id}>
                       {showHeader && (
