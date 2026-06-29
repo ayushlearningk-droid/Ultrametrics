@@ -16,10 +16,10 @@ export default function DataDeletionPage() {
     'Sign in to Ultrametrics.',
     'Open Workspace Settings.',
     'Open Connected Accounts.',
-    'Disconnect Meta, Google Ads, Google Analytics or any connected platform.',
-    'Open Account Settings.',
-    'Click Delete Workspace.',
-    'Confirm permanent deletion.',
+    'Disconnect Meta Ads, Google Ads, Google Analytics or any connected platform.',
+    'Save your changes.',
+    'Contact our support team at ultrametrics.ai@gmail.com requesting permanent account and data deletion.',
+    'Our team will permanently remove your account, connected OAuth tokens, synced marketing data, AI conversations, uploaded assets and workspace data after verification.',
   ];
 
   const deletedItems = [
@@ -87,13 +87,27 @@ export default function DataDeletionPage() {
             </div>
           </div>
 
-          {/* Section 3: Need Help */}
+          {/* Section 3: Deletion Timeline */}
+          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-8 sm:p-10">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <span className="h-1 w-1.5 bg-emerald-600 rounded-full"></span>
+              Deletion Timeline
+            </h2>
+            <div className="space-y-4 text-base sm:text-lg text-slate-700">
+              <p>• Requests are reviewed within 24–48 hours.</p>
+              <p>• Data is permanently deleted after identity verification.</p>
+              <p>• OAuth tokens are revoked before deletion.</p>
+              <p>• Deleted data cannot be recovered.</p>
+            </div>
+          </div>
+
+          {/* Section 4: Need Help */}
           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-lg p-8 sm:p-12 border border-emerald-200">
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">
               Need help?
             </h2>
             <p className="text-slate-600 mb-6 text-base sm:text-lg">
-              If you have questions about deleting your data or need assistance with your account, please reach out to our support team:
+              For account deletion, privacy requests, or assistance with removing your connected marketing platforms, please contact:
             </p>
             <div className="flex items-center gap-3 sm:gap-4">
               <Mail className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-600 flex-shrink-0" />
@@ -104,9 +118,20 @@ export default function DataDeletionPage() {
                 ultrametrics.ai@gmail.com
               </a>
             </div>
+            <p className="text-slate-500 mt-6 text-sm sm:text-base">
+              We normally respond within 24–48 hours.
+            </p>
           </div>
         </div>
       </section>
+
+      <div className="px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="text-sm text-slate-500">
+            Ultrametrics complies with Meta Platform Terms and applicable privacy regulations regarding user data deletion.
+          </p>
+        </div>
+      </div>
 
       {/* Footer */}
       <footer className="px-4 py-12 sm:px-6 lg:px-8 bg-slate-900 text-slate-100">
