@@ -44,6 +44,23 @@ export {
   type EnqueueOptions,
 } from "./producers";
 
+// Worker runtime (consume + log only).
+export {
+  createWorker,
+  startWorkers,
+  getRunningWorkers,
+  checkWorkerHealth,
+  closeAllWorkers,
+  type RunningWorker,
+  type WorkerHealth,
+} from "./worker";
+
+// Graceful shutdown.
+export {
+  registerShutdownHandlers,
+  shutdownQueueRuntime,
+} from "./shutdown";
+
 // Registry / factory.
 export {
   getQueue,
