@@ -13,7 +13,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
+  Target,
   LayoutGrid,
+  Users,
+  Clapperboard,
   Library,
   TrendingUp,
   Upload,
@@ -31,7 +34,10 @@ interface NavDestination {
 
 const DESTINATIONS: NavDestination[] = [
   { id: "home", label: "Home", icon: Home, href: "/dashboard/studio" },
+  { id: "outcomes", label: "Outcomes", icon: Target, href: "/dashboard/studio/outcomes" },
   { id: "canvas", label: "Canvas", icon: LayoutGrid, href: "/dashboard/studio/canvas" },
+  { id: "team", label: "AI Team", icon: Users, href: "/dashboard/studio/team" },
+  { id: "movie", label: "AI Movie", icon: Clapperboard, href: "/dashboard/studio/movie" },
   { id: "library", label: "Library", icon: Library },
   { id: "trending", label: "Trending", icon: TrendingUp },
   { id: "exports", label: "Exports", icon: Upload },
