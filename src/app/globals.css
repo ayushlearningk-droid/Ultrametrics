@@ -669,6 +669,65 @@
   .studio-card-interactive:hover { transform: none; }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   AI STUDIO LIVING CANVAS 63G — presence & life motion (token-based).
+   Reuses the Studio easing/duration tokens; reduced-motion safe.
+   ══════════════════════════════════════════════════════════════════ */
+@keyframes um-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.97; }
+  50% { transform: scale(1.012); opacity: 1; }
+}
+@keyframes um-edge-flow {
+  to { stroke-dashoffset: -16; }
+}
+@keyframes um-stage-in {
+  from { opacity: 0; transform: scale(0.992); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes um-cursor-float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(6px, -6px); }
+}
+
+/* A node that is "thinking/running" gently breathes. */
+.studio-breathe { animation: um-breathe 3.2s var(--studio-ease) infinite; }
+/* An active workflow edge shows flowing energy. */
+.studio-edge-flow { stroke-dasharray: 5 5; animation: um-edge-flow 0.8s linear infinite; }
+/* Canvas stage-in transition. */
+.studio-stage-in { animation: um-stage-in var(--studio-dur-slow) var(--studio-ease) both; }
+/* Idle AI presence cursor drift. */
+.studio-cursor-float { animation: um-cursor-float 6s var(--studio-ease) infinite; }
+/* Selected/running node lifts with a stronger, dynamic shadow. */
+.studio-elevated { box-shadow: var(--studio-elevation-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-breathe,
+  .studio-edge-flow,
+  .studio-stage-in,
+  .studio-cursor-float {
+    animation: none !important;
+  }
+}
+
+/* AI Studio Home 63F — Netflix-style media posters (token-based). */
+.studio-poster {
+  overflow: hidden;
+  border-radius: var(--studio-radius-lg);
+  transition:
+    transform var(--studio-dur-base) var(--studio-ease),
+    box-shadow var(--studio-dur-base) var(--studio-ease);
+}
+.studio-poster:hover {
+  transform: scale(1.03);
+  box-shadow: var(--studio-elevation-3);
+}
+.studio-poster-overlay {
+  background: linear-gradient(180deg, transparent 28%, hsl(240 30% 1% / 0.85) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-poster:hover { transform: none; }
+}
+
 /* ════════════════════════════════════════════════════════════════
    MOTION — 6 named animations, all reduced-motion safe
    pulse · flow · settle · elevate(hover) · bloom(focus) · drift

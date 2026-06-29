@@ -14,13 +14,20 @@ import {
   StickyNote,
   MessageSquare,
   Bot,
+  Sparkles,
   Plus,
   Minus,
   Maximize2,
+  Undo2,
+  Redo2,
+  LayoutGrid,
+  Trash2,
+  CopyPlus,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ReservedSlot } from "@/components/studio/shell/shell-region";
 import { useCanvas } from "./canvas-context";
 import {
   computeFitViewport,
@@ -28,6 +35,7 @@ import {
   visibleWorldRect,
   type CanvasTool,
 } from "./canvas-model";
+import { NODE_TYPES, STATUS_META, type NodeStatus } from "./node-types";
 
 /* ── Tool palette (left) ─────────────────────────────────────────────────── */
 interface ToolDef {
@@ -109,10 +117,12 @@ export function ZoomControls({ size }: { size: { width: number; height: number }
 function IconBtn({
   label,
   onClick,
+  disabled,
   children,
 }: {
   label: string;
   onClick: () => void;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -121,7 +131,13 @@ function IconBtn({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="studio-focusable flex h-8 w-8 items-center justify-center rounded-[var(--studio-radius-sm)] text-foreground-muted transition-colors hover:bg-white/[0.05] hover:text-foreground"
+      disabled={disabled}
+      className={cn(
+        "studio-focusable flex h-8 w-8 items-center justify-center rounded-[var(--studio-radius-sm)] transition-colors",
+        disabled
+          ? "cursor-default text-foreground-muted/40"
+          : "text-foreground-muted hover:bg-white/[0.05] hover:text-foreground"
+      )}
     >
       {children}
     </button>
@@ -159,20 +175,24 @@ export function Minimap({ size }: { size: { width: number; height: number } }) {
       className="studio-glass pointer-events-none absolute bottom-3 left-3 z-20 overflow-hidden p-0"
       style={{ width: MINIMAP_W, height: MINIMAP_H }}
     >
-      {/* nodes */}
+      {/* nodes (running nodes pulse) */}
       {activeTab.nodes.map((n) => {
         const p = toMap(n.x, n.y);
+        const running = n.status === "running";
         return (
           <span
             key={n.id}
-            className="absolute rounded-[2px] bg-foreground-muted/50"
+            className={cn(
+              "absolute rounded-[2px]",
+              running ? "anim-pulse bg-brand" : "bg-foreground-muted/50"
+            )}
             style={{ left: p.x, top: p.y, width: Math.max(2, n.width * sx), height: Math.max(2, n.height * sy) }}
           />
         );
       })}
-      {/* viewport rectangle */}
+      {/* viewport rectangle (eased) */}
       <span
-        className="absolute rounded-[3px] border border-brand/70 bg-brand/10"
+        className="absolute rounded-[3px] border border-brand/70 bg-brand/10 transition-all duration-200 ease-out motion-reduce:transition-none"
         style={{ left: viewTL.x, top: viewTL.y, width: view.width * sx, height: view.height * sy }}
       />
     </div>
@@ -229,5 +249,146 @@ export function CanvasTabs() {
         </button>
       </div>
     </div>
+  );
+}
+
+/* ── History + graph controls (top-left) ─────────────────────────────────── */
+export function HistoryControls() {
+  const { canUndo, canRedo, undo, redo, autoLayout } = useCanvas();
+  return (
+    <div className="studio-glass pointer-events-auto absolute left-3 top-3 z-20 flex items-center gap-1 p-1.5">
+      <IconBtn label="Undo" onClick={undo} disabled={!canUndo}>
+        <Undo2 className="h-4 w-4" />
+      </IconBtn>
+      <IconBtn label="Redo" onClick={redo} disabled={!canRedo}>
+        <Redo2 className="h-4 w-4" />
+      </IconBtn>
+      <span className="mx-0.5 h-5 w-px bg-white/[0.08]" />
+      <IconBtn label="Auto-layout" onClick={autoLayout}>
+        <LayoutGrid className="h-4 w-4" />
+      </IconBtn>
+    </div>
+  );
+}
+
+/* ── Inspector (right) — property panel + AI inspector hooks ──────────────── */
+export function CanvasInspector() {
+  const { state, activeTab, setStatus, duplicateSelected, deleteSelected } = useCanvas();
+  const selected = activeTab.nodes.filter((n) => state.selectedIds.includes(n.id));
+
+  return (
+    <aside
+      aria-label="Inspector"
+      className="studio-surface-raised pointer-events-auto absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-64 flex-col overflow-y-auto p-3"
+    >
+      <span className="flex items-center gap-2 type-eyebrow text-foreground-muted">
+        <Sparkles className="h-3.5 w-3.5 text-brand" />
+        Inspector
+      </span>
+
+      {selected.length === 0 ? (
+        <p className="mt-3 type-caption text-foreground-muted">
+          Select a node to inspect its properties.
+        </p>
+      ) : selected.length === 1 ? (
+        <SingleNodeInspector node={selected[0]} onStatus={setStatus} />
+      ) : (
+        <div className="mt-3 flex flex-col gap-3">
+          <p className="type-body font-semibold text-foreground">
+            {selected.length} nodes selected
+          </p>
+          <div className="flex gap-2">
+            <InspectorAction icon={<CopyPlus className="h-3.5 w-3.5" />} label="Duplicate" onClick={duplicateSelected} />
+            <InspectorAction icon={<Trash2 className="h-3.5 w-3.5" />} label="Delete" onClick={deleteSelected} />
+          </div>
+        </div>
+      )}
+
+      {/* Reserved future module mounts (no logic this sprint). */}
+      <div className="mt-4 flex flex-col gap-3">
+        <ReservedSlot label="AI Inspector" hint="Reserved" />
+        <ReservedSlot label="Provider settings" hint="Reserved" />
+      </div>
+    </aside>
+  );
+}
+
+const STATUS_ORDER: NodeStatus[] = ["idle", "running", "complete", "failed"];
+
+function SingleNodeInspector({
+  node,
+  onStatus,
+}: {
+  node: ReturnType<typeof useCanvas>["activeTab"]["nodes"][number];
+  onStatus: (id: string, status: NodeStatus) => void;
+}) {
+  const def = NODE_TYPES[node.type];
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <div className="studio-tile flex h-8 w-8 items-center justify-center text-foreground-muted">
+          <def.icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate type-body font-semibold text-foreground">{node.title ?? def.label}</p>
+          <p className="type-caption text-foreground-muted">{def.label}</p>
+        </div>
+      </div>
+
+      <Row label="Position" value={`${Math.round(node.x)}, ${Math.round(node.y)}`} />
+      <Row label="Size" value={`${node.width} × ${node.height}`} />
+
+      <div className="flex flex-col gap-1.5">
+        <span className="type-caption text-foreground-muted">Status</span>
+        <div className="grid grid-cols-2 gap-1.5">
+          {STATUS_ORDER.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onStatus(node.id, s)}
+              aria-pressed={node.status === s}
+              className={cn(
+                "studio-focusable rounded-[var(--studio-radius-sm)] px-2 py-1 type-caption transition-colors",
+                node.status === s
+                  ? "bg-brand/10 text-brand"
+                  : "text-foreground-muted hover:bg-white/[0.05] hover:text-foreground"
+              )}
+            >
+              {STATUS_META[s].label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="type-caption text-foreground-muted">{label}</span>
+      <span className="type-caption tabular-nums text-foreground/90">{value}</span>
+    </div>
+  );
+}
+
+function InspectorAction({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="studio-focusable flex flex-1 items-center justify-center gap-1.5 rounded-[var(--studio-radius-sm)] border border-white/[0.08] px-2 py-1.5 type-caption text-foreground-muted transition-colors hover:bg-white/[0.05] hover:text-foreground"
+    >
+      {icon}
+      {label}
+    </button>
   );
 }

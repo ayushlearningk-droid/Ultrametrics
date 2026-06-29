@@ -26,25 +26,49 @@ export interface Viewport {
   scale: number;
 }
 
-export type CanvasNodeKind = "note" | "placeholder";
+import type { NodeType, NodeStatus } from "./node-types";
 
-/** A node lives in world coordinates. Node-ready: future kinds extend this. */
+/** A workflow node in world coordinates. Type-driven via the node registry. */
 export interface CanvasNode {
   id: string;
-  kind: CanvasNodeKind;
+  type: NodeType;
   x: number;
   y: number;
   width: number;
   height: number;
-  label?: string;
+  title?: string;
+  status: NodeStatus;
+  /** Group membership (expand/collapse) — null when ungrouped. */
+  groupId?: string | null;
+  /** Whether the node's group is collapsed (groups only). */
+  collapsed?: boolean;
 }
 
-/** A workspace tab = one independent canvas (viewport + nodes). */
+/** A directed workflow edge (output port → input port). */
+export interface CanvasEdge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+/** A workspace tab = one independent canvas (viewport + nodes + edges). */
 export interface CanvasTab {
   id: string;
   name: string;
   viewport: Viewport;
   nodes: CanvasNode[];
+  edges: CanvasEdge[];
+}
+
+/** World position of a node's input ("in") or output ("out") port. */
+export function portPosition(
+  node: CanvasNode,
+  side: "in" | "out"
+): { x: number; y: number } {
+  return {
+    x: side === "out" ? node.x + node.width : node.x,
+    y: node.y + node.height / 2,
+  };
 }
 
 export type CanvasTool = "select" | "pan";

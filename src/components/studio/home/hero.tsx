@@ -39,42 +39,48 @@ export function StudioHero() {
       variants={fadeIn}
       initial={reduce ? false : "hidden"}
       animate="visible"
-      className="studio-hero relative overflow-hidden p-7 md:p-12"
+      className="studio-hero relative flex min-h-[58vh] flex-col justify-center overflow-hidden p-8 md:min-h-[64vh] md:p-16"
     >
       {/* Ambient brand wash (token-based) */}
-      <div aria-hidden className="studio-ambient pointer-events-none absolute inset-0 opacity-70" />
+      <div aria-hidden className="studio-ambient pointer-events-none absolute inset-0 opacity-80" />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
             "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
+          backgroundSize: "32px 32px",
           maskImage: "radial-gradient(120% 100% at 50% 0%, black, transparent 70%)",
         }}
       />
 
-      <div className="relative flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <span className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
-            <Sparkles className="h-3.5 w-3.5 text-brand" />
+      <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-8">
+        <div className="flex flex-col gap-3">
+          <span className="flex items-center gap-2 type-eyebrow text-foreground-muted">
+            <Sparkles className="h-4 w-4 text-brand" />
             AI Workspace
           </span>
-          <h1 className="type-display text-foreground">
-            What do you want to create today?
+          <h1 className="text-4xl font-bold leading-[1.05] tracking-tight text-foreground md:text-6xl">
+            What do you want
+            <br />
+            to create today?
           </h1>
+          <p className="max-w-xl type-body text-foreground-muted md:text-lg">
+            One prompt. Your entire creative team — directing video, image, and
+            campaigns from a single line.
+          </p>
         </div>
 
         {/* Prompt workspace (inert placeholder this sprint) */}
-        <div className="studio-glass p-3.5">
+        <div className="studio-glass p-4 md:p-5">
           <textarea
             value={value}
             onChange={(e) => setValue(e.target.value)}
             readOnly
-            rows={3}
+            rows={4}
             aria-label="Describe what you want to create"
             placeholder="Describe a campaign, an ad, a video — or paste a product link…"
-            className="w-full resize-none cursor-default bg-transparent px-2 py-1 type-body leading-relaxed text-foreground outline-none placeholder:text-foreground-muted"
+            className="w-full resize-none cursor-default bg-transparent px-2 py-1 text-lg leading-relaxed text-foreground outline-none placeholder:text-foreground-muted"
           />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1">
             <div className="flex flex-wrap items-center gap-2">
