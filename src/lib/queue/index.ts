@@ -78,3 +78,28 @@ export {
   type QueueHealth,
   type QueueHealthReport,
 } from "./health";
+
+// Retry adapter (reuses src/lib/actions/retry.ts).
+export {
+  classifyError,
+  decideJobRetry,
+  logRetryDecision,
+  MAX_ATTEMPTS,
+  isRetryable,
+  backoffMs,
+  type ErrorClass,
+  type RetryDecision,
+  type RetryLogContext,
+} from "./retry";
+
+// Dead Letter Queue (standalone, outside QUEUE_NAMES).
+export {
+  DEAD_LETTER_QUEUE_NAME,
+  getDeadLetterQueue,
+  shouldDeadLetter,
+  routeToDeadLetter,
+  getDeadLetterCounts,
+  closeDeadLetterQueue,
+  type DeadLetterRecord,
+  type DeadLetterInput,
+} from "./dead-letter";
