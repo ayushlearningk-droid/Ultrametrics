@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { decodePendingAccessToken } from "@/lib/data/oauth-pending";
 
 export async function getLatestMetaPendingSession(
   workspaceId: string
@@ -18,5 +19,6 @@ export async function getLatestMetaPendingSession(
     return null;
   }
 
-  return data;
+  // Decrypt the stored token transparently (Sprint 55C).
+  return { ...data, access_token: decodePendingAccessToken(data.access_token) };
 }

@@ -17,6 +17,7 @@ import {
 } from "@/lib/google-ads/accounts";
 import { GOOGLE_ADS_CONNECT_PATH } from "@/lib/google-ads/oauth-redirect";
 import { getCurrentWorkspaceId, getUserWorkspaces } from "@/lib/data/workspaces";
+import { decodePendingAccessToken } from "@/lib/data/oauth-pending";
 
 export const metadata = {
   title: "Select Google Ads Account",
@@ -36,7 +37,8 @@ async function getGoogleAdsPendingSession(workspaceId: string) {
   if (error || !data) {
     return null;
   }
-  return data;
+  // Decrypt the stored token transparently (Sprint 55C).
+  return { ...data, access_token: decodePendingAccessToken(data.access_token) };
 }
 
 export default async function GoogleAdsSelectAccountPage() {
