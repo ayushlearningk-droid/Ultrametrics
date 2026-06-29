@@ -70,7 +70,7 @@ export function WorkspacePanel({ region }: { region: RegionState }) {
     <section
       aria-label={def.title}
       className={cn(
-        "studio-surface-raised flex flex-col overflow-hidden",
+        "studio-surface-raised studio-stage-in flex flex-col overflow-hidden",
         floating && "shadow-floating absolute z-30"
       )}
       style={floating ? { left: region.float.x, top: region.float.y, width: region.float.w, height: region.float.h } : undefined}
@@ -102,7 +102,7 @@ export function WorkspacePanel({ region }: { region: RegionState }) {
 
       {/* Body */}
       {!region.collapsed && (
-        <div className={cn("min-h-0 flex-1 overflow-auto p-2", !floating && "max-h-[72vh]")}>
+        <div className={cn("studio-scroll min-h-0 flex-1 overflow-auto p-2", !floating && "max-h-[72vh]")}>
           <RegionContent id={region.id} />
         </div>
       )}

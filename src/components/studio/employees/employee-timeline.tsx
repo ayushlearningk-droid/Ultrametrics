@@ -34,10 +34,15 @@ export function EmployeeTimeline() {
           <p className="px-2 py-1 type-caption text-foreground-muted">No events yet.</p>
         ) : (
           timeline.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 rounded-[var(--studio-radius-sm)] px-2 py-1.5">
+            <div
+              key={e.id}
+              className="flex items-center gap-2 rounded-[var(--studio-radius-sm)] px-2 py-1.5 transition-colors hover:bg-white/[0.03]"
+            >
               <KindIcon kind={e.kind} />
               <span className="type-caption text-foreground/90">{e.text}</span>
-              <span className="ml-auto type-caption tabular-nums text-foreground-muted">{timeLabel(e.at)}</span>
+              <span className="ml-auto rounded bg-white/[0.04] px-1.5 py-0.5 type-caption tabular-nums text-foreground-muted">
+                {timeLabel(e.at)}
+              </span>
             </div>
           ))
         )}

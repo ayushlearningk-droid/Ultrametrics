@@ -34,16 +34,25 @@ function ResizeHandle({ onResize, side }: { onResize: (dx: number) => void; side
       role="separator"
       aria-label={`Resize ${side} panel`}
       onPointerDown={onDown}
-      className="group flex w-2 shrink-0 cursor-col-resize items-center justify-center"
+      className="group flex w-3 shrink-0 cursor-col-resize items-center justify-center"
     >
-      <span className="h-10 w-px rounded bg-white/[0.08] transition-colors group-hover:bg-brand/50" />
+      {/* Premium grip — a vertical rail with three dots that warm to brand. */}
+      <span className="relative flex h-12 w-1.5 flex-col items-center justify-center gap-1 rounded-full transition-colors">
+        <span className="absolute inset-x-[3px] inset-y-0 rounded-full bg-white/[0.06] transition-colors group-hover:bg-brand/40" />
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="relative h-1 w-1 rounded-full bg-white/30 transition-colors group-hover:bg-brand group-active:bg-brand"
+          />
+        ))}
+      </span>
     </div>
   );
 }
 
 function ZoneColumn({ regions, width }: { regions: RegionState[]; width?: number }) {
   return (
-    <div className="flex shrink-0 flex-col gap-3 overflow-y-auto" style={width ? { width } : undefined}>
+    <div className="studio-scroll flex shrink-0 flex-col gap-3 overflow-y-auto" style={width ? { width } : undefined}>
       {regions.map((r) => (
         <WorkspacePanel key={r.id} region={r} />
       ))}

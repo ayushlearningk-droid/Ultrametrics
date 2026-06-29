@@ -520,18 +520,19 @@
   }
   .studio-card-interactive { cursor: default; }
   .studio-card-interactive:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--studio-elevation-2);
-    border-color: hsl(var(--brand) / 0.22);
+    transform: translateY(-4px);
+    /* Premium lift: deeper shadow + a soft brand halo. */
+    box-shadow: var(--studio-elevation-2), var(--studio-glow-soft);
+    border-color: hsl(var(--brand) / 0.26);
   }
   .studio-card-interactive:active { transform: translateY(-1px) scale(0.994); }
 
-  /* Raised surface — higher in the depth ladder. */
+  /* Raised surface — higher in the depth ladder (handcrafted edge light). */
   .studio-surface-raised {
     background: var(--studio-surface-raised);
     border: var(--studio-border-strong);
     border-radius: var(--studio-radius-lg);
-    box-shadow: var(--studio-elevation-2);
+    box-shadow: var(--studio-elevation-2), 0 1px 0 0 hsl(0 0% 100% / 0.06) inset;
     backdrop-filter: blur(var(--studio-blur-md));
   }
 
@@ -545,19 +546,21 @@
     backdrop-filter: blur(var(--studio-blur-lg));
   }
 
-  /* Inset glass — for inputs / nested fields. */
+  /* Inset glass — for inputs / nested fields (subtle top edge light). */
   .studio-glass {
     background: var(--studio-glass-fill);
     border: var(--studio-border);
     border-radius: var(--studio-radius-md);
+    box-shadow: 0 1px 0 0 hsl(0 0% 100% / 0.05) inset;
     backdrop-filter: blur(var(--studio-blur-md));
   }
 
-  /* Icon / avatar tile — the one reusable square chassis. */
+  /* Icon / avatar tile — handcrafted: soft top-lit gradient + inner edge light. */
   .studio-tile {
-    background: var(--studio-glass-fill);
+    background: linear-gradient(160deg, hsl(0 0% 100% / 0.05), hsl(0 0% 100% / 0.015));
     border: var(--studio-border);
     border-radius: var(--studio-radius-md);
+    box-shadow: 0 1px 0 0 hsl(0 0% 100% / 0.05) inset;
   }
 
   /* Reserved placeholder — calm dashed slot. */

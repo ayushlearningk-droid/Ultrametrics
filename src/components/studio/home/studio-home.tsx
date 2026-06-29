@@ -1,26 +1,18 @@
 "use client";
 
 /**
- * AI Studio Home (Sprint 63F · Visual Excellence).
+ * AI Studio Home (Sprint 63 · production media).
  *
- * Premium, media-dominant creative landing experience. Presentation only —
- * reuses the Studio 2.0 tokens + primitives (StudioSection / PremiumCard /
- * PremiumEmptyState / ReservedSlot) and the Netflix-style `studio-poster`
- * utility. No new features, no AI, no providers, no APIs, no architecture
- * change. All interactive entry points are inert placeholders.
+ * Media-dominant landing experience, mounted as the Home region of the Unified
+ * Workspace. Now uses the PRODUCTION media components (AdPoster · UGCCard ·
+ * VideoPreviewCard · CreativeThumbnail · badges) instead of inline placeholders.
+ * Presentation only — components render real media when a source is supplied and
+ * an honest empty-media frame otherwise. No generation, providers, or APIs.
  */
 
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import {
-  Play,
-  Bookmark,
-  Wand2,
-  BarChart3,
-  Lightbulb,
-  Image as ImageIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { Bookmark, Wand2, BarChart3, Lightbulb, type LucideIcon } from "lucide-react";
 import { slideUp } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { StudioSection, PremiumCard } from "./primitives";
@@ -33,6 +25,52 @@ import {
   type CreateType,
   type BrandFacet,
 } from "./data";
+import {
+  AdPoster,
+  UGCCard,
+  VideoPreviewCard,
+  CreativeThumbnail,
+  type MediaSource,
+  type PerformanceMetric,
+  type PlatformId,
+} from "@/components/studio/media";
+
+/* ── Sample content (structured props — real components, empty media frames) ── */
+const VIDEO_MEDIA: MediaSource = { kind: "video" };
+
+const TRENDING: {
+  id: string;
+  title: string;
+  subtitle: string;
+  platform: PlatformId;
+  metrics: PerformanceMetric[];
+}[] = [
+  { id: "t1", title: "Problem-first hook", subtitle: "Win-back angle", platform: "reels", metrics: [{ label: "CTR", value: "3.2%", tone: "positive" }, { label: "ROAS", value: "4.1x", tone: "neutral" }] },
+  { id: "t2", title: "Founder story", subtitle: "Trust angle", platform: "tiktok", metrics: [{ label: "CTR", value: "2.7%", tone: "positive" }] },
+  { id: "t3", title: "Before / after", subtitle: "Proof angle", platform: "shorts", metrics: [{ label: "ROAS", value: "3.6x", tone: "neutral" }] },
+  { id: "t4", title: "Unboxing", subtitle: "Curiosity angle", platform: "reels", metrics: [{ label: "CTR", value: "2.1%", tone: "neutral" }] },
+  { id: "t5", title: "Comparison", subtitle: "Consideration", platform: "meta", metrics: [{ label: "ROAS", value: "2.9x", tone: "neutral" }] },
+  { id: "t6", title: "Testimonial", subtitle: "Social proof", platform: "tiktok", metrics: [{ label: "CTR", value: "3.9%", tone: "positive" }] },
+];
+
+const UGC: { id: string; handle: string; hook: string; platform: PlatformId; metrics: PerformanceMetric[] }[] = [
+  { id: "u1", handle: "mayacreates", hook: "This fixed my morning routine in 7 days.", platform: "tiktok", metrics: [{ label: "CTR", value: "2.8%", tone: "positive" }] },
+  { id: "u2", handle: "leoonbudget", hook: "I didn't expect the third one to work.", platform: "reels", metrics: [{ label: "CTR", value: "3.1%", tone: "positive" }] },
+  { id: "u3", handle: "thesarah", hook: "Honestly skeptical — then this happened.", platform: "shorts", metrics: [{ label: "ROAS", value: "3.3x", tone: "neutral" }] },
+  { id: "u4", handle: "dailydose", hook: "POV: you finally found the one.", platform: "tiktok", metrics: [{ label: "CTR", value: "2.5%", tone: "neutral" }] },
+  { id: "u5", handle: "ninaedits", hook: "Stop scrolling — this is for you.", platform: "reels", metrics: [{ label: "CTR", value: "3.4%", tone: "positive" }] },
+];
+
+const PROJECTS = [
+  { id: "p1", title: "Summer Launch", subtitle: "Edited 2h ago", duration: "0:15", platform: "reels" as PlatformId },
+  { id: "p2", title: "Win-back UGC", subtitle: "Edited yesterday", duration: "0:22", platform: "tiktok" as PlatformId },
+  { id: "p3", title: "Brand Film", subtitle: "Draft", duration: "0:30", platform: undefined },
+];
+
+const COLLECTIONS = [
+  { id: "c1", title: "Top Performers", subtitle: "Smart collection" },
+  { id: "c2", title: "TikTok Hooks", subtitle: "12 assets" },
+];
 
 /* ── Scroll-reveal section transition ─────────────────────────────────────── */
 function Reveal({ children }: { children: ReactNode }) {
@@ -46,48 +84,6 @@ function Reveal({ children }: { children: ReactNode }) {
     >
       {children}
     </motion.div>
-  );
-}
-
-/* ── Netflix-style portrait poster (Trending / Inspirations) ──────────────── */
-function Poster({ kind }: { kind: "trending" | "inspiration" }) {
-  const isTrending = kind === "trending";
-  return (
-    <div className="studio-poster studio-snap relative w-[208px] shrink-0 md:w-[228px]">
-      <div className="studio-media relative aspect-[2/3]">
-        <div className="absolute inset-0 flex items-center justify-center text-foreground-muted/50">
-          <Play className="h-7 w-7" />
-        </div>
-
-        {isTrending && (
-          <span className="absolute left-2.5 top-2.5 rounded-[var(--studio-radius-sm)] bg-black/45 px-1.5 py-0.5 type-caption text-foreground-muted backdrop-blur-sm">
-            Reels
-          </span>
-        )}
-        {isTrending && (
-          <div className="absolute right-2.5 top-2.5 flex gap-1">
-            <span className="chip chip-emerald">CTR</span>
-            <span className="chip chip-slate">ROAS</span>
-          </div>
-        )}
-
-        {/* Bottom gradient + title + hover actions */}
-        <div className="studio-poster-overlay absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3">
-          <p className="type-body font-semibold text-foreground">
-            {isTrending ? "Problem-first hook" : "Editorial mood"}
-          </p>
-          {isTrending ? (
-            <div className="flex items-center gap-1">
-              <PosterAction icon={Bookmark} label="Save" />
-              <PosterAction icon={Wand2} label="Remix" />
-              <PosterAction icon={BarChart3} label="Analyze" />
-            </div>
-          ) : (
-            <span className="type-caption text-foreground-muted">Inspiration</span>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -105,43 +101,6 @@ function PosterAction({ icon: Icon, label }: { icon: LucideIcon; label: string }
   );
 }
 
-/* ── Landscape project poster (Continue Working) ──────────────────────────── */
-const PROJECT_PLACEHOLDERS = [
-  { id: "p1", title: "Summer Launch", meta: "Edited 2h ago", progress: 72 },
-  { id: "p2", title: "Win-back UGC", meta: "Edited yesterday", progress: 40 },
-  { id: "p3", title: "Brand Film", meta: "Draft", progress: 15 },
-];
-
-function ProjectPoster({ title, meta, progress }: { title: string; meta: string; progress: number }) {
-  return (
-    <div className="studio-poster relative aspect-[16/10] w-full cursor-default">
-      <div className="studio-media absolute inset-0 flex items-center justify-center text-foreground-muted/40">
-        <Play className="h-8 w-8" />
-      </div>
-      <div className="studio-poster-overlay absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4">
-        <div className="flex items-end justify-between gap-2">
-          <p className="type-body font-semibold text-foreground">{title}</p>
-          <span className="type-caption text-foreground-muted">{meta}</span>
-        </div>
-        <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.12]">
-          <div className="h-full rounded-full bg-brand" style={{ width: `${progress}%` }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Square asset tile (Recent Assets) ────────────────────────────────────── */
-function AssetTile() {
-  return (
-    <div className="studio-poster relative aspect-square w-full cursor-default">
-      <div className="studio-media absolute inset-0 flex items-center justify-center text-foreground-muted/40">
-        <ImageIcon className="h-6 w-6" />
-      </div>
-    </div>
-  );
-}
-
 /* ── AI Employee card ─────────────────────────────────────────────────────── */
 function EmployeeCard({ employee }: { employee: StudioEmployee }) {
   const { name, role, icon: Icon, status } = employee;
@@ -151,12 +110,7 @@ function EmployeeCard({ employee }: { employee: StudioEmployee }) {
       <div className="flex items-center gap-2.5">
         <div className="studio-tile relative flex h-10 w-10 items-center justify-center text-foreground-muted">
           <Icon className="h-4 w-4" />
-          <span
-            className={cn(
-              "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[hsl(222_44%_6%)]",
-              ready ? "bg-brand" : "bg-foreground-muted/50"
-            )}
-          />
+          <span className={cn("absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[hsl(222_44%_6%)]", ready ? "bg-brand" : "bg-foreground-muted/50")} />
         </div>
         <div className="min-w-0">
           <p className="truncate type-body font-semibold text-foreground">{name}</p>
@@ -168,7 +122,7 @@ function EmployeeCard({ employee }: { employee: StudioEmployee }) {
   );
 }
 
-/* ── Create entry card (visual) ───────────────────────────────────────────── */
+/* ── Create entry card ────────────────────────────────────────────────────── */
 function CreateCard({ type }: { type: CreateType }) {
   const { label, icon: Icon } = type;
   return (
@@ -205,41 +159,51 @@ function BrandTile({ facet }: { facet: BrandFacet }) {
 /* ── Composition ──────────────────────────────────────────────────────────── */
 export function StudioHome() {
   const reduce = useReducedMotion();
-  const posters = Array.from({ length: 7 });
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-24 px-4 py-10 md:px-10 md:py-16">
-      {/* 1 · Hero — the dominant visual center */}
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-16 px-1 py-4">
+      {/* 1 · Hero */}
       <motion.div variants={slideUp} initial={reduce ? false : "hidden"} animate="visible">
         <StudioHero />
       </motion.div>
 
-      {/* 2 · Projects (Continue Working) — landscape posters */}
+      {/* 2 · Continue Working — video preview cards */}
       <Reveal>
         <StudioSection label="Continue Working" description="Pick up where you left off.">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {PROJECT_PLACEHOLDERS.map((p) => (
-              <ProjectPoster key={p.id} title={p.title} meta={p.meta} progress={p.progress} />
+            {PROJECTS.map((p) => (
+              <VideoPreviewCard key={p.id} title={p.title} subtitle={p.subtitle} duration={p.duration} platform={p.platform} />
             ))}
           </div>
         </StudioSection>
       </Reveal>
 
-      {/* 3 · Trending — Netflix-style poster rail (full-bleed) */}
+      {/* 3 · Trending — cinematic ad posters */}
       <Reveal>
-        <StudioSection
-          label="Trending Winning Ads"
-          description="High-performing patterns — save, remix, analyze."
-        >
-          <div className="studio-scroll -mx-4 flex gap-4 overflow-x-auto px-4 pb-3 md:-mx-10 md:px-10">
-            {posters.map((_, i) => (
-              <Poster key={i} kind="trending" />
+        <StudioSection label="Trending Winning Ads" description="High-performing patterns — save, remix, analyze.">
+          <div className="studio-scroll -mx-1 flex gap-4 overflow-x-auto px-1 pb-3">
+            {TRENDING.map((t) => (
+              <AdPoster
+                key={t.id}
+                media={VIDEO_MEDIA}
+                title={t.title}
+                subtitle={t.subtitle}
+                platform={t.platform}
+                metrics={t.metrics}
+                actions={
+                  <div className="flex items-center gap-1.5">
+                    <PosterAction icon={Bookmark} label="Save" />
+                    <PosterAction icon={Wand2} label="Remix" />
+                    <PosterAction icon={BarChart3} label="Analyze" />
+                  </div>
+                }
+              />
             ))}
           </div>
         </StudioSection>
       </Reveal>
 
-      {/* 4 · Create — large visual cards */}
+      {/* 4 · Create */}
       <Reveal>
         <StudioSection label="Create" description="Start something new.">
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
@@ -250,7 +214,7 @@ export function StudioHome() {
         </StudioSection>
       </Reveal>
 
-      {/* 5 · AI Employees — rail */}
+      {/* 5 · AI Employees */}
       <Reveal>
         <StudioSection label="AI Employees" description="Your always-on creative team.">
           <div className="studio-scroll -mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
@@ -261,7 +225,7 @@ export function StudioHome() {
         </StudioSection>
       </Reveal>
 
-      {/* 6 · Brand Workspace — tiles */}
+      {/* 6 · Brand Workspace */}
       <Reveal>
         <StudioSection label="Brand Workspace" description="Everything that keeps you on-brand.">
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
@@ -272,33 +236,34 @@ export function StudioHome() {
         </StudioSection>
       </Reveal>
 
-      {/* 7 · Recent Assets — square media grid */}
+      {/* 7 · Recent Assets — creative thumbnails */}
       <Reveal>
         <StudioSection label="Recent Assets">
           <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <AssetTile key={i} />
+              <CreativeThumbnail key={i} media={{ kind: "image" }} aspect="square" />
             ))}
           </div>
         </StudioSection>
       </Reveal>
 
-      {/* 8 · Collections — wide landscape posters */}
+      {/* 8 · Collections — video preview cards */}
       <Reveal>
         <StudioSection label="Collections" description="Group your best work.">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <ProjectPoster title="Top Performers" meta="Smart collection" progress={100} />
-            <ProjectPoster title="TikTok Hooks" meta="12 assets" progress={100} />
+            {COLLECTIONS.map((c) => (
+              <VideoPreviewCard key={c.id} title={c.title} subtitle={c.subtitle} />
+            ))}
           </div>
         </StudioSection>
       </Reveal>
 
-      {/* 9 · Inspirations — portrait poster rail (full-bleed) */}
+      {/* 9 · Inspirations — UGC cards */}
       <Reveal>
         <StudioSection label="Inspirations" description="A wall of ideas to remix.">
-          <div className="studio-scroll -mx-4 flex gap-4 overflow-x-auto px-4 pb-3 md:-mx-10 md:px-10">
-            {posters.map((_, i) => (
-              <Poster key={i} kind="inspiration" />
+          <div className="studio-scroll -mx-1 flex gap-4 overflow-x-auto px-1 pb-3">
+            {UGC.map((u) => (
+              <UGCCard key={u.id} handle={u.handle} hook={u.hook} platform={u.platform} metrics={u.metrics} />
             ))}
           </div>
         </StudioSection>
@@ -308,9 +273,7 @@ export function StudioHome() {
       <Reveal>
         <div className="studio-reserved flex items-center justify-center gap-2 px-4 py-6 text-center">
           <Lightbulb className="h-4 w-4 text-foreground-muted" />
-          <span className="type-caption text-foreground-muted">
-            More workspace modules · reserved for future Roadmap 8.0
-          </span>
+          <span className="type-caption text-foreground-muted">More workspace modules · reserved for future Roadmap 8.0</span>
         </div>
       </Reveal>
     </div>
