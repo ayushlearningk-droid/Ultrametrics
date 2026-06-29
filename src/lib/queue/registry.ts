@@ -12,7 +12,7 @@
 
 import { Queue, type ConnectionOptions, type QueueOptions } from "bullmq";
 import { getRedisConnection } from "./connection";
-import { QUEUE_NAMES, type QueueName, type QueuePayload } from "./types";
+import { QUEUE_NAMES, type QueueName, type JobEnvelope } from "./types";
 
 /**
  * Default BullMQ job options applied to every queue. Conservative, transport-
@@ -35,9 +35,9 @@ const registry = new Map<QueueName, Queue>();
  * The generic ties the returned Queue's data type to the queue's payload
  * contract from types.ts, so producers (later) get compile-time-checked jobs.
  */
-export function getQueue<Q extends QueueName>(name: Q): Queue<QueuePayload<Q>> {
+export function getQueue<Q extends QueueName>(name: Q): Queue<JobEnvelope<Q>> {
   const existing = registry.get(name);
-  if (existing) return existing as Queue<QueuePayload<Q>>;
+  if (existing) return existing as Queue<JobEnvelope<Q>>;
 
   // BullMQ bundles its own ioredis copy, so the structurally-identical Redis
   // instance is treated as a distinct type; cast at this single boundary.
@@ -47,7 +47,7 @@ export function getQueue<Q extends QueueName>(name: Q): Queue<QueuePayload<Q>> {
   });
 
   registry.set(name, queue);
-  return queue as Queue<QueuePayload<Q>>;
+  return queue as Queue<JobEnvelope<Q>>;
 }
 
 /** All currently-instantiated queues (only those getQueue() has touched). */

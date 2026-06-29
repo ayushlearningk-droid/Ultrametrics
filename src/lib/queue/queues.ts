@@ -10,19 +10,19 @@
 
 import { getQueue } from "./registry";
 import type { Queue } from "bullmq";
-import type { QueuePayload } from "./types";
+import type { JobEnvelope } from "./types";
 
 /** Connector data-sync queue. */
-export function syncQueue(): Queue<QueuePayload<"sync">> {
+export function syncQueue(): Queue<JobEnvelope<"sync">> {
   return getQueue("sync");
 }
 
 /** Action Engine execution queue. */
-export function actionExecQueue(): Queue<QueuePayload<"action-exec">> {
+export function actionExecQueue(): Queue<JobEnvelope<"action-exec">> {
   return getQueue("action-exec");
 }
 
 /** AI generation queue. */
-export function generationQueue(): Queue<QueuePayload<"generation">> {
+export function generationQueue(): Queue<JobEnvelope<"generation">> {
   return getQueue("generation");
 }

@@ -19,10 +19,30 @@ export {
 export {
   QUEUE_NAMES,
   isQueueName,
+  JOB_PRIORITY,
   type QueueName,
   type QueuePayload,
   type QueuePayloads,
+  type JobEnvelope,
+  type JobPriorityName,
+  type JobPriorityValue,
+  type RetryPolicy,
 } from "./types";
+
+// Deterministic idempotency helpers.
+export {
+  idempotencyKeyFor,
+  jobIdFromKey,
+  jobIdentity,
+} from "./idempotency";
+
+// Producers (the only enqueue path).
+export {
+  enqueueSyncJob,
+  enqueueActionExecution,
+  enqueueGenerationJob,
+  type EnqueueOptions,
+} from "./producers";
 
 // Registry / factory.
 export {

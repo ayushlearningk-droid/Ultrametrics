@@ -55,3 +55,60 @@ export interface QueuePayloads {
 
 /** Payload type for a specific queue. */
 export type QueuePayload<Q extends QueueName> = QueuePayloads[Q];
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Job envelope (Sprint 56B — producers).
+ *
+ * Every enqueued job is wrapped in a self-describing envelope so the data row
+ * itself carries the required metadata — jobId, workspaceId, createdAt,
+ * priority, idempotencyKey, retryPolicy — independent of BullMQ's own job
+ * options. jobId/priority/retryPolicy are ALSO passed to BullMQ as options
+ * (for dedup + scheduling); mirroring them in the data keeps a job fully
+ * traceable from its payload alone.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Named priorities mapped to BullMQ's numeric scale (lower = higher priority,
+ * 1 is most urgent). Named here so producers never sprinkle magic numbers.
+ */
+export const JOB_PRIORITY = {
+  high: 1,
+  normal: 5,
+  low: 10,
+} as const;
+
+export type JobPriorityName = keyof typeof JOB_PRIORITY;
+export type JobPriorityValue = (typeof JOB_PRIORITY)[JobPriorityName];
+
+/**
+ * Declarative retry policy carried with every job. Mapped by producers onto
+ * BullMQ's `attempts` + exponential `backoff` options. `backoffMs` is the base
+ * delay that doubles each attempt.
+ */
+export interface RetryPolicy {
+  attempts: number;
+  backoff: {
+    type: "exponential" | "fixed";
+    backoffMs: number;
+  };
+}
+
+/**
+ * The data row BullMQ stores for a job: required metadata plus the domain
+ * payload. Generic over QueueName so the embedded payload type matches the
+ * queue it is enqueued on.
+ */
+export interface JobEnvelope<Q extends QueueName> {
+  /** Deterministic, stable job id (also used as BullMQ jobId for dedup). */
+  jobId: string;
+  workspaceId: string;
+  /** ISO timestamp the job was enqueued. */
+  createdAt: string;
+  /** Numeric BullMQ priority resolved from a JobPriorityName. */
+  priority: JobPriorityValue;
+  /** Deterministic idempotency key the jobId is derived from. */
+  idempotencyKey: string;
+  retryPolicy: RetryPolicy;
+  /** Domain-specific fields for this queue. */
+  payload: QueuePayload<Q>;
+}
