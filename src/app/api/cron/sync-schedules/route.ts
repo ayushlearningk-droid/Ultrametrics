@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { runMetaToGoogleSheetsSyncForWorkspace } from "@/lib/sync/meta-to-google-sheets";
-import { runGoogleAdsToGoogleSheetsSyncForWorkspace } from "@/lib/sync/google-ads-to-google-sheets";
+import { enqueueSyncJob } from "@/lib/queue/producers";
 
 type ScheduleFrequency = "hourly" | "daily" | "weekly";
 
@@ -64,17 +63,25 @@ export async function GET(request: Request) {
   const schedules = (data ?? []) as WorkspaceSchedule[];
   const dueSchedules = schedules.filter((schedule) => isDue(schedule, now));
 
-  const results: Array<{
+  // Cron is now a PRODUCER (Sprint 56F): it enqueues one workspace-wide sync job
+  // per due schedule instead of running the sync pipeline inline. A worker
+  // invokes the existing pipeline. next_run_at is advanced here at enqueue time,
+  // preserving the prior behavior of advancing the schedule regardless of the
+  // sync's eventual outcome. `requestedAt` is pinned to the scan time so the
+  // deterministic idempotency key dedupes re-enqueues of the same run.
+  const requestedAt = now.toISOString();
+
+  const enqueued: Array<{
     workspaceId: string;
-    meta: { ok: boolean; status: number; error?: string };
-    googleAds: { ok: boolean; status: number; error?: string };
+    jobId: string;
+    frequency: ScheduleFrequency;
   }> = [];
 
   for (const schedule of dueSchedules) {
-    const [metaResult, googleAdsResult] = await Promise.all([
-      runMetaToGoogleSheetsSyncForWorkspace(schedule.workspace_id),
-      runGoogleAdsToGoogleSheetsSyncForWorkspace(schedule.workspace_id),
-    ]);
+    const job = await enqueueSyncJob(
+      { workspaceId: schedule.workspace_id, requestedAt },
+      { createdAt: requestedAt }
+    );
 
     const nextRunAt = addScheduleInterval(now, schedule.frequency).toISOString();
 
@@ -86,18 +93,10 @@ export async function GET(request: Request) {
       })
       .eq("workspace_id", schedule.workspace_id);
 
-    results.push({
+    enqueued.push({
       workspaceId: schedule.workspace_id,
-      meta: {
-        ok: metaResult.ok,
-        status: metaResult.status,
-        error: metaResult.ok ? undefined : metaResult.error,
-      },
-      googleAds: {
-        ok: googleAdsResult.ok,
-        status: googleAdsResult.status,
-        error: googleAdsResult.ok ? undefined : googleAdsResult.error,
-      },
+      jobId: job.data.jobId,
+      frequency: schedule.frequency,
     });
   }
 
@@ -105,6 +104,6 @@ export async function GET(request: Request) {
     ok: true,
     scanned: schedules.length,
     triggered: dueSchedules.length,
-    results,
+    enqueued,
   });
 }

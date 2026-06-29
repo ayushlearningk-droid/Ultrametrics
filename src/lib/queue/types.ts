@@ -38,8 +38,10 @@ export function isQueueName(value: string): value is QueueName {
  */
 export interface QueuePayloads {
   sync: {
-    connectorId: string;
     workspaceId: string;
+    /** Optional — present for a single-connector sync; absent for a
+     *  workspace-wide scheduled sync (runs every provider for the workspace). */
+    connectorId?: string;
     /** Optional ISO timestamp the sync was requested for. */
     requestedAt?: string;
   };

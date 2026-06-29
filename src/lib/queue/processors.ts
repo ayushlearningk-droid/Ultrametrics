@@ -13,6 +13,8 @@
 
 import type { Job } from "bullmq";
 import type { JobEnvelope, QueueName } from "./types";
+import { runMetaToGoogleSheetsSyncForWorkspace } from "@/lib/sync/meta-to-google-sheets";
+import { runGoogleAdsToGoogleSheetsSyncForWorkspace } from "@/lib/sync/google-ads-to-google-sheets";
 
 /** Structured log line for a processed job (no secrets — metadata only). */
 function describe<Q extends QueueName>(queue: Q, job: Job<JobEnvelope<Q>>) {
@@ -40,9 +42,49 @@ function makeProcessor<Q extends QueueName>(queue: Q) {
   };
 }
 
+/**
+ * Sync processor (Sprint 56F — Cron → Queue migration).
+ *
+ * Invokes the EXISTING sync pipeline unchanged — one workspace-wide run across
+ * every provider, exactly as the cron used to call it. We do not re-implement or
+ * modify the sync engine / Meta / Google connectors; we only call them.
+ *
+ * Failure handling preserves the 56D retry policy: if either provider sync
+ * returns a non-ok result, we throw so BullMQ retries per the sync queue's
+ * policy and ultimately dead-letters. The sync functions keep their own internal
+ * audit logging — nothing here adds, removes, or duplicates it.
+ */
+async function syncProcessor(job: Job<JobEnvelope<"sync">>): Promise<void> {
+  console.info("[worker:sync] job received", describe("sync", job));
+  const { workspaceId } = job.data;
+
+  const [meta, googleAds] = await Promise.all([
+    runMetaToGoogleSheetsSyncForWorkspace(workspaceId),
+    runGoogleAdsToGoogleSheetsSyncForWorkspace(workspaceId),
+  ]);
+
+  console.info("[worker:sync] sync pipeline finished", {
+    workspaceId,
+    meta: { ok: meta.ok, status: meta.status },
+    googleAds: { ok: googleAds.ok, status: googleAds.status },
+  });
+
+  const failures: string[] = [];
+  if (!meta.ok) failures.push(`meta(${meta.status}): ${meta.error}`);
+  if (!googleAds.ok)
+    failures.push(`google_ads(${googleAds.status}): ${googleAds.error}`);
+
+  if (failures.length > 0) {
+    // Throw → BullMQ applies the sync queue's retry policy, then DLQ.
+    throw new Error(
+      `sync failed for workspace ${workspaceId}: ${failures.join("; ")}`
+    );
+  }
+}
+
 /** Processor for each queue, keyed by name. */
 export const PROCESSORS = {
-  sync: makeProcessor("sync"),
+  sync: syncProcessor,
   "action-exec": makeProcessor("action-exec"),
   generation: makeProcessor("generation"),
 } as const;

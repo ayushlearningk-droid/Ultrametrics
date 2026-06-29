@@ -24,7 +24,7 @@ import type { QueueName, QueuePayload } from "./types";
  * different work stays distinct.
  */
 const KEY_FIELDS: { [Q in QueueName]: (p: QueuePayload<Q>) => string[] } = {
-  sync: (p) => [p.connectorId, p.workspaceId, p.requestedAt ?? ""],
+  sync: (p) => [p.connectorId ?? "", p.workspaceId, p.requestedAt ?? ""],
   "action-exec": (p) => [p.actionId, p.workspaceId],
   generation: (p) => [p.generationId, p.workspaceId],
 };
