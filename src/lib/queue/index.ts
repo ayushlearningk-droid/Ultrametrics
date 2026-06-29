@@ -1,0 +1,43 @@
+/**
+ * Queue infrastructure barrel (Sprint 56A — Roadmap 8.0).
+ *
+ * Public surface of the queue foundation. Foundation only: connection singleton,
+ * typed queue names + payloads, Queue registry/factory, typed accessors, and a
+ * health check helper. No Workers, producers, or consumers are exported because
+ * none exist yet (later sprints).
+ */
+
+// Connection singleton.
+export {
+  getRedisConnection,
+  closeRedisConnection,
+  resolveRedisUrl,
+  MissingRedisUrlError,
+} from "./connection";
+
+// Typed queue names + payload contracts.
+export {
+  QUEUE_NAMES,
+  isQueueName,
+  type QueueName,
+  type QueuePayload,
+  type QueuePayloads,
+} from "./types";
+
+// Registry / factory.
+export {
+  getQueue,
+  getAllQueues,
+  getInstantiatedQueues,
+  closeAllQueues,
+} from "./registry";
+
+// Typed per-queue accessors.
+export { syncQueue, actionExecQueue, generationQueue } from "./queues";
+
+// Health check.
+export {
+  checkQueueHealth,
+  type QueueHealth,
+  type QueueHealthReport,
+} from "./health";
