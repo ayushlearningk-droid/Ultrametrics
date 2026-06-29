@@ -103,3 +103,41 @@ export {
   type DeadLetterRecord,
   type DeadLetterInput,
 } from "./dead-letter";
+
+// Scheduling & rate control (Sprint 56E) — pure config + decision helpers.
+export {
+  PRIORITY_ORDER,
+  priorityValue,
+  priorityName,
+  comparePriority,
+  isMoreUrgent,
+} from "./priority";
+
+export {
+  RATE_LIMIT_PROFILES,
+  getRateLimitProfile,
+  effectiveLimit,
+  isWithinRateLimit,
+  remainingCapacity,
+  suggestedDelayMs,
+  type RateLimitProvider,
+  type RateLimitProfile,
+} from "./rate-limiter";
+
+export {
+  QUEUE_CONCURRENCY,
+  PROVIDER_CONCURRENCY,
+  getConcurrency,
+  getProviderConcurrency,
+  hasConcurrencyHeadroom,
+} from "./concurrency";
+
+export {
+  BACKPRESSURE_THRESHOLDS,
+  detectBackpressure,
+  decideAdmission,
+  type BackpressureLevel,
+  type AdmissionSignals,
+  type AdmissionDecision,
+  type AdmissionReason,
+} from "./backpressure";
