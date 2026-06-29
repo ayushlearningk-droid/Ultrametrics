@@ -499,6 +499,174 @@
     background-size: 200% 100%;
     animation: um-shimmer 1.6s linear infinite;
   }
+
+  /* ══════════════════════════════════════════════════════════════════
+     AI STUDIO DESIGN SYSTEM 2.0 — handcrafted, token-based surfaces.
+     Components reference these classes / the :root --studio-* tokens
+     below; they never hardcode radius, elevation, glass, glow, or blur.
+     ══════════════════════════════════════════════════════════════════ */
+
+  /* Floating intelligent surface (the new "card" — reads as lifted, not boxed). */
+  .studio-card {
+    background: var(--studio-surface);
+    border: var(--studio-border);
+    border-radius: var(--studio-radius-lg);
+    box-shadow: var(--studio-elevation-1);
+    backdrop-filter: blur(var(--studio-blur-sm));
+    transition:
+      transform var(--studio-dur-base) var(--studio-ease),
+      box-shadow var(--studio-dur-base) var(--studio-ease),
+      border-color var(--studio-dur-base) var(--studio-ease);
+  }
+  .studio-card-interactive { cursor: default; }
+  .studio-card-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--studio-elevation-2);
+    border-color: hsl(var(--brand) / 0.22);
+  }
+  .studio-card-interactive:active { transform: translateY(-1px) scale(0.994); }
+
+  /* Raised surface — higher in the depth ladder. */
+  .studio-surface-raised {
+    background: var(--studio-surface-raised);
+    border: var(--studio-border-strong);
+    border-radius: var(--studio-radius-lg);
+    box-shadow: var(--studio-elevation-2);
+    backdrop-filter: blur(var(--studio-blur-md));
+  }
+
+  /* Hero surface — the visual center of the app. */
+  .studio-hero {
+    position: relative;
+    background: var(--studio-surface-hero);
+    border: var(--studio-border-brand);
+    border-radius: var(--studio-radius-2xl);
+    box-shadow: var(--studio-elevation-3);
+    backdrop-filter: blur(var(--studio-blur-lg));
+  }
+
+  /* Inset glass — for inputs / nested fields. */
+  .studio-glass {
+    background: var(--studio-glass-fill);
+    border: var(--studio-border);
+    border-radius: var(--studio-radius-md);
+    backdrop-filter: blur(var(--studio-blur-md));
+  }
+
+  /* Icon / avatar tile — the one reusable square chassis. */
+  .studio-tile {
+    background: var(--studio-glass-fill);
+    border: var(--studio-border);
+    border-radius: var(--studio-radius-md);
+  }
+
+  /* Reserved placeholder — calm dashed slot. */
+  .studio-reserved {
+    background: hsl(0 0% 100% / 0.012);
+    border: 1px dashed hsl(0 0% 100% / 0.08);
+    border-radius: var(--studio-radius-lg);
+  }
+
+  .studio-glow { box-shadow: var(--studio-glow-soft); }
+  .studio-divider { border-color: hsl(var(--hairline)); }
+
+  /* Focus — one signature brand bloom, used everywhere focusable. */
+  .studio-focusable:focus-visible {
+    outline: none;
+    box-shadow: var(--studio-glow-focus);
+    border-radius: var(--studio-radius-md);
+  }
+
+  /* Skeleton — tokenized loading placeholder (reduced-motion safe below). */
+  .studio-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: hsl(0 0% 100% / 0.04);
+    border-radius: var(--studio-radius-md);
+  }
+  .studio-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.06), transparent);
+    background-size: 200% 100%;
+    animation: um-shimmer 1.6s linear infinite;
+  }
+
+  /* Cinematic media field — for Trending / Inspiration cards. */
+  .studio-media {
+    background:
+      radial-gradient(120% 90% at 50% 0%, hsl(var(--brand) / 0.08), transparent 60%),
+      linear-gradient(180deg, hsl(0 0% 100% / 0.06), transparent 70%);
+  }
+
+  /* Ambient brand wash — hero background light. */
+  .studio-ambient {
+    background: radial-gradient(120% 80% at 50% -12%, hsl(var(--brand) / 0.12), transparent 60%);
+  }
+
+  /* Horizontal rail — snap + restrained scrollbar. */
+  .studio-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(0 0% 100% / 0.12) transparent;
+    scroll-snap-type: x proximity;
+  }
+  .studio-scroll::-webkit-scrollbar { height: 6px; }
+  .studio-scroll::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 100% / 0.1);
+    border-radius: var(--studio-radius-pill);
+  }
+  .studio-snap { scroll-snap-align: start; }
+}
+
+/* AI Studio 2.0 design tokens — single source of truth for Studio materials.
+   NEVER hardcode these values in components; reference the token. */
+:root {
+  /* Radius scale */
+  --studio-radius-sm: 0.625rem;
+  --studio-radius-md: 0.875rem;
+  --studio-radius-lg: 1.25rem;
+  --studio-radius-xl: 1.75rem;
+  --studio-radius-2xl: 2rem;
+  --studio-radius-pill: 999px;
+
+  /* Borders */
+  --studio-border: 1px solid hsl(0 0% 100% / 0.08);
+  --studio-border-strong: 1px solid hsl(0 0% 100% / 0.12);
+  --studio-border-brand: 1px solid hsl(var(--brand) / 0.2);
+
+  /* Surfaces (gradients) */
+  --studio-surface: linear-gradient(168deg, hsl(var(--surface-1) / 0.66) 0%, hsl(var(--surface-0) / 0.66) 100%);
+  --studio-surface-raised: linear-gradient(168deg, hsl(var(--surface-2) / 0.64) 0%, hsl(var(--surface-1) / 0.62) 100%);
+  --studio-surface-hero: linear-gradient(165deg, hsl(var(--surface-1) / 0.86) 0%, hsl(var(--surface-0) / 0.8) 100%);
+  --studio-glass-fill: hsl(0 0% 100% / 0.03);
+
+  /* Elevation ladder (soft, real) */
+  --studio-elevation-1: 0 1px 0 0 hsl(0 0% 100% / 0.05) inset, 0 8px 24px hsl(240 30% 1% / 0.4);
+  --studio-elevation-2: 0 1px 0 0 hsl(0 0% 100% / 0.06) inset, 0 18px 48px hsl(240 30% 1% / 0.5);
+  --studio-elevation-3: 0 1px 0 0 hsl(0 0% 100% / 0.07) inset, 0 30px 72px hsl(240 30% 1% / 0.6);
+
+  /* Glow */
+  --studio-glow-soft: 0 0 0 1px hsl(var(--brand) / 0.16), 0 0 30px 2px hsl(var(--brand) / 0.12);
+  --studio-glow-focus: 0 0 0 1px hsl(var(--brand) / 0.5), 0 0 0 4px hsl(var(--brand) / 0.12), 0 0 36px 2px hsl(var(--brand) / 0.2);
+
+  /* Blur hierarchy */
+  --studio-blur-sm: 8px;
+  --studio-blur-md: 16px;
+  --studio-blur-lg: 28px;
+
+  /* Animation */
+  --studio-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --studio-dur-fast: 160ms;
+  --studio-dur-base: 240ms;
+  --studio-dur-slow: 420ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-skeleton::after { animation: none; }
+  .studio-card,
+  .studio-card-interactive { transition: none; }
+  .studio-card-interactive:hover { transform: none; }
 }
 
 /* ════════════════════════════════════════════════════════════════

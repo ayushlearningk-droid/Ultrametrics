@@ -24,6 +24,7 @@ import {
   Search,
   Settings,
   Blocks,
+  Palette,
 } from "lucide-react";
 import { useAsk } from "@/components/os/ask-provider";
 import { useNotifications } from "@/lib/stores/notifications";
@@ -54,6 +55,7 @@ const PRIMARY_NAV = [
   { href: "/dashboard/actions", label: "Actions", icon: ListTodo },
   { href: "/dashboard/reports", label: "Reports", icon: FileText },
   { href: "/dashboard/timeline", label: "Timeline", icon: History },
+  { href: "/dashboard/studio", label: "AI Studio", icon: Palette },
   { href: "/dashboard/skills", label: "Skills", icon: Blocks },
   { href: "/dashboard/connectors", label: "Connectors", icon: Plug },
 ];
