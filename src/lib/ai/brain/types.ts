@@ -78,9 +78,26 @@ export interface DailyPulse {
 }
 
 /* ── Knowledge graph (pure TS; no graph DB) ──────────────────────────────── */
+/**
+ * Node vocabulary. The reasoning chain (Performance → Risk/Opportunity →
+ * Recommendation → Action → ExpectedOutcome) plus the marketing entities added
+ * in Sprint 61 (Campaign / Creative / Audience). Extending this union is how the
+ * graph vocabulary grows — no new graph store, just new node kinds.
+ */
+export type GraphNodeType =
+  | "Performance"
+  | "Risk"
+  | "Opportunity"
+  | "Recommendation"
+  | "Action"
+  | "ExpectedOutcome"
+  | "Campaign"
+  | "Creative"
+  | "Audience";
+
 export interface GraphNode {
   id: string;
-  type: string;
+  type: GraphNodeType;
   label: string;
 }
 export interface GraphEdge {

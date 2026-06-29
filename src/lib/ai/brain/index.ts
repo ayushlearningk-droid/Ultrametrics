@@ -17,7 +17,7 @@ import { detectOpportunities } from "./opportunity";
 import { detectRisks } from "./risk";
 import { buildExecutive } from "./executive";
 import { buildPulse } from "./pulse";
-import { buildKnowledgeGraph } from "./graph";
+import { buildMarketingGraph } from "./graph";
 import type { MarketingBrain } from "./types";
 
 export function buildMarketingBrain(
@@ -32,7 +32,15 @@ export function buildMarketingBrain(
   const risks = detectRisks(creativeInput, signals);
   const executive = buildExecutive(health, opportunities, risks, reasoning);
   const pulse = buildPulse(health, opportunities, risks, signals, reasoning);
-  const graph = buildKnowledgeGraph(opportunities, risks, reasoning);
+  // Sprint 61A: the brain's graph is now the unified Marketing Graph (reasoning
+  // chain + Campaign / Creative / Audience entities), same KnowledgeGraph shape.
+  const graph = buildMarketingGraph(
+    opportunities,
+    risks,
+    reasoning,
+    creativeInput,
+    signals
+  );
 
   return { health, opportunities, risks, executive, pulse, graph };
 }

@@ -36,12 +36,49 @@ import { listMemories } from "@/lib/data/workspace-memory";
 import { getSyncJobsByWorkspace } from "@/lib/data/dashboard";
 import { listActions } from "@/lib/data/action-queue";
 import { listConversations } from "@/lib/data/conversations";
+import type { KnowledgeGraph } from "@/lib/ai/brain";
 
 /* ── Token-budget caps (keep the injected block small) ─────────────────────── */
 const MAX_MEMORIES = 10;
 const MAX_ACTIVITY = 4;
 const MAX_TOPICS = 3;
+/** Cap on relationship phrases in the marketing-graph awareness line. */
+const MAX_GRAPH_RELATIONS = 6;
 const RECENT_FAILURE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Entity node types added by Sprint 61 (the marketing graph). */
+const ENTITY_NODE_TYPES = new Set(["Campaign", "Creative", "Audience"]);
+
+/**
+ * Summarise the Marketing Graph (Sprint 61) as awareness only — STRUCTURE, not
+ * values. It lists relationship phrases built from node TYPES + edge relations
+ * (e.g. "Campaign uses Creative"), restricted to edges touching an entity node.
+ * It deliberately ignores node labels, so no metric/number ever leaks: grounding
+ * is preserved and there is no numerical duplication. Returns "" when there are
+ * no entity relationships. Pure — consumes the graph buildMarketingBrain()
+ * already produced; it does not build or fetch anything.
+ */
+export function summarizeMarketingGraph(graph: KnowledgeGraph): string {
+  const typeById = new Map(graph.nodes.map((n) => [n.id, n.type]));
+  const phrases: string[] = [];
+  const seen = new Set<string>();
+
+  for (const edge of graph.edges) {
+    const fromType = typeById.get(edge.from);
+    const toType = typeById.get(edge.to);
+    if (!fromType || !toType) continue;
+    if (!ENTITY_NODE_TYPES.has(fromType) && !ENTITY_NODE_TYPES.has(toType)) {
+      continue; // only edges involving Campaign / Creative / Audience
+    }
+    const phrase = `${fromType} ${edge.relation} ${toType}`;
+    if (seen.has(phrase)) continue;
+    seen.add(phrase);
+    phrases.push(phrase);
+    if (phrases.length >= MAX_GRAPH_RELATIONS) break;
+  }
+
+  return phrases.join("; ");
+}
 
 /* ── Cache (60s TTL per workspace) ─────────────────────────────────────────── */
 const CACHE_TTL_MS = 60_000;
@@ -59,6 +96,31 @@ export interface WorkspaceSignals {
   recentActivity: string[];
   /** 4 — recent conversation titles (continuity). */
   recentTopics: string[];
+  /**
+   * 5 — Marketing Graph awareness (Sprint 61). Populated ONLY when the caller
+   * already built the brain and passes its graph; structural relationships only,
+   * never numbers. Omitted otherwise (no eager brain build, no added cost).
+   */
+  marketingGraphSummary?: string;
+}
+
+/** Optional inputs the caller may supply (no eager fetching is triggered). */
+export interface AggregateOptions {
+  /** The Marketing Graph from buildMarketingBrain(), if the caller has one. */
+  marketingGraph?: KnowledgeGraph;
+}
+
+/**
+ * Attach the marketing-graph awareness summary when a graph is supplied. Pure;
+ * does not mutate or cache the base signals (so the cache stays graph-free).
+ */
+function withMarketingGraph(
+  base: WorkspaceSignals,
+  opts?: AggregateOptions
+): WorkspaceSignals {
+  if (!opts?.marketingGraph) return base;
+  const summary = summarizeMarketingGraph(opts.marketingGraph);
+  return summary ? { ...base, marketingGraphSummary: summary } : base;
 }
 
 /**
@@ -67,11 +129,12 @@ export interface WorkspaceSignals {
  * workspace. Failures degrade gracefully to empty signals — never throws.
  */
 export async function aggregateWorkspaceContext(
-  workspaceId: string
+  workspaceId: string,
+  opts?: AggregateOptions
 ): Promise<WorkspaceSignals> {
   const now = Date.now();
   const hit = cache.get(workspaceId);
-  if (hit && hit.expires > now) return hit.signals;
+  if (hit && hit.expires > now) return withMarketingGraph(hit.signals, opts);
 
   const signals: WorkspaceSignals = {
     memories: [],
@@ -129,7 +192,7 @@ export async function aggregateWorkspaceContext(
   }
 
   cache.set(workspaceId, { expires: now + CACHE_TTL_MS, signals });
-  return signals;
+  return withMarketingGraph(signals, opts);
 }
 
 /**
@@ -144,6 +207,12 @@ export function signalsToPromptBlock(signals: WorkspaceSignals): string {
   }
   if (signals.recentTopics.length > 0) {
     lines.push(`- Recent topics discussed: ${signals.recentTopics.join("; ")}.`);
+  }
+  if (signals.marketingGraphSummary) {
+    // Awareness of HOW entities relate — structure only, no metrics.
+    lines.push(
+      `- Marketing graph (relationships only): ${signals.marketingGraphSummary}.`
+    );
   }
   if (lines.length === 0) return "";
   return `\n\nRECENT WORKSPACE SIGNALS (awareness only — fetch any detail with the tools; never state a number you have not retrieved):\n${lines.join(
