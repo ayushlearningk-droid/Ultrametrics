@@ -15,6 +15,8 @@ import { Worker, type ConnectionOptions, type Job } from "bullmq";
 import IORedis, { type Redis } from "ioredis";
 import { resolveRedisUrl } from "./connection";
 import { PROCESSORS } from "./processors";
+import { classifyError, isRetryable } from "./retry";
+import { routeToDeadLetter } from "./dead-letter";
 import { QUEUE_NAMES, type JobEnvelope, type QueueName } from "./types";
 
 /** Dedicated worker connection options (blocking-safe, like the foundation's). */
@@ -44,10 +46,41 @@ function attachLogging(name: QueueName, worker: Worker): void {
     console.info(`[worker:${name}] job completed`, { bullmqId: job.id });
   });
   worker.on("failed", (job: Job | undefined, err: Error) => {
+    const attemptsAllowed = job?.opts.attempts ?? 1;
+    const attemptsMade = job?.attemptsMade ?? 0;
+    const errorClass = classifyError(err);
+    // BullMQ retries automatically until `attempts` is reached; a non-retryable
+    // class can be dead-lettered immediately. Route only on the terminal failure
+    // so transient mid-retry failures are not dead-lettered prematurely.
+    const exhausted = attemptsMade >= attemptsAllowed;
+    const terminal = exhausted || !isRetryable(errorClass);
+
     console.error(`[worker:${name}] job failed`, {
       bullmqId: job?.id,
-      attemptsMade: job?.attemptsMade,
+      attemptsMade,
+      attemptsAllowed,
+      errorClass,
+      terminal,
       error: err.message,
+    });
+
+    if (!job || !terminal) return;
+
+    // Hand the terminal failure to the existing DLQ helper (56D). Best-effort:
+    // a DLQ failure must not crash the worker event loop.
+    const envelope = job.data as JobEnvelope<QueueName>;
+    void routeToDeadLetter({
+      sourceQueue: name,
+      sourceJobId: envelope?.jobId ?? job.id,
+      workspaceId: envelope?.workspaceId,
+      originalData: job.data,
+      error: err,
+      attemptsMade,
+    }).catch((dlqErr) => {
+      console.error(`[worker:${name}] failed to route job to DLQ`, {
+        bullmqId: job.id,
+        error: dlqErr instanceof Error ? dlqErr.message : String(dlqErr),
+      });
     });
   });
   worker.on("error", (err: Error) => {

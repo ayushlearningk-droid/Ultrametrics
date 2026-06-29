@@ -93,6 +93,14 @@ export async function GET(request: Request) {
       })
       .eq("workspace_id", schedule.workspace_id);
 
+    // Diagnostic (Sprint 57C): trace each enqueue end-to-end against the
+    // worker's "[worker:sync] job received" log via the shared jobId.
+    console.info("[cron:sync-schedules] enqueued sync job", {
+      workspaceId: schedule.workspace_id,
+      jobId: job.data.jobId,
+      frequency: schedule.frequency,
+    });
+
     enqueued.push({
       workspaceId: schedule.workspace_id,
       jobId: job.data.jobId,
