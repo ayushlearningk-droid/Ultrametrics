@@ -17,6 +17,43 @@ import {
   type EncryptedToken,
 } from "@/lib/crypto/token-vault";
 
+/**
+ * Raised when a credential operation targets a connector that does not belong to
+ * the supplied workspace. Defense-in-depth (Sprint 55B): connector_credentials
+ * has RLS deny-all and is reached only via the service role, so workspace
+ * authorization lives in app code — this makes it explicit and centralized.
+ */
+export class CredentialAuthorizationError extends Error {
+  constructor(connectorId: string, workspaceId: string) {
+    super(
+      `Connector ${connectorId} does not belong to workspace ${workspaceId}.`
+    );
+    this.name = "CredentialAuthorizationError";
+  }
+}
+
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+/**
+ * Centralized authorization: verify a connector belongs to the given workspace.
+ * Throws CredentialAuthorizationError when it does not (or does not exist).
+ * Uses the service-role client by design (the vault is server-only).
+ */
+export async function assertConnectorInWorkspace(
+  connectorId: string,
+  workspaceId: string,
+  admin: AdminClient = createAdminClient()
+): Promise<void> {
+  const { data } = await admin
+    .from("connectors")
+    .select("id")
+    .eq("id", connectorId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle<{ id: string }>();
+
+  if (!data) throw new CredentialAuthorizationError(connectorId, workspaceId);
+}
+
 export interface StoreTokenInput {
   connectorId: string;
   accessToken: string;
@@ -147,4 +184,41 @@ export async function deleteConnectorToken(
   if (error) {
     throw new Error(`Failed to delete connector credentials: ${error.message}`);
   }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Workspace-scoped variants (Sprint 55B — defense-in-depth).
+ *
+ * Prefer these in any path where the workspace is known (OAuth callbacks, sync
+ * jobs, API routes). Each verifies the connector belongs to the workspace via
+ * assertConnectorInWorkspace BEFORE touching credentials, then delegates to the
+ * existing unscoped helper. The unscoped helpers remain for callers that have
+ * already authorized the connector upstream (backward compatible).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Store token(s) for a connector after verifying workspace ownership. */
+export async function storeConnectorTokenForWorkspace(
+  workspaceId: string,
+  input: StoreTokenInput
+): Promise<void> {
+  await assertConnectorInWorkspace(input.connectorId, workspaceId);
+  return storeConnectorToken(input);
+}
+
+/** Fetch + decrypt token(s) for a connector after verifying workspace ownership. */
+export async function getConnectorTokenForWorkspace(
+  connectorId: string,
+  workspaceId: string
+): Promise<ResolvedToken | null> {
+  await assertConnectorInWorkspace(connectorId, workspaceId);
+  return getConnectorToken(connectorId);
+}
+
+/** Delete a connector's credentials after verifying workspace ownership. */
+export async function deleteConnectorTokenForWorkspace(
+  connectorId: string,
+  workspaceId: string
+): Promise<void> {
+  await assertConnectorInWorkspace(connectorId, workspaceId);
+  return deleteConnectorToken(connectorId);
 }
