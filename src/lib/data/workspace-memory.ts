@@ -16,17 +16,42 @@ export const MEMORY_LIMIT = 50;
 
 export type MemorySource = "user" | "ai";
 
-/** List a workspace's memory notes, newest-first (RLS-scoped). */
+/** Max chars of a memory search query honoured (after sanitisation). */
+const MEMORY_SEARCH_MAX = 100;
+
+/**
+ * Sanitise a query for a PostgREST ilike filter: strip structural/wildcard chars
+ * so they can't break the filter, trim + cap. "" → caller skips the filter.
+ * Mirrors the conversations data layer.
+ */
+function sanitizeMemorySearch(q: string): string {
+  return q.replace(/[,()%*\\_]/g, "").trim().slice(0, MEMORY_SEARCH_MAX);
+}
+
+/**
+ * List a workspace's memory notes, newest-first (RLS-scoped).
+ *  - `q` → substring search across `content` (ilike). Added Sprint 58 (search);
+ *    optional + backward compatible (no arg → unchanged behaviour).
+ *  - `limit` → override the default cap (MEMORY_LIMIT).
+ */
 export async function listMemories(
-  workspaceId: string
+  workspaceId: string,
+  opts?: { q?: string; limit?: number }
 ): Promise<WorkspaceMemoryRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("workspace_memory")
     .select("*")
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", workspaceId);
+
+  const safe = opts?.q ? sanitizeMemorySearch(opts.q) : "";
+  if (safe) {
+    query = query.ilike("content", `%${safe}%`);
+  }
+
+  const { data } = await query
     .order("created_at", { ascending: false })
-    .limit(MEMORY_LIMIT);
+    .limit(opts?.limit ?? MEMORY_LIMIT);
   return (data ?? []) as WorkspaceMemoryRow[];
 }
 
