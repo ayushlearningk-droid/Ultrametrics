@@ -31,7 +31,7 @@ interface NavDestination {
 
 const DESTINATIONS: NavDestination[] = [
   { id: "home", label: "Home", icon: Home, href: "/dashboard/studio" },
-  { id: "canvas", label: "Canvas", icon: LayoutGrid },
+  { id: "canvas", label: "Canvas", icon: LayoutGrid, href: "/dashboard/studio/canvas" },
   { id: "library", label: "Library", icon: Library },
   { id: "trending", label: "Trending", icon: TrendingUp },
   { id: "exports", label: "Exports", icon: Upload },
