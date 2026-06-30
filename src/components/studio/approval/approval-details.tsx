@@ -7,9 +7,9 @@
  * Esc / backdrop close. No duplicated inspector logic.
  */
 
-import { useEffect } from "react";
 import { X } from "lucide-react";
 import { VideoPreviewCard, CreativeThumbnail } from "@/components/studio/media";
+import { useDialog } from "@/components/studio/generation/use-dialog";
 import { resolveCreative } from "@/components/studio/creative/creative-data";
 import { InspectorForecast } from "@/components/studio/inspector/inspector-forecast";
 import { InspectorPerformance } from "@/components/studio/inspector/inspector-performance";
@@ -24,14 +24,7 @@ import { ApprovalActions } from "./approval-actions";
 export function ApprovalDetails() {
   const { selectedId, setSelectedId } = useApproval();
   const item = useApprovalItem(selectedId);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelectedId(null);
-    };
-    if (selectedId) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, setSelectedId]);
+  const ref = useDialog<HTMLDivElement>(!!selectedId && !!item, () => setSelectedId(null));
 
   if (!selectedId || !item) return null;
   const creative = resolveCreative(item.creativeId);
@@ -39,7 +32,7 @@ export function ApprovalDetails() {
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onPointerDown={() => setSelectedId(null)} aria-hidden />
-      <div role="dialog" aria-modal aria-label="Approval details" className="studio-surface-raised relative z-10 flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden">
+      <div ref={ref} tabIndex={-1} role="dialog" aria-modal aria-label="Approval details" className="studio-surface-raised relative z-10 flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden outline-none">
         <header className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="type-body font-semibold text-foreground">{creative?.title ?? item.creativeId}</span>

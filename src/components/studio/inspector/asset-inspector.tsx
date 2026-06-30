@@ -49,7 +49,7 @@ function AssetPicker() {
 }
 
 function Body() {
-  const { asset, loading } = useInspector();
+  const { asset } = useInspector();
 
   return (
     <div className="mx-auto flex w-full max-w-[420px] flex-col gap-4 px-1 py-3">
@@ -65,12 +65,7 @@ function Body() {
         <AssetPicker />
       </header>
 
-      {loading ? (
-        <div className="flex flex-col gap-3">
-          <div className="studio-skeleton aspect-video w-full rounded-[var(--studio-radius-lg)]" />
-          <div className="studio-skeleton h-24 w-full rounded-[var(--studio-radius-lg)]" />
-        </div>
-      ) : !asset ? (
+      {!asset ? (
         <div className="studio-card flex flex-col items-center gap-2 px-6 py-12 text-center">
           <p className="type-body font-semibold text-foreground">No creative selected</p>
           <p className="type-caption text-foreground-muted">Pick a creative above to inspect it.</p>
@@ -97,14 +92,12 @@ function Body() {
 export function AssetInspector({
   initialId,
   source,
-  loading,
 }: {
   initialId?: string | null;
   source?: CreativeItem[];
-  loading?: boolean;
 }) {
   return (
-    <InspectorProvider initialId={initialId} source={source} loading={loading}>
+    <InspectorProvider initialId={initialId} source={source}>
       <Body />
     </InspectorProvider>
   );

@@ -228,7 +228,8 @@ function HomeBody({ onOpen, onAdvanced }: { onOpen: () => void; onAdvanced: () =
     setTab("home");
   };
 
-  const recentGenerated = gen?.creatives.length ? gen.creatives : SAMPLE_CREATIVES.filter((c) => c.recent).slice(0, 6);
+  // Only ever show real generated output here — never sample data (Sprint 63.9).
+  const recentGenerated = gen?.creatives ?? [];
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-12 px-4 py-8 md:px-10 md:py-12">
@@ -272,11 +273,17 @@ function HomeBody({ onOpen, onAdvanced }: { onOpen: () => void; onAdvanced: () =
       <InspirationLibrary onSelect={handleInspire} />
 
       <StudioSection label="Recent generations" description="Your latest generated assets.">
-        <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-          {recentGenerated.map((c) => (
-            <CreativeThumbnail key={c.id} media={c.media} aspect="square" />
-          ))}
-        </div>
+        {recentGenerated.length === 0 ? (
+          <PremiumCard className="px-6 py-10 text-center">
+            <p className="type-caption text-foreground-muted">No generations yet — pick an outcome above to create your first campaign.</p>
+          </PremiumCard>
+        ) : (
+          <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+            {recentGenerated.map((c) => (
+              <CreativeThumbnail key={c.id} media={c.media} aspect="square" />
+            ))}
+          </div>
+        )}
       </StudioSection>
 
       {/* Continue Working — reuses the Workspace Sessions module (Resume restores the generation). */}

@@ -10,7 +10,7 @@ import { Clock, Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreativeThumbnail } from "@/components/studio/media";
 import { resolveCreative } from "@/components/studio/creative/creative-data";
-import { selectAsset } from "@/components/studio/generation/generation-store";
+import { selectAsset, useSelectedAsset } from "@/components/studio/generation/generation-store";
 import { CreativeForecastChip } from "@/components/studio/creative/creative-metadata";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { MOVIE_LABEL } from "@/components/studio/movie/movie-runtime";
@@ -31,14 +31,19 @@ export function QueueItem({ item }: { item: QueueItemType }) {
   const OwnerIcon = EMPLOYEE_ICON[item.assignedId];
   const outcome = outcomeById(item.outcomeId);
   const stage = item.stageId ? MOVIE_LABEL[item.stageId] : null;
+  const isSelected = useSelectedAsset() === item.creativeId;
 
   return (
-    <div className="studio-card flex items-center gap-3 p-2.5">
+    <div className={cn("studio-card flex items-center gap-3 p-2.5", isSelected && "ring-1 ring-brand/50")}>
       <button
         type="button"
         onClick={() => selectAsset(item.creativeId)}
+        aria-pressed={isSelected}
         title="Focus this asset"
-        className="studio-focusable w-20 shrink-0 overflow-hidden rounded-[var(--studio-radius-md)]"
+        className={cn(
+          "studio-focusable w-20 shrink-0 overflow-hidden rounded-[var(--studio-radius-md)]",
+          isSelected && "ring-2 ring-brand"
+        )}
       >
         {creative ? <CreativeThumbnail media={creative.media} aspect="video" /> : <div className="studio-media aspect-video" />}
       </button>

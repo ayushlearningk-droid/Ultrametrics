@@ -6,9 +6,9 @@
  * metadata + actions. Esc / backdrop close. Keyboard + focus. Token-based.
  */
 
-import { useEffect } from "react";
 import { X } from "lucide-react";
 import { VideoPreviewCard, CreativeThumbnail, PerformanceBadge } from "@/components/studio/media";
+import { useDialog } from "@/components/studio/generation/use-dialog";
 import { useCreativeBrowser, useCreativeById } from "./creative-context";
 import { CreativeStatus } from "./creative-status";
 import { CreativeMetadata } from "./creative-metadata";
@@ -17,21 +17,14 @@ import { CreativeActions } from "./creative-actions";
 export function CreativeQuickPreview() {
   const { previewId, setPreviewId } = useCreativeBrowser();
   const item = useCreativeById(previewId);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPreviewId(null);
-    };
-    if (previewId) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [previewId, setPreviewId]);
+  const ref = useDialog<HTMLDivElement>(!!previewId && !!item, () => setPreviewId(null));
 
   if (!previewId || !item) return null;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onPointerDown={() => setPreviewId(null)} aria-hidden />
-      <div role="dialog" aria-modal aria-label={`Preview ${item.title}`} className="studio-surface-raised relative z-10 flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden">
+      <div ref={ref} tabIndex={-1} role="dialog" aria-modal aria-label={`Preview ${item.title}`} className="studio-surface-raised relative z-10 flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden outline-none">
         <header className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="type-body font-semibold text-foreground">{item.title}</span>

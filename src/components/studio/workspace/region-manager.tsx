@@ -23,7 +23,6 @@ import {
   Radio,
   History,
   CheckCircle2,
-  Home as HomeIcon,
   LayoutGrid,
   Images,
   PanelRight,
@@ -38,7 +37,6 @@ export type RegionId =
   | "activity"
   | "timeline"
   | "approval"
-  | "home"
   | "canvas"
   | "creative"
   | "inspector"
@@ -76,7 +74,6 @@ export const REGION_DEFS: RegionDef[] = [
   { id: "activity", title: "Activity", icon: Radio, defaultZone: "right", defaultOrder: 0 },
   { id: "timeline", title: "Timeline", icon: History, defaultZone: "right", defaultOrder: 1 },
   { id: "approval", title: "Approval", icon: CheckCircle2, defaultZone: "hidden", defaultOrder: 0 },
-  { id: "home", title: "Home", icon: HomeIcon, defaultZone: "hidden", defaultOrder: 0 },
   { id: "canvas", title: "Canvas", icon: LayoutGrid, defaultZone: "hidden", defaultOrder: 0 },
   { id: "creative", title: "Creatives", icon: Images, defaultZone: "hidden", defaultOrder: 0 },
   { id: "inspector", title: "Inspector", icon: PanelRight, defaultZone: "right", defaultOrder: 2 },

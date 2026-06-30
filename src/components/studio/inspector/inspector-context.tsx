@@ -8,7 +8,7 @@
  * changing any inspector component.
  */
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { SAMPLE_CREATIVES, type CreativeItem } from "@/components/studio/creative/creative-data";
 
 interface InspectorValue {
@@ -16,7 +16,6 @@ interface InspectorValue {
   selectedId: string | null;
   asset: CreativeItem | null;
   setSelectedId: (id: string | null) => void;
-  loading: boolean;
 }
 
 const InspectorContext = createContext<InspectorValue | null>(null);
@@ -24,20 +23,24 @@ const InspectorContext = createContext<InspectorValue | null>(null);
 export function InspectorProvider({
   initialId = SAMPLE_CREATIVES[0]?.id ?? null,
   source = SAMPLE_CREATIVES,
-  loading = false,
   children,
 }: {
   initialId?: string | null;
   source?: CreativeItem[];
-  loading?: boolean;
   children: React.ReactNode;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(initialId);
 
+  // Follow the shared selection reactively (Sprint 63.8A) — update in place
+  // instead of remounting the inspector when initialId changes.
+  useEffect(() => {
+    setSelectedId(initialId ?? null);
+  }, [initialId]);
+
   const value = useMemo<InspectorValue>(() => {
     const asset = selectedId ? source.find((c) => c.id === selectedId) ?? null : null;
-    return { items: source, selectedId, asset, setSelectedId, loading };
-  }, [source, selectedId, loading]);
+    return { items: source, selectedId, asset, setSelectedId };
+  }, [source, selectedId]);
 
   return <InspectorContext.Provider value={value}>{children}</InspectorContext.Provider>;
 }

@@ -17,7 +17,6 @@ import { ApprovalCenter } from "@/components/studio/approval/approval-center";
 import { OutcomePicker } from "@/components/studio/outcomes/outcome-picker";
 import { OutcomePlan } from "@/components/studio/outcomes/outcome-plan";
 import { useOutcome } from "@/components/studio/outcomes/outcome-engine";
-import { StudioHome } from "@/components/studio/home/studio-home";
 import { StudioCanvas } from "@/components/studio/canvas/studio-canvas";
 import { CreativeBrowser } from "@/components/studio/creative/creative-browser";
 import { CreativeWarRoom } from "@/components/studio/creative/creative-war-room";
@@ -72,12 +71,12 @@ function CreativeRegion() {
 
 function InspectorRegion() {
   const gen = useGeneration();
-  // Follow the shared selection (Sprint 63Z); fall back to the newest asset.
+  // Follow the shared selection reactively (Sprint 63.8A) — no remount, and never
+  // fall back to sample creatives: show only generated assets (empty until then).
   const selected = useSelectedAsset();
   const newestId = gen?.creatives[gen.creatives.length - 1]?.id;
-  const id = selected ?? newestId;
-  // Re-key on selection so the Inspector always opens the shared asset.
-  return <AssetInspector key={id ?? "none"} source={gen?.creatives} initialId={id} />;
+  const id = selected ?? newestId ?? null;
+  return <AssetInspector source={gen?.creatives ?? []} initialId={id} />;
 }
 
 function QueueRegion() {
@@ -123,8 +122,6 @@ export function RegionContent({ id }: { id: RegionId }) {
       return <TimelineRegion />;
     case "approval":
       return <ApprovalRegion />;
-    case "home":
-      return <StudioHome />;
     case "canvas":
       return <CanvasRegion />;
     case "creative":

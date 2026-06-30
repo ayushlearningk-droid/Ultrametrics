@@ -10,7 +10,7 @@ import { Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreativeThumbnail } from "@/components/studio/media";
 import { resolveCreative } from "@/components/studio/creative/creative-data";
-import { selectAsset } from "@/components/studio/generation/generation-store";
+import { selectAsset, useSelectedAsset } from "@/components/studio/generation/generation-store";
 import { CreativeForecastChip } from "@/components/studio/creative/creative-metadata";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { outcomeById } from "@/components/studio/outcomes/outcomes-data";
@@ -26,14 +26,19 @@ export function ApprovalItem({ item }: { item: ApprovalItemType }) {
   const creative = resolveCreative(item.creativeId);
   const AssignedIcon = EMPLOYEE_ICON[item.assignedId];
   const outcome = outcomeById(item.outcomeId);
+  const isSelected = useSelectedAsset() === item.creativeId;
 
   return (
-    <div className="studio-card flex items-center gap-3 p-2.5">
+    <div className={cn("studio-card flex items-center gap-3 p-2.5", isSelected && "ring-1 ring-brand/50")}>
       <button
         type="button"
         onClick={() => selectAsset(item.creativeId)}
+        aria-pressed={isSelected}
         title="Focus this asset"
-        className="studio-focusable w-20 shrink-0 overflow-hidden rounded-[var(--studio-radius-md)]"
+        className={cn(
+          "studio-focusable w-20 shrink-0 overflow-hidden rounded-[var(--studio-radius-md)]",
+          isSelected && "ring-2 ring-brand"
+        )}
       >
         {creative ? <CreativeThumbnail media={creative.media} aspect="video" /> : <div className="studio-media aspect-video" />}
       </button>

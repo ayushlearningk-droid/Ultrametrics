@@ -26,14 +26,14 @@ function ActionBtn({
   return (
     <button
       type="button"
-      aria-label={label}
-      aria-disabled={inert}
-      title={inert ? `${label} (coming soon)` : label}
+      aria-label={inert ? `${label} — not available yet` : label}
+      disabled={inert}
+      title={inert ? `${label} — not available yet` : label}
       onClick={onClick}
       className={cn(
         "studio-focusable flex h-7 w-7 items-center justify-center rounded-[var(--studio-radius-sm)] transition-colors",
         active ? "text-brand" : "text-foreground-muted hover:bg-white/[0.06] hover:text-foreground",
-        inert && "cursor-default"
+        inert && "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-foreground-muted"
       )}
     >
       <Icon className="h-3.5 w-3.5" fill={active ? "currentColor" : "none"} />

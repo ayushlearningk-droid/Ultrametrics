@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { useGeneration } from "./generation-store";
 import { openExplanation, closeExplanation, useExplanation } from "./explanation-store";
+import { useDialog } from "./use-dialog";
 
 const CONFIDENCE_CHIP: Record<"high" | "medium" | "low", string> = {
   high: "chip-emerald",
@@ -46,15 +47,17 @@ export function ExplainButton({ stage, className }: { stage: string | null; clas
 export function ExplanationOverlay() {
   const gen = useGeneration();
   const { open, stage } = useExplanation();
+  const active = open && !!gen && gen.explanations.length > 0;
+  const ref = useDialog<HTMLDivElement>(active, closeExplanation);
   if (!open || !gen || gen.explanations.length === 0) return null;
 
   const ex = gen.explanations.find((e) => e.stage === stage) ?? gen.explanations[0];
   const Icon = EMPLOYEE_ICON[ex.sourceEmployeeId];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal="true" aria-label={`Decision explanation: ${ex.stage}`}>
       <button type="button" aria-label="Close" className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeExplanation} />
-      <div className="studio-card relative flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto p-5">
+      <div ref={ref} tabIndex={-1} className="studio-card relative flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto p-5 outline-none">
         <header className="flex items-start gap-3">
           <div className="studio-tile flex h-10 w-10 shrink-0 items-center justify-center text-brand">
             <Icon className="h-5 w-5" />

@@ -18,6 +18,7 @@ import {
 import { MovieProvider, useMovie } from "@/components/studio/movie/movie-context";
 import { useGeneration } from "@/components/studio/generation/generation-store";
 import { ExplanationOverlay } from "@/components/studio/generation/explanation-panel";
+import { ExportDrawer } from "@/components/studio/generation/export-center";
 import { RegionManagerProvider, useRegions } from "./region-manager";
 import { WorkspaceDock } from "./workspace-dock";
 
@@ -79,6 +80,8 @@ export function UnifiedWorkspace() {
           </div>
           {/* AI Explainability Layer (Sprint 63Y) — single overlay for every surface. */}
           <ExplanationOverlay />
+          {/* Production Export Center (Sprint 63.7) — single drawer for the shared selection. */}
+          <ExportDrawer />
         </RegionManagerProvider>
       </MovieProvider>
     </OutcomeEngineProvider>
