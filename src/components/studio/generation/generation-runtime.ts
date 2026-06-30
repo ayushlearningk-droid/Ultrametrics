@@ -20,6 +20,7 @@ import { outcomeById } from "@/components/studio/outcomes/outcomes-data";
 import type { CreativeItem } from "@/components/studio/creative/creative-data";
 import type { QueueItem } from "@/components/studio/queue/queue-data";
 import type { ApprovalItem } from "@/components/studio/approval/approval-data";
+import { MOVIE_LABEL } from "@/components/studio/movie/movie-runtime";
 import { buildMetaPayload, buildGooglePayload } from "./connectors";
 import {
   zGenerationInput,
@@ -57,9 +58,60 @@ export interface GenerationResult {
   creatives: CreativeItem[];
   queueItems: QueueItem[];
   approvalItems: ApprovalItem[];
-  timeline: { id: string; at: number; text: string }[];
-  activity: { id: string; authorId: EmployeeId; text: string }[];
+  timeline: LiveTimelineEvent[];
+  activity: ActivityEvent[];
 }
+
+/** One event of the Production AI Activity Bus (Sprint 63W). */
+export interface ActivityEvent {
+  id: string;
+  authorId: EmployeeId;
+  at: number;
+  category: string;
+  title: string;
+  description: string;
+  /** Linked generated asset (focused in the Inspector). */
+  assetId?: string;
+  /** Linked Live Timeline stage. */
+  stage?: string;
+}
+
+/** One event of the Production Live Timeline (Sprint 63V). */
+export interface LiveTimelineEvent {
+  id: string;
+  at: number;
+  ownerId: EmployeeId;
+  stage: string;
+  status: "complete" | "ready";
+  durationSec: number;
+  /** Reused Movie action label, when the stage maps to a Movie stage. */
+  detail?: string;
+  /** Linked generated asset (opens in the Inspector). */
+  assetId?: string;
+}
+
+/** The deterministic 12-stage timeline spec — reuses Movie stage labels. */
+interface LiveStageSpec {
+  stage: string;
+  ownerId: EmployeeId;
+  movieStageId?: string;
+  durationSec: number;
+  ready?: boolean;
+}
+const LIVE_TIMELINE: LiveStageSpec[] = [
+  { stage: "Brief Received", ownerId: "ceo", durationSec: 8 },
+  { stage: "Research Started", ownerId: "creative-director", movieStageId: "s-hook", durationSec: 20 },
+  { stage: "Competitor Analysis", ownerId: "media-buyer", durationSec: 24 },
+  { stage: "Audience Analysis", ownerId: "media-buyer", durationSec: 18 },
+  { stage: "Strategy Built", ownerId: "ceo", movieStageId: "s-brief", durationSec: 14 },
+  { stage: "Hooks Generated", ownerId: "creative-director", durationSec: 22 },
+  { stage: "Storyboard Generated", ownerId: "creative-director", durationSec: 26 },
+  { stage: "Copy Generated", ownerId: "copywriter", movieStageId: "s-script", durationSec: 20 },
+  { stage: "Creative Generated", ownerId: "automation", movieStageId: "s-render", durationSec: 30 },
+  { stage: "Queue Created", ownerId: "automation", durationSec: 10 },
+  { stage: "Approval Requested", ownerId: "brand-guardian", movieStageId: "s-brand", durationSec: 12 },
+  { stage: "Campaign Ready", ownerId: "ceo", durationSec: 6, ready: true },
+];
 
 const BASE = Date.parse("2026-06-01T09:00:00Z");
 /** Owners assigned round-robin to creative tasks (reused Employees registry). */
@@ -214,18 +266,56 @@ export function generate(rawInput: GenerationInput): GenerationResult {
 
   const stages: GenerationStage[] = GENERATION_STAGES.map((name) => ({ name, status: "complete" }));
 
-  const timeline = GENERATION_STAGES.map((name, i) => ({
-    id: `${campaignId}-tl${i + 1}`,
-    at: BASE + i * 600_000,
-    text: name,
-  }));
+  // Production Live Timeline (Sprint 63V): 12 deterministic events, cumulative
+  // times derived from each stage's duration (no timers), each linked to a
+  // generated asset so selecting it opens the Inspector.
+  let cursor = BASE;
+  const timeline: LiveTimelineEvent[] = LIVE_TIMELINE.map((s, i) => {
+    const at = cursor;
+    cursor += s.durationSec * 1000;
+    return {
+      id: `${campaignId}-lt${i + 1}`,
+      at,
+      ownerId: s.ownerId,
+      stage: s.stage,
+      status: s.ready ? "ready" : "complete",
+      durationSec: s.durationSec,
+      detail: s.movieStageId ? MOVIE_LABEL[s.movieStageId] : undefined,
+      assetId: creatives.length ? creatives[i % creatives.length].id : undefined,
+    };
+  });
 
-  const activity = [
-    { id: `${campaignId}-ac1`, authorId: "creative-director" as EmployeeId, text: `Assembled "${campaignPlan.name}".` },
-    { id: `${campaignId}-ac2`, authorId: "copywriter" as EmployeeId, text: `Wrote ${creativePlan.headlines.length} headlines and ${creativePlan.descriptions.length} descriptions.` },
-    { id: `${campaignId}-ac3`, authorId: "automation" as EmployeeId, text: `Queued ${assetPlan.assets.length} creative tasks.` },
-    { id: `${campaignId}-ac4`, authorId: REVIEWER, text: `Sent ${approvalPlan.items.length} assets to approval.` },
+  // AI Activity Bus (Sprint 63W): deterministic events emitted by the runtime,
+  // each anchored to a Live Timeline stage (reusing its timestamp + linked
+  // asset). No timers, no notifications — pure derivation.
+  const tlByStage = new Map(timeline.map((t) => [t.stage, t]));
+  const assetCount = assetPlan.assets.length;
+  const activitySpec: { authorId: EmployeeId; category: string; title: string; description: string; stage: string }[] = [
+    { authorId: "creative-director", category: "Research", title: "Finished competitor research", description: "Mapped rival angles and gaps.", stage: "Competitor Analysis" },
+    { authorId: "media-buyer", category: "Forecast", title: "Predicted ROAS", description: `Modeled expected return for ${input.audience}.`, stage: "Audience Analysis" },
+    { authorId: "finance", category: "Finance", title: "Calculated CPA", description: "Set the target cost per acquisition.", stage: "Strategy Built" },
+    { authorId: "creative-director", category: "Creative", title: "Generated hooks", description: `Drafted ${creativePlan.hooks.length} problem-first hooks.`, stage: "Hooks Generated" },
+    { authorId: "automation", category: "Creative", title: "Created storyboard", description: "Sequenced the shots.", stage: "Storyboard Generated" },
+    { authorId: "copywriter", category: "Copy", title: "Wrote ad copy", description: `${creativePlan.headlines.length} headlines, ${creativePlan.descriptions.length} descriptions.`, stage: "Copy Generated" },
+    { authorId: "automation", category: "Creative", title: "Generated creative", description: `Produced ${assetCount} assets.`, stage: "Creative Generated" },
+    { authorId: "automation", category: "Connector", title: "Prepared Meta payload", description: "Built a PAUSED campaign payload (not published).", stage: "Creative Generated" },
+    { authorId: "automation", category: "Queue", title: "Queue created", description: `${assetCount} creative tasks queued.`, stage: "Queue Created" },
+    { authorId: REVIEWER, category: "Approval", title: "Approval requested", description: `Sent ${approvalPlan.items.length} assets to review.`, stage: "Approval Requested" },
+    { authorId: "ceo", category: "Ready", title: "Campaign ready", description: "Brief to render — ready to launch.", stage: "Campaign Ready" },
   ];
+  const activity: ActivityEvent[] = activitySpec.map((a, i) => {
+    const tl = tlByStage.get(a.stage);
+    return {
+      id: `${campaignId}-ac${i + 1}`,
+      authorId: a.authorId,
+      at: tl?.at ?? BASE,
+      category: a.category,
+      title: a.title,
+      description: a.description,
+      assetId: tl?.assetId,
+      stage: a.stage,
+    };
+  });
 
   return {
     id: campaignId,

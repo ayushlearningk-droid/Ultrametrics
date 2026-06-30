@@ -19,6 +19,8 @@ import { ComposerProvider } from "@/components/studio/composer/composer-context"
 import { ForecastPreview, AITeamPreview, CostEstimator, ProviderReadiness } from "@/components/studio/composer/inspector";
 import { EMPLOYEES, EMPLOYEE_ICON } from "@/components/studio/employees/employees-data";
 import { OutcomeLibrary } from "@/components/studio/outcomes/outcome-library";
+import { SessionsProvider } from "@/components/studio/sessions/sessions-context";
+import { SessionsPanel } from "@/components/studio/sessions/sessions-panel";
 import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
 import { VideoPreviewCard, CreativeThumbnail } from "@/components/studio/media";
 import { useComposer } from "@/components/studio/composer/composer-context";
@@ -128,6 +130,13 @@ function Body({ onOpen }: { onOpen: () => void }) {
         </Section>
       </Reveal>
 
+      {/* Workspace Sessions — resume / duplicate / archive / delete */}
+      <Reveal>
+        <Section label="Workspace Sessions">
+          <SessionsPanel onResume={onOpen} />
+        </Section>
+      </Reveal>
+
       {/* Recent campaigns */}
       <Reveal>
         <Section label="Recent campaigns">
@@ -181,7 +190,9 @@ export function AiStudioCommandCenter({ onOpen }: { onOpen: () => void }) {
       <CommandProvider>
         <BrandDnaProvider>
           <WorkspaceMemoryProvider>
-            <Body onOpen={onOpen} />
+            <SessionsProvider>
+              <Body onOpen={onOpen} />
+            </SessionsProvider>
           </WorkspaceMemoryProvider>
         </BrandDnaProvider>
       </CommandProvider>
