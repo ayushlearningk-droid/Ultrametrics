@@ -14,7 +14,14 @@
 import { CheckCircle2, Sparkles } from "lucide-react";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { useRegions } from "@/components/studio/workspace/region-manager";
-import { useGeneration } from "./generation-store";
+import { useGeneration, selectAsset } from "./generation-store";
+import { ExplainButton } from "./explanation-panel";
+
+/** Focus the linked asset across regions, then surface the Inspector. */
+function openAsset(showRegion: (id: "inspector", zone: "float") => void, assetId?: string) {
+  selectAsset(assetId ?? null);
+  showRegion("inspector", "float");
+}
 
 function fmtTime(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
@@ -40,12 +47,12 @@ export function GenerationTimeline() {
         {gen.timeline.map((e) => {
           const Icon = EMPLOYEE_ICON[e.ownerId];
           return (
-            <li key={e.id}>
+            <li key={e.id} className="flex items-start gap-1">
               <button
                 type="button"
-                onClick={() => showRegion("inspector", "float")}
+                onClick={() => openAsset(showRegion, e.assetId)}
                 title="Open in Inspector"
-                className="studio-focusable flex w-full items-start gap-2.5 rounded-[var(--studio-radius-sm)] p-1.5 text-left transition-colors hover:bg-white/[0.04]"
+                className="studio-focusable flex min-w-0 flex-1 items-start gap-2.5 rounded-[var(--studio-radius-sm)] p-1.5 text-left transition-colors hover:bg-white/[0.04]"
               >
                 <span className="studio-tile flex h-7 w-7 shrink-0 items-center justify-center text-foreground-muted">
                   <Icon className="h-3.5 w-3.5" />
@@ -64,6 +71,7 @@ export function GenerationTimeline() {
                 </div>
                 <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
               </button>
+              <ExplainButton stage={e.stage} className="mt-1 shrink-0" />
             </li>
           );
         })}
@@ -88,27 +96,29 @@ export function GenerationActivity() {
       {gen.activity.map((a) => {
         const Icon = EMPLOYEE_ICON[a.authorId];
         return (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => showRegion("inspector", "float")}
-            title="Open in Inspector"
-            className="studio-card studio-focusable flex w-full items-start gap-2.5 p-3 text-left transition-colors hover:bg-white/[0.04]"
-          >
-            <div className="studio-tile flex h-8 w-8 shrink-0 items-center justify-center text-foreground-muted">
-              <Icon className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate type-caption font-semibold text-foreground">{employeeName(a.authorId)}</p>
-                <span className="chip chip-slate shrink-0">{a.category}</span>
-                <span className="ml-auto shrink-0 type-caption tabular-nums text-foreground-muted">{fmtTime(a.at)}</span>
+          <div key={a.id} className="studio-card flex items-start gap-2.5 p-3">
+            <button
+              type="button"
+              onClick={() => openAsset(showRegion, a.assetId)}
+              title="Open in Inspector"
+              className="studio-focusable flex min-w-0 flex-1 items-start gap-2.5 text-left"
+            >
+              <div className="studio-tile flex h-8 w-8 shrink-0 items-center justify-center text-foreground-muted">
+                <Icon className="h-4 w-4" />
               </div>
-              <p className="type-caption font-medium text-foreground">{a.title}</p>
-              <p className="type-caption text-foreground-muted">{a.description}</p>
-              {a.stage && <p className="type-caption text-brand">{a.stage}</p>}
-            </div>
-          </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate type-caption font-semibold text-foreground">{employeeName(a.authorId)}</p>
+                  <span className="chip chip-slate shrink-0">{a.category}</span>
+                  <span className="ml-auto shrink-0 type-caption tabular-nums text-foreground-muted">{fmtTime(a.at)}</span>
+                </div>
+                <p className="type-caption font-medium text-foreground">{a.title}</p>
+                <p className="type-caption text-foreground-muted">{a.description}</p>
+                {a.stage && <p className="type-caption text-brand">{a.stage}</p>}
+              </div>
+            </button>
+            <ExplainButton stage={a.stage ?? null} className="shrink-0" />
+          </div>
         );
       })}
     </section>

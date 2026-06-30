@@ -21,6 +21,7 @@ import type { CreativeItem } from "@/components/studio/creative/creative-data";
 import type { QueueItem } from "@/components/studio/queue/queue-data";
 import type { ApprovalItem } from "@/components/studio/approval/approval-data";
 import { MOVIE_LABEL } from "@/components/studio/movie/movie-runtime";
+import { employeeName } from "@/components/studio/employees/employees-data";
 import { buildMetaPayload, buildGooglePayload } from "./connectors";
 import {
   zGenerationInput,
@@ -60,7 +61,43 @@ export interface GenerationResult {
   approvalItems: ApprovalItem[];
   timeline: LiveTimelineEvent[];
   activity: ActivityEvent[];
+  explanations: DecisionExplanation[];
 }
+
+/** AI Explainability Layer (Sprint 63Y) — a complete explanation per decision. */
+export interface DecisionExplanation {
+  id: string;
+  stage: string;
+  sourceEmployeeId: EmployeeId;
+  /** Why this decision was made. */
+  why: string;
+  /** Grounded evidence (campaign facts only — no fabricated metrics). */
+  evidence: string[];
+  confidence: "high" | "medium" | "low";
+  /** Alternatives considered. */
+  alternatives: string[];
+  /** Expected business impact. */
+  businessImpact: string;
+  /** Linked generated asset (focused in the Inspector). */
+  assetId?: string;
+}
+
+/** Per-stage elaboration: confidence · alternatives · business impact. Deterministic. */
+const EXPLAIN_ELAB: Record<string, { confidence: "high" | "medium" | "low"; alternatives: string[]; impact: string }> = {
+  "Brief Received": { confidence: "high", alternatives: ["Defer until more inputs", "Start from a template"], impact: "Sets scope and prevents rework downstream." },
+  "Research Started": { confidence: "medium", alternatives: ["Skip research and reuse last brief", "Outsource references"], impact: "Grounds creative in proven angles." },
+  "Competitor Analysis": { confidence: "high", alternatives: ["Ignore competitors", "Copy the category leader"], impact: "Finds the open angle rivals miss." },
+  "Audience Analysis": { confidence: "high", alternatives: ["Broad untargeted reach", "Reuse a stale segment"], impact: "Concentrates spend on the highest-intent segment." },
+  "Strategy Built": { confidence: "high", alternatives: ["Single-channel push", "Discount-led plan"], impact: "Aligns creative, audience and budget on one outcome." },
+  "Hooks Generated": { confidence: "medium", alternatives: ["One safe hook", "Trend-chasing hook"], impact: "Raises hook rate in the first 3 seconds." },
+  "Storyboard Generated": { confidence: "medium", alternatives: ["Static image only", "Talking-head only"], impact: "Improves watch-through with a clear arc." },
+  "Copy Generated": { confidence: "high", alternatives: ["Long-form copy", "Feature-led copy"], impact: "Lifts CTR with benefit-first, on-voice lines." },
+  "Creative Generated": { confidence: "high", alternatives: ["Fewer placements", "Generic crops"], impact: "Produces native assets per placement." },
+  "Queue Created": { confidence: "high", alternatives: ["Manual handoff", "Single batch"], impact: "Parallelizes production with clear ownership." },
+  "Approval Requested": { confidence: "medium", alternatives: ["Auto-publish", "Skip brand review"], impact: "Protects the brand before any spend." },
+  "Campaign Ready": { confidence: "high", alternatives: ["Hold for more variants", "Launch unreviewed"], impact: "Brief-to-render package ready to launch." },
+};
+const EXPLAIN_FALLBACK = { confidence: "medium" as const, alternatives: ["Maintain the current plan"], impact: "Advances the campaign toward the chosen outcome." };
 
 /** One event of the Production AI Activity Bus (Sprint 63W). */
 export interface ActivityEvent {
@@ -317,6 +354,30 @@ export function generate(rawInput: GenerationInput): GenerationResult {
     };
   });
 
+  // AI Explainability Layer (Sprint 63Y): one complete explanation per timeline
+  // decision, grounded in campaign facts only. Reuses the timeline (stage,
+  // employee, timestamp, asset) and the per-stage elaboration. Deterministic.
+  const evidence = [
+    `Outcome: ${outcomeLabel}`,
+    `Audience: ${input.audience}`,
+    `Budget: $${input.budget.toLocaleString()}`,
+    `Placements: ${input.platforms.join(", ")}`,
+  ];
+  const explanations: DecisionExplanation[] = timeline.map((t) => {
+    const elab = EXPLAIN_ELAB[t.stage] ?? EXPLAIN_FALLBACK;
+    return {
+      id: `${campaignId}-ex-${t.id}`,
+      stage: t.stage,
+      sourceEmployeeId: t.ownerId,
+      why: `${employeeName(t.ownerId)} ran "${t.stage}" to move ${campaignPlan.name} toward ${outcomeLabel} for ${input.audience}.`,
+      evidence,
+      confidence: elab.confidence,
+      alternatives: elab.alternatives,
+      businessImpact: elab.impact,
+      assetId: t.assetId,
+    };
+  });
+
   return {
     id: campaignId,
     createdAt: BASE,
@@ -334,5 +395,6 @@ export function generate(rawInput: GenerationInput): GenerationResult {
     approvalItems,
     timeline,
     activity,
+    explanations,
   };
 }

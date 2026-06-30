@@ -10,9 +10,11 @@ import { Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreativeThumbnail } from "@/components/studio/media";
 import { resolveCreative } from "@/components/studio/creative/creative-data";
+import { selectAsset } from "@/components/studio/generation/generation-store";
 import { CreativeForecastChip } from "@/components/studio/creative/creative-metadata";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { outcomeById } from "@/components/studio/outcomes/outcomes-data";
+import { ExplainButton } from "@/components/studio/generation/explanation-panel";
 import { ApprovalStatus } from "./approval-status";
 import { ReviewerBadge } from "./reviewer-badge";
 import { ApprovalActions } from "./approval-actions";
@@ -27,9 +29,14 @@ export function ApprovalItem({ item }: { item: ApprovalItemType }) {
 
   return (
     <div className="studio-card flex items-center gap-3 p-2.5">
-      <div className="w-20 shrink-0 overflow-hidden rounded-[var(--studio-radius-md)]">
+      <button
+        type="button"
+        onClick={() => selectAsset(item.creativeId)}
+        title="Focus this asset"
+        className="studio-focusable w-20 shrink-0 overflow-hidden rounded-[var(--studio-radius-md)]"
+      >
         {creative ? <CreativeThumbnail media={creative.media} aspect="video" /> : <div className="studio-media aspect-video" />}
-      </div>
+      </button>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-center gap-2">
@@ -48,6 +55,7 @@ export function ApprovalItem({ item }: { item: ApprovalItemType }) {
           <span className="type-caption">v{item.version}</span>
           <CreativeForecastChip budget={item.budget} />
           {item.dnaVersion && <span className="chip chip-slate">DNA {item.dnaVersion}</span>}
+          <ExplainButton stage="Approval Requested" />
         </div>
       </div>
 

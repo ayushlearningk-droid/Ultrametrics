@@ -17,6 +17,7 @@ import {
 } from "@/components/studio/outcomes/outcome-engine";
 import { MovieProvider, useMovie } from "@/components/studio/movie/movie-context";
 import { useGeneration } from "@/components/studio/generation/generation-store";
+import { ExplanationOverlay } from "@/components/studio/generation/explanation-panel";
 import { RegionManagerProvider, useRegions } from "./region-manager";
 import { WorkspaceDock } from "./workspace-dock";
 
@@ -76,6 +77,8 @@ export function UnifiedWorkspace() {
           <div className="mx-auto w-full max-w-[1600px] px-3 py-5 md:px-6">
             <WorkspaceDock />
           </div>
+          {/* AI Explainability Layer (Sprint 63Y) — single overlay for every surface. */}
+          <ExplanationOverlay />
         </RegionManagerProvider>
       </MovieProvider>
     </OutcomeEngineProvider>

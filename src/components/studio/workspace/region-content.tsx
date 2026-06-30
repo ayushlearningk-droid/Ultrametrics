@@ -22,7 +22,7 @@ import { StudioCanvas } from "@/components/studio/canvas/studio-canvas";
 import { CreativeBrowser } from "@/components/studio/creative/creative-browser";
 import { AssetInspector } from "@/components/studio/inspector/asset-inspector";
 import { GenerationQueue } from "@/components/studio/queue/generation-queue";
-import { useGeneration } from "@/components/studio/generation/generation-store";
+import { useGeneration, useSelectedAsset } from "@/components/studio/generation/generation-store";
 import { GenerationTimeline, GenerationActivity } from "@/components/studio/generation/generation-feed";
 import type { RegionId } from "./region-manager";
 
@@ -64,10 +64,12 @@ function CreativeRegion() {
 
 function InspectorRegion() {
   const gen = useGeneration();
-  // Open the NEWEST generated asset (Sprint 63S) — the last creative carries the
-  // highest createdAt in the deterministic plan.
+  // Follow the shared selection (Sprint 63Z); fall back to the newest asset.
+  const selected = useSelectedAsset();
   const newestId = gen?.creatives[gen.creatives.length - 1]?.id;
-  return <AssetInspector source={gen?.creatives} initialId={newestId} />;
+  const id = selected ?? newestId;
+  // Re-key on selection so the Inspector always opens the shared asset.
+  return <AssetInspector key={id ?? "none"} source={gen?.creatives} initialId={id} />;
 }
 
 function QueueRegion() {

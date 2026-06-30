@@ -11,6 +11,7 @@
 
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ExplainButton } from "@/components/studio/generation/explanation-panel";
 import type { CreativeItem } from "@/components/studio/creative/creative-data";
 import { InspectorProvider, useInspector } from "./inspector-context";
 import { InspectorPreview } from "./inspector-preview";
@@ -53,10 +54,13 @@ function Body() {
   return (
     <div className="mx-auto flex w-full max-w-[420px] flex-col gap-4 px-1 py-3">
       <header className="flex flex-col gap-1.5">
-        <span className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
-          <Sparkles className="h-3.5 w-3.5 text-brand" />
-          Creative Intelligence
-        </span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
+            <Sparkles className="h-3.5 w-3.5 text-brand" />
+            Creative Intelligence
+          </span>
+          <ExplainButton stage="Creative Generated" />
+        </div>
         <h2 className="text-xl font-bold tracking-tight text-foreground">Inspector</h2>
         <AssetPicker />
       </header>
