@@ -5,10 +5,10 @@
  * plan. Deterministic, presentation only; no AI, no providers, no backend.
  */
 
-import { AiOutcomeStudio } from "@/components/studio/outcomes/ai-outcome-studio";
+import { ProductionPromptComposer } from "@/components/studio/composer/production-prompt-composer";
 
 export const metadata = { title: "Outcomes · AI Studio" };
 
 export default function StudioOutcomesPage() {
-  return <AiOutcomeStudio />;
+  return <ProductionPromptComposer />;
 }

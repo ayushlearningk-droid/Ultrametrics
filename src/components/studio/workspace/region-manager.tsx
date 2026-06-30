@@ -25,6 +25,9 @@ import {
   CheckCircle2,
   Home as HomeIcon,
   LayoutGrid,
+  Images,
+  PanelRight,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,7 +39,10 @@ export type RegionId =
   | "timeline"
   | "approval"
   | "home"
-  | "canvas";
+  | "canvas"
+  | "creative"
+  | "inspector"
+  | "queue";
 
 export type Zone = "left" | "center" | "right" | "float" | "hidden";
 
@@ -72,6 +78,9 @@ export const REGION_DEFS: RegionDef[] = [
   { id: "approval", title: "Approval", icon: CheckCircle2, defaultZone: "hidden", defaultOrder: 0 },
   { id: "home", title: "Home", icon: HomeIcon, defaultZone: "hidden", defaultOrder: 0 },
   { id: "canvas", title: "Canvas", icon: LayoutGrid, defaultZone: "hidden", defaultOrder: 0 },
+  { id: "creative", title: "Creatives", icon: Images, defaultZone: "hidden", defaultOrder: 0 },
+  { id: "inspector", title: "Inspector", icon: PanelRight, defaultZone: "right", defaultOrder: 2 },
+  { id: "queue", title: "Queue", icon: ListChecks, defaultZone: "hidden", defaultOrder: 0 },
 ];
 
 const STORAGE_KEY = "um:studio:workspace:v1";
