@@ -11,6 +11,7 @@
 
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { CreativeItem } from "@/components/studio/creative/creative-data";
 import { InspectorProvider, useInspector } from "./inspector-context";
 import { InspectorPreview } from "./inspector-preview";
 import { InspectorMetadata } from "./inspector-metadata";
@@ -89,9 +90,17 @@ function Body() {
   );
 }
 
-export function AssetInspector({ initialId, loading }: { initialId?: string | null; loading?: boolean }) {
+export function AssetInspector({
+  initialId,
+  source,
+  loading,
+}: {
+  initialId?: string | null;
+  source?: CreativeItem[];
+  loading?: boolean;
+}) {
   return (
-    <InspectorProvider initialId={initialId} loading={loading}>
+    <InspectorProvider initialId={initialId} source={source} loading={loading}>
       <Body />
     </InspectorProvider>
   );

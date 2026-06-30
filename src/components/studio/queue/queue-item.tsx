@@ -9,7 +9,7 @@
 import { Clock, Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreativeThumbnail } from "@/components/studio/media";
-import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
+import { resolveCreative } from "@/components/studio/creative/creative-data";
 import { CreativeForecastChip } from "@/components/studio/creative/creative-metadata";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { MOVIE_LABEL } from "@/components/studio/movie/movie-runtime";
@@ -26,7 +26,7 @@ function etaLabel(item: QueueItemType): string {
 }
 
 export function QueueItem({ item }: { item: QueueItemType }) {
-  const creative = SAMPLE_CREATIVES.find((c) => c.id === item.creativeId);
+  const creative = resolveCreative(item.creativeId);
   const OwnerIcon = EMPLOYEE_ICON[item.assignedId];
   const outcome = outcomeById(item.outcomeId);
   const stage = item.stageId ? MOVIE_LABEL[item.stageId] : null;

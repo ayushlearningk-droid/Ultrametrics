@@ -66,6 +66,23 @@ export const SAMPLE_CREATIVES: CreativeItem[] = [
   { id: "cr10", title: "Recovery angle", media: V, platform: "reels", status: "pending", ownerId: "brand-guardian", version: 1, variants: 2, tags: ["recover"], bookmarked: false, favorite: false, recent: true, budget: 6000, createdAt: T(13) },
 ];
 
+/* ── Generated-creative registry ─────────────────────────────────────────── */
+/**
+ * Generated campaigns (Sprint 63O) register their creatives here so the Queue,
+ * Approval, and Inspector surfaces can resolve previews by id without importing
+ * the generation runtime. Falls back to the sample set.
+ */
+const generatedRegistry = new Map<string, CreativeItem>();
+
+export function registerCreatives(items: CreativeItem[]): void {
+  for (const c of items) generatedRegistry.set(c.id, c);
+}
+
+/** Resolve a creative by id — generated first, then sample data. */
+export function resolveCreative(id: string): CreativeItem | undefined {
+  return generatedRegistry.get(id) ?? SAMPLE_CREATIVES.find((c) => c.id === id);
+}
+
 export interface CreativeCollection {
   id: string;
   label: string;

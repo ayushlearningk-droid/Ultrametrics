@@ -23,6 +23,8 @@ import { StudioCanvas } from "@/components/studio/canvas/studio-canvas";
 import { CreativeBrowser } from "@/components/studio/creative/creative-browser";
 import { AssetInspector } from "@/components/studio/inspector/asset-inspector";
 import { GenerationQueue } from "@/components/studio/queue/generation-queue";
+import { useGeneration } from "@/components/studio/generation/generation-store";
+import { GenerationTimeline, GenerationActivity } from "@/components/studio/generation/generation-feed";
 import type { RegionId } from "./region-manager";
 
 function EmployeesRegion() {
@@ -59,6 +61,46 @@ function CanvasRegion() {
   );
 }
 
+/* Generated campaign (Sprint 63O) flows into these regions via the store; they
+   fall back to the deterministic sample data when no campaign was generated. */
+function CreativeRegion() {
+  const gen = useGeneration();
+  return <CreativeBrowser source={gen?.creatives} />;
+}
+
+function InspectorRegion() {
+  const gen = useGeneration();
+  return <AssetInspector source={gen?.creatives} initialId={gen?.creatives[0]?.id} />;
+}
+
+function QueueRegion() {
+  const gen = useGeneration();
+  return <GenerationQueue source={gen?.queueItems} />;
+}
+
+function ApprovalRegion() {
+  const gen = useGeneration();
+  return <ApprovalCenter source={gen?.approvalItems} />;
+}
+
+function TimelineRegion() {
+  return (
+    <div className="flex flex-col gap-3">
+      <GenerationTimeline />
+      <EmployeeTimeline />
+    </div>
+  );
+}
+
+function ActivityRegion() {
+  return (
+    <div className="flex h-full min-h-[280px] flex-col gap-3">
+      <GenerationActivity />
+      <ConversationBus />
+    </div>
+  );
+}
+
 export function RegionContent({ id }: { id: RegionId }) {
   switch (id) {
     case "outcome":
@@ -68,25 +110,21 @@ export function RegionContent({ id }: { id: RegionId }) {
     case "employees":
       return <EmployeesRegion />;
     case "activity":
-      return (
-        <div className="h-full min-h-[280px]">
-          <ConversationBus />
-        </div>
-      );
+      return <ActivityRegion />;
     case "timeline":
-      return <EmployeeTimeline />;
+      return <TimelineRegion />;
     case "approval":
-      return <ApprovalCenter />;
+      return <ApprovalRegion />;
     case "home":
       return <StudioHome />;
     case "canvas":
       return <CanvasRegion />;
     case "creative":
-      return <CreativeBrowser />;
+      return <CreativeRegion />;
     case "inspector":
-      return <AssetInspector />;
+      return <InspectorRegion />;
     case "queue":
-      return <GenerationQueue />;
+      return <QueueRegion />;
     default:
       return null;
   }

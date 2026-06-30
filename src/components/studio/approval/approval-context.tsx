@@ -10,7 +10,7 @@
  */
 
 import { createContext, useContext, useMemo, useState } from "react";
-import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
+import { resolveCreative } from "@/components/studio/creative/creative-data";
 import { EMPLOYEES, employeeName } from "@/components/studio/employees/employees-data";
 import type { EmployeeId } from "@/components/studio/employees/types";
 import {
@@ -24,7 +24,7 @@ import {
 } from "./approval-data";
 
 function titleOf(creativeId: string): string {
-  return SAMPLE_CREATIVES.find((c) => c.id === creativeId)?.title ?? creativeId;
+  return resolveCreative(creativeId)?.title ?? creativeId;
 }
 let seq = 0;
 const uid = (p: string) => `${p}-${seq++}`;

@@ -9,7 +9,7 @@
 import { Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreativeThumbnail } from "@/components/studio/media";
-import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
+import { resolveCreative } from "@/components/studio/creative/creative-data";
 import { CreativeForecastChip } from "@/components/studio/creative/creative-metadata";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { outcomeById } from "@/components/studio/outcomes/outcomes-data";
@@ -21,7 +21,7 @@ import type { ApprovalItem as ApprovalItemType } from "./approval-data";
 const PRIORITY_CLASS = { high: "text-brand", normal: "text-foreground-muted", low: "text-foreground-muted/60" } as const;
 
 export function ApprovalItem({ item }: { item: ApprovalItemType }) {
-  const creative = SAMPLE_CREATIVES.find((c) => c.id === item.creativeId);
+  const creative = resolveCreative(item.creativeId);
   const AssignedIcon = EMPLOYEE_ICON[item.assignedId];
   const outcome = outcomeById(item.outcomeId);
 

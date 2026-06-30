@@ -10,7 +10,7 @@
  */
 
 import { createContext, useContext, useMemo, useState } from "react";
-import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
+import { resolveCreative } from "@/components/studio/creative/creative-data";
 import {
   SAMPLE_QUEUE,
   filterQueue,
@@ -24,7 +24,7 @@ import {
 } from "./queue-data";
 
 function titleOf(creativeId: string): string {
-  return SAMPLE_CREATIVES.find((c) => c.id === creativeId)?.title ?? creativeId;
+  return resolveCreative(creativeId)?.title ?? creativeId;
 }
 
 interface QueueValue {

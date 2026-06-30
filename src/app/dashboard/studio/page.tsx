@@ -6,10 +6,10 @@
  * only — no new layout, no data, no execution. Presentation foundation only.
  */
 
-import { UnifiedWorkspace } from "@/components/studio/workspace/unified-workspace";
+import { StudioEntry } from "@/components/studio/landing/studio-entry";
 
 export const metadata = { title: "AI Studio" };
 
 export default function AiStudioPage() {
-  return <UnifiedWorkspace />;
+  return <StudioEntry />;
 }

@@ -9,7 +9,7 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 import { VideoPreviewCard, CreativeThumbnail } from "@/components/studio/media";
-import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
+import { resolveCreative } from "@/components/studio/creative/creative-data";
 import { CreativeForecastChip } from "@/components/studio/creative/creative-metadata";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { outcomeById } from "@/components/studio/outcomes/outcomes-data";
@@ -31,7 +31,7 @@ export function QueueDetails() {
   }, [selectedId, setSelectedId]);
 
   if (!selectedId || !item) return null;
-  const creative = SAMPLE_CREATIVES.find((c) => c.id === item.creativeId);
+  const creative = resolveCreative(item.creativeId);
   const OwnerIcon = EMPLOYEE_ICON[item.assignedId];
   const outcome = outcomeById(item.outcomeId);
 

@@ -10,7 +10,7 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 import { VideoPreviewCard, CreativeThumbnail } from "@/components/studio/media";
-import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
+import { resolveCreative } from "@/components/studio/creative/creative-data";
 import { InspectorForecast } from "@/components/studio/inspector/inspector-forecast";
 import { InspectorPerformance } from "@/components/studio/inspector/inspector-performance";
 import { useApproval, useApprovalItem } from "./approval-context";
@@ -34,7 +34,7 @@ export function ApprovalDetails() {
   }, [selectedId, setSelectedId]);
 
   if (!selectedId || !item) return null;
-  const creative = SAMPLE_CREATIVES.find((c) => c.id === item.creativeId);
+  const creative = resolveCreative(item.creativeId);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
