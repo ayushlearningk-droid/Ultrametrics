@@ -20,10 +20,12 @@ import { useOutcome } from "@/components/studio/outcomes/outcome-engine";
 import { StudioHome } from "@/components/studio/home/studio-home";
 import { StudioCanvas } from "@/components/studio/canvas/studio-canvas";
 import { CreativeBrowser } from "@/components/studio/creative/creative-browser";
+import { CreativeWarRoom } from "@/components/studio/creative/creative-war-room";
 import { AssetInspector } from "@/components/studio/inspector/asset-inspector";
 import { GenerationQueue } from "@/components/studio/queue/generation-queue";
 import { useGeneration, useSelectedAsset } from "@/components/studio/generation/generation-store";
 import { GenerationTimeline, GenerationActivity } from "@/components/studio/generation/generation-feed";
+import { DreamMode } from "@/components/studio/generation/dream-mode";
 import type { RegionId } from "./region-manager";
 
 function EmployeesRegion() {
@@ -59,7 +61,13 @@ function CanvasRegion() {
    fall back to the deterministic sample data when no campaign was generated. */
 function CreativeRegion() {
   const gen = useGeneration();
-  return <CreativeBrowser source={gen?.creatives} />;
+  // AI War Room (Sprint 63.4) sits above the reused Creative Browser.
+  return (
+    <div className="flex flex-col gap-6">
+      <CreativeWarRoom />
+      <CreativeBrowser source={gen?.creatives} />
+    </div>
+  );
 }
 
 function InspectorRegion() {
@@ -94,6 +102,7 @@ function TimelineRegion() {
 function ActivityRegion() {
   return (
     <div className="flex h-full min-h-[280px] flex-col gap-3">
+      <DreamMode />
       <GenerationActivity />
       <ConversationBus />
     </div>
