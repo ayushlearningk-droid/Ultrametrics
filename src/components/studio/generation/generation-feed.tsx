@@ -1,34 +1,58 @@
 "use client";
 
 /**
- * Campaign Generation Runtime — workspace feeds (Sprint 63O).
+ * Campaign Generation Runtime — workspace feeds (Sprint 63O · live in 63P).
  *
  * Renders the active generated campaign's execution timeline and activity into
  * the Unified Workspace's Timeline and Activity regions, alongside the existing
- * Movie feeds. Reads the generation store; renders nothing until a campaign is
- * generated. Presentation only.
+ * Movie feeds. The timeline is the LIVE AI Movie: it reflects the real-time
+ * Movie Runtime state (finished · current · upcoming workers + ETA) for the
+ * generated campaign — no static checklist, no fake loading. Reads the
+ * generation store + the reused Movie Runtime. Presentation only.
  */
 
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Circle, Sparkles } from "lucide-react";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
+import { useMovie } from "@/components/studio/movie/movie-context";
+import { formatEta } from "@/components/studio/movie/movie-runtime";
 import { useGeneration } from "./generation-store";
 
 export function GenerationTimeline() {
   const gen = useGeneration();
+  const { movie, isComplete } = useMovie();
   if (!gen) return null;
   return (
     <section className="studio-card flex flex-col gap-2 p-3">
-      <header className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
-        <Sparkles className="h-3.5 w-3.5 text-brand" />
-        {gen.campaignPlan.name}
+      <header className="flex items-center justify-between gap-2 type-eyebrow text-foreground-muted">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand" />
+          <span className="truncate">{gen.campaignPlan.name}</span>
+        </span>
+        <span className="shrink-0 tabular-nums">{isComplete ? "Ready" : formatEta(movie.etaMs)}</span>
       </header>
       <ol className="flex flex-col gap-1.5">
-        {gen.stages.map((s) => (
-          <li key={s.name} className="flex items-center gap-2 type-caption text-foreground">
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-brand" />
-            {s.name}
-          </li>
-        ))}
+        {movie.stages.map((s) => {
+          const finished = s.status === "finished";
+          const current = s.status === "current";
+          return (
+            <li
+              key={s.id}
+              className={`flex items-center gap-2 type-caption ${current || finished ? "text-foreground" : "text-foreground-muted"}`}
+            >
+              {finished ? (
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-brand" />
+              ) : current ? (
+                <span className="anim-pulse h-2 w-2 shrink-0 rounded-full bg-amber-400" aria-hidden />
+              ) : (
+                <Circle className="h-3.5 w-3.5 shrink-0 text-foreground-muted/60" />
+              )}
+              <span className="truncate">
+                <span className="font-semibold">{employeeName(s.ownerId)}</span>
+                <span className="text-foreground-muted"> · {current ? s.label : finished ? "Done" : "Up next"}</span>
+              </span>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );

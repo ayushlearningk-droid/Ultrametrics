@@ -26,6 +26,20 @@ export const zGenerationInput = z.object({
   skills: z.array(z.string()),
   connectors: z.array(z.string()),
   model: z.string(),
+  /* Marketing DNA imprint (Sprint 63R) — the brand brain every campaign inherits. */
+  dna: z
+    .object({
+      version: z.string(),
+      brandName: z.string(),
+      voice: z.string(),
+      writingStyle: z.string(),
+      ctaStyle: z.string(),
+      visualStyle: z.string(),
+      pricePositioning: z.string(),
+      usp: z.string(),
+      restrictions: z.array(z.string()),
+    })
+    .optional(),
 });
 export type GenerationInput = z.infer<typeof zGenerationInput>;
 

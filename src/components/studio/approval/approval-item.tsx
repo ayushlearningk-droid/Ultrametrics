@@ -47,6 +47,7 @@ export function ApprovalItem({ item }: { item: ApprovalItemType }) {
           </span>
           <span className="type-caption">v{item.version}</span>
           <CreativeForecastChip budget={item.budget} />
+          {item.dnaVersion && <span className="chip chip-slate">DNA {item.dnaVersion}</span>}
         </div>
       </div>
 

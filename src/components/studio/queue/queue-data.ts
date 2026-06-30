@@ -26,6 +26,8 @@ export interface QueueItem {
   etaSec: number;
   status: QueueStatus;
   budget: number;
+  /** Marketing DNA version that produced this item (Sprint 63R). */
+  dnaVersion?: string;
 }
 
 export const SAMPLE_QUEUE: QueueItem[] = [

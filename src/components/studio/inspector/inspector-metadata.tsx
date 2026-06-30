@@ -26,6 +26,7 @@ export function InspectorMetadata({ item }: { item: CreativeItem }) {
         <InspectorRow label="Campaign" value={item.campaign ?? "—"} />
         <InspectorRow label="Objective" value={item.objective ?? "—"} />
         <InspectorRow label="Language" value={item.language ?? "—"} />
+        <InspectorRow label="Brand DNA" value={item.dnaVersion ?? "—"} />
         <InspectorRow label="Version" value={`v${item.version}`} />
         <InspectorRow label="Variants" value={item.variants} />
         <InspectorRow label="Created by" value={employeeName(item.ownerId)} />

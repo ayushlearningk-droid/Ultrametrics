@@ -8,8 +8,7 @@
  * Employees), so regions stay in sync deterministically.
  */
 
-import { useEmployees } from "@/components/studio/employees/employees-context";
-import { EmployeeCard } from "@/components/studio/employees/employee-card";
+import { CompanyDashboard } from "@/components/studio/employees/company-dashboard";
 import { ConversationBus } from "@/components/studio/employees/conversation-bus";
 import { EmployeeTimeline } from "@/components/studio/employees/employee-timeline";
 import { EmployeeSpotlight } from "@/components/studio/movie/employee-spotlight";
@@ -28,14 +27,9 @@ import { GenerationTimeline, GenerationActivity } from "@/components/studio/gene
 import type { RegionId } from "./region-manager";
 
 function EmployeesRegion() {
-  const { employees } = useEmployees();
-  return (
-    <div className="grid grid-cols-1 gap-3 p-1 sm:grid-cols-2">
-      {employees.map((view) => (
-        <EmployeeCard key={view.identity.id} view={view} />
-      ))}
-    </div>
-  );
+  // The AI Company Dashboard (Sprint 63Q): every employee live, fed from the
+  // Employees + Movie + Generation runtimes. Reuses EmployeeCard internally.
+  return <CompanyDashboard />;
 }
 
 function MovieRegion() {
@@ -70,7 +64,10 @@ function CreativeRegion() {
 
 function InspectorRegion() {
   const gen = useGeneration();
-  return <AssetInspector source={gen?.creatives} initialId={gen?.creatives[0]?.id} />;
+  // Open the NEWEST generated asset (Sprint 63S) — the last creative carries the
+  // highest createdAt in the deterministic plan.
+  const newestId = gen?.creatives[gen.creatives.length - 1]?.id;
+  return <AssetInspector source={gen?.creatives} initialId={newestId} />;
 }
 
 function QueueRegion() {

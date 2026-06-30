@@ -24,6 +24,8 @@ import { useComposer } from "@/components/studio/composer/composer-context";
 import { buildGenerationInput } from "@/components/studio/generation/build-input";
 import { generate } from "@/components/studio/generation/generation-runtime";
 import { setGeneration } from "@/components/studio/generation/generation-store";
+import { BrandDnaProvider, useBrandDna } from "@/components/studio/dna/brand-dna-context";
+import { MarketingDNA, ActiveBrandDnaSummary } from "@/components/studio/dna/marketing-dna";
 import { CommandProvider, useCommand } from "./command-context";
 import { CommandComposer } from "./command-composer";
 
@@ -71,11 +73,13 @@ function Body({ onOpen }: { onOpen: () => void }) {
   const reduce = useReducedMotion();
   const { brief } = useComposer();
   const { model, knowledge, skills, connectors, attachments } = useCommand();
+  const dna = useBrandDna();
 
-  // "Generate Campaign" executes the real Generation Runtime, then opens the
-  // workspace where the generated plans appear across every region.
+  // "Generate Campaign" executes the real Generation Runtime with the active
+  // Marketing DNA injected (Sprint 63R), then opens the workspace where the
+  // generated plans — stamped with the DNA version — appear across every region.
   const handleGenerate = () => {
-    const input = buildGenerationInput(brief, { model, knowledge, skills, connectors, attachments });
+    const input = buildGenerationInput(brief, { model, knowledge, skills, connectors, attachments }, dna);
     setGeneration(generate(input));
     onOpen();
   };
@@ -88,14 +92,22 @@ function Body({ onOpen }: { onOpen: () => void }) {
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-12 px-4 py-10 md:px-10 md:py-14">
       {/* Composer + live inspector */}
       <motion.div variants={slideUp} initial={reduce ? false : "hidden"} animate="visible" className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
-        <CommandComposer onGenerate={onOpen} />
+        <CommandComposer onGenerate={handleGenerate} />
         <aside className="flex flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
+          <ActiveBrandDnaSummary />
           <ForecastPreview />
           <AITeamPreview />
           <CostEstimator />
           <ProviderReadiness />
         </aside>
       </motion.div>
+
+      {/* Marketing DNA — the brain every generated campaign inherits */}
+      <Reveal>
+        <Section label="Marketing DNA">
+          <MarketingDNA />
+        </Section>
+      </Reveal>
 
       {/* Recent campaigns */}
       <Reveal>
@@ -148,7 +160,9 @@ export function AiStudioCommandCenter({ onOpen }: { onOpen: () => void }) {
   return (
     <ComposerProvider>
       <CommandProvider>
-        <Body onOpen={onOpen} />
+        <BrandDnaProvider>
+          <Body onOpen={onOpen} />
+        </BrandDnaProvider>
       </CommandProvider>
     </ComposerProvider>
   );

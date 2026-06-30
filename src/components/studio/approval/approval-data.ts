@@ -39,6 +39,8 @@ export interface ApprovalItem {
   comments: ApprovalComment[];
   history: ApprovalEvent[];
   scheduledAt?: number;
+  /** Marketing DNA version that produced this item (Sprint 63R). */
+  dnaVersion?: string;
 }
 
 const T = (d: number) => Date.parse(`2026-06-${String(d).padStart(2, "0")}T10:00:00Z`);

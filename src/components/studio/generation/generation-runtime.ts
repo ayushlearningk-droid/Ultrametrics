@@ -70,10 +70,14 @@ function low(s: string): string {
   return s.trim().toLowerCase();
 }
 
-/** Build the deterministic ad copy from the outcome, brand, brief and audience. */
+/** Build the deterministic ad copy from the outcome, brand, brief, audience + DNA. */
 function buildCreative(campaignId: string, input: GenerationInput, outcomeLabel: string): CreativePlan {
   const { brand, audience, brief } = { ...input, brief: input.brief.trim() };
   const offer = brief || `New from ${brand}`;
+  // The Marketing DNA (Sprint 63R) shapes the copy: USP grounds a description and
+  // the brand's CTA style closes the primary text. Deterministic — no randomness.
+  const usp = input.dna?.usp;
+  const cta = input.dna?.ctaStyle ? input.dna.ctaStyle.replace(/\s*\(.*\)\s*/g, "").trim() : null;
   const plan: CreativePlan = {
     campaignId,
     hooks: [
@@ -84,9 +88,12 @@ function buildCreative(campaignId: string, input: GenerationInput, outcomeLabel:
     headlines: [`${brand}: ${outcomeLabel}`, `${outcomeLabel}, made simple`, `Built for ${audience}`],
     descriptions: [
       `${brand} helps you ${low(outcomeLabel)}. ${offer}.`,
-      `Designed for ${audience}. See the difference with ${brand}.`,
+      usp ? `${usp}. Designed for ${audience}.` : `Designed for ${audience}. See the difference with ${brand}.`,
     ],
-    primaryText: [`${offer}. Built to ${low(outcomeLabel)}.`, `See why ${audience} choose ${brand}.`],
+    primaryText: [
+      `${offer}. Built to ${low(outcomeLabel)}.`,
+      cta ? `See why ${audience} choose ${brand}. ${cta}.` : `See why ${audience} choose ${brand}.`,
+    ],
   };
   return zCreativePlan.parse(plan);
 }
@@ -149,6 +156,7 @@ export function generate(rawInput: GenerationInput): GenerationResult {
   const googlePayload = buildGooglePayload(campaignPlan, creativePlan);
 
   /* ── Derived region views ──────────────────────────────────────────────── */
+  const dnaVersion = input.dna?.version;
   const tags = input.skills.length ? input.skills.slice(0, 3) : ["generated"];
   const creatives: CreativeItem[] = assetPlan.assets.map((a, i) => ({
     id: a.id,
@@ -170,6 +178,7 @@ export function generate(rawInput: GenerationInput): GenerationResult {
     campaign: campaignPlan.name,
     objective: input.objective,
     language: "English",
+    dnaVersion,
     history: [{ at: BASE + i * 3_600_000, text: `Generated for ${campaignPlan.name}` }],
   }));
 
@@ -183,6 +192,7 @@ export function generate(rawInput: GenerationInput): GenerationResult {
     etaSec: 12 + i * 6,
     status: "queued",
     budget: input.budget,
+    dnaVersion,
   }));
 
   const approvalItems: ApprovalItem[] = approvalPlan.items.map((ap, i) => ({
@@ -196,6 +206,7 @@ export function generate(rawInput: GenerationInput): GenerationResult {
     budget: input.budget,
     version: 1,
     comments: [],
+    dnaVersion,
     history: [{ id: `${ap.id}-h1`, at: BASE + i * 3_600_000, text: "Submitted for review" }],
   }));
 

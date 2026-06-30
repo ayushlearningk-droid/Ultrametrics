@@ -46,6 +46,8 @@ export interface CreativeItem {
   campaign?: string;
   objective?: string;
   language?: string;
+  /** Marketing DNA version that produced this asset (Sprint 63R). */
+  dnaVersion?: string;
   history?: { at: number; text: string }[];
 }
 

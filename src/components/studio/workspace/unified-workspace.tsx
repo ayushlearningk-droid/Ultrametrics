@@ -16,15 +16,18 @@ import {
   useOutcome,
 } from "@/components/studio/outcomes/outcome-engine";
 import { MovieProvider, useMovie } from "@/components/studio/movie/movie-context";
+import { useGeneration } from "@/components/studio/generation/generation-store";
 import { RegionManagerProvider, useRegions } from "./region-manager";
 import { WorkspaceDock } from "./workspace-dock";
 
 /** Wires outcome selection → runtime start → approval reveal. Deterministic. */
 function Orchestrator() {
   const { outcome } = useOutcome();
+  const gen = useGeneration();
   const { reset: startRun, pause, isComplete } = useMovie();
   const { showRegion } = useRegions();
   const prevOutcome = useRef<string | null>(null);
+  const prevGen = useRef<string | null>(null);
 
   // Idle until an outcome is chosen (the team "wakes up" on selection).
   useEffect(() => {
@@ -39,6 +42,22 @@ function Orchestrator() {
     if (id && id !== prevOutcome.current) startRun();
     prevOutcome.current = id;
   }, [outcome, startRun]);
+
+  // Campaign generated (Sprint 63P/63S) → play the live AI Movie of the team
+  // building it AND surface the runtime flow automatically: the queued jobs,
+  // the new creatives, and the review item appear without any manual docking
+  // (Inspector is already in the right zone). Reuses showRegion — hidden→zone
+  // only, so it never disturbs a layout the operator has already arranged.
+  useEffect(() => {
+    const id = gen?.id ?? null;
+    if (id && id !== prevGen.current) {
+      startRun();
+      showRegion("queue", "float");
+      showRegion("creative", "float");
+      showRegion("approval", "float");
+    }
+    prevGen.current = id;
+  }, [gen, startRun, showRegion]);
 
   // Run complete → approval appears.
   useEffect(() => {

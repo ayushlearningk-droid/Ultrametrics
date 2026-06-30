@@ -55,6 +55,7 @@ export function QueueItem({ item }: { item: QueueItemType }) {
             <Clock className="h-3 w-3" /> {etaLabel(item)}
           </span>
           <CreativeForecastChip budget={item.budget} />
+          {item.dnaVersion && <span className="chip chip-slate">DNA {item.dnaVersion}</span>}
         </div>
       </div>
 
