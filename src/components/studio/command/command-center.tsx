@@ -18,6 +18,7 @@ import { slideUp } from "@/lib/motion";
 import { ComposerProvider } from "@/components/studio/composer/composer-context";
 import { ForecastPreview, AITeamPreview, CostEstimator, ProviderReadiness } from "@/components/studio/composer/inspector";
 import { EMPLOYEES, EMPLOYEE_ICON } from "@/components/studio/employees/employees-data";
+import { OutcomeLibrary } from "@/components/studio/outcomes/outcome-library";
 import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
 import { VideoPreviewCard, CreativeThumbnail } from "@/components/studio/media";
 import { useComposer } from "@/components/studio/composer/composer-context";
@@ -26,6 +27,8 @@ import { generate } from "@/components/studio/generation/generation-runtime";
 import { setGeneration } from "@/components/studio/generation/generation-store";
 import { BrandDnaProvider, useBrandDna } from "@/components/studio/dna/brand-dna-context";
 import { MarketingDNA, ActiveBrandDnaSummary } from "@/components/studio/dna/marketing-dna";
+import { WorkspaceMemoryProvider, useWorkspaceMemory } from "@/components/studio/memory/workspace-memory-context";
+import { MemoryPanel } from "@/components/studio/memory/memory-panel";
 import { CommandProvider, useCommand } from "./command-context";
 import { CommandComposer } from "./command-composer";
 
@@ -74,12 +77,14 @@ function Body({ onOpen }: { onOpen: () => void }) {
   const { brief } = useComposer();
   const { model, knowledge, skills, connectors, attachments } = useCommand();
   const dna = useBrandDna();
+  const { memory } = useWorkspaceMemory();
 
   // "Generate Campaign" executes the real Generation Runtime with the active
-  // Marketing DNA injected (Sprint 63R), then opens the workspace where the
-  // generated plans — stamped with the DNA version — appear across every region.
+  // Marketing DNA (Sprint 63R) and editable Workspace Memory (Sprint 63S)
+  // injected, then opens the workspace where the generated plans appear across
+  // every region.
   const handleGenerate = () => {
-    const input = buildGenerationInput(brief, { model, knowledge, skills, connectors, attachments }, dna);
+    const input = buildGenerationInput(brief, { model, knowledge, skills, connectors, attachments }, dna, memory);
     setGeneration(generate(input));
     onOpen();
   };
@@ -106,6 +111,20 @@ function Body({ onOpen }: { onOpen: () => void }) {
       <Reveal>
         <Section label="Marketing DNA">
           <MarketingDNA />
+        </Section>
+      </Reveal>
+
+      {/* AI Memory — editable preferences inherited by every campaign */}
+      <Reveal>
+        <Section label="AI Memory">
+          <MemoryPanel />
+        </Section>
+      </Reveal>
+
+      {/* Outcome Intelligence Library — pick a result, populate the brief */}
+      <Reveal>
+        <Section label="Outcome Library">
+          <OutcomeLibrary />
         </Section>
       </Reveal>
 
@@ -161,7 +180,9 @@ export function AiStudioCommandCenter({ onOpen }: { onOpen: () => void }) {
     <ComposerProvider>
       <CommandProvider>
         <BrandDnaProvider>
-          <Body onOpen={onOpen} />
+          <WorkspaceMemoryProvider>
+            <Body onOpen={onOpen} />
+          </WorkspaceMemoryProvider>
         </BrandDnaProvider>
       </CommandProvider>
     </ComposerProvider>

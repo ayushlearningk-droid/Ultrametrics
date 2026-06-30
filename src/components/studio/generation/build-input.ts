@@ -9,6 +9,7 @@
 import type { PlatformId } from "@/components/studio/media";
 import type { Brief } from "@/components/studio/composer/composer-context";
 import { DEFAULT_BRAND_DNA, toDnaImprint, type MarketingDNAProfile } from "@/components/studio/dna/brand-dna";
+import { DEFAULT_WORKSPACE_MEMORY, type WorkspaceMemory } from "@/components/studio/memory/workspace-memory-context";
 import type { GenerationInput } from "./schemas";
 
 export interface CommandSelection {
@@ -39,14 +40,16 @@ const DEFAULT_PLATFORMS: PlatformId[] = ["reels", "meta", "tiktok"];
 export function buildGenerationInput(
   brief: Brief,
   command: CommandSelection,
-  dna: MarketingDNAProfile = DEFAULT_BRAND_DNA
+  dna: MarketingDNAProfile = DEFAULT_BRAND_DNA,
+  memory: WorkspaceMemory = DEFAULT_WORKSPACE_MEMORY
 ): GenerationInput {
   return {
     brief: brief.offer.trim(),
     outcomeId: brief.outcome ?? "",
     brand: prettify(brief.brand, dna.brandName),
     objective: brief.objective ?? "Conversions",
-    audience: brief.audience ?? dna.targetAudience,
+    // Audience resolves brief → DNA → remembered Workspace Memory preference.
+    audience: brief.audience ?? memory.audience ?? dna.targetAudience,
     budget: brief.budget,
     platforms: brief.platform ? [brief.platform] : DEFAULT_PLATFORMS,
     product: command.attachments.map((a) => a.name),
@@ -55,5 +58,6 @@ export function buildGenerationInput(
     connectors: command.connectors,
     model: command.model,
     dna: toDnaImprint(dna),
+    memory: { ...memory },
   };
 }

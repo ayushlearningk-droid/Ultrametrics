@@ -77,7 +77,9 @@ function buildCreative(campaignId: string, input: GenerationInput, outcomeLabel:
   // The Marketing DNA (Sprint 63R) shapes the copy: USP grounds a description and
   // the brand's CTA style closes the primary text. Deterministic — no randomness.
   const usp = input.dna?.usp;
-  const cta = input.dna?.ctaStyle ? input.dna.ctaStyle.replace(/\s*\(.*\)\s*/g, "").trim() : null;
+  // CTA prefers the DNA's CTA style, then the remembered Workspace Memory CTA.
+  const ctaSource = input.dna?.ctaStyle || input.memory?.ctaPreferences || "";
+  const cta = ctaSource ? ctaSource.replace(/\s*\(.*\)\s*/g, "").trim() : null;
   const plan: CreativePlan = {
     campaignId,
     hooks: [
@@ -124,7 +126,7 @@ export function generate(rawInput: GenerationInput): GenerationResult {
     audience: input.audience,
     budget: input.budget,
     platforms: input.platforms,
-    summary: `${input.brand} campaign to ${low(outcomeLabel)} for ${input.audience}, ${input.platforms.length} placement${input.platforms.length > 1 ? "s" : ""}, ${input.skills.length} skill${input.skills.length === 1 ? "" : "s"}.`,
+    summary: `${input.brand} campaign to ${low(outcomeLabel)} for ${input.audience}, ${input.platforms.length} placement${input.platforms.length > 1 ? "s" : ""}, ${input.skills.length} skill${input.skills.length === 1 ? "" : "s"}.${input.memory?.campaignStyle ? ` Style: ${input.memory.campaignStyle}.` : ""}`,
   } satisfies CampaignPlan);
 
   const creativePlan = buildCreative(campaignId, input, outcomeLabel);

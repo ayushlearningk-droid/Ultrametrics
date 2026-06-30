@@ -40,6 +40,19 @@ export const zGenerationInput = z.object({
       restrictions: z.array(z.string()),
     })
     .optional(),
+  /* Workspace Memory (Sprint 63S) — editable preferences inherited per campaign. */
+  memory: z
+    .object({
+      brandPreferences: z.string(),
+      tone: z.string(),
+      language: z.string(),
+      audience: z.string(),
+      campaignStyle: z.string(),
+      ugcPreferences: z.string(),
+      ctaPreferences: z.string(),
+      creativePreferences: z.string(),
+    })
+    .optional(),
 });
 export type GenerationInput = z.infer<typeof zGenerationInput>;
 

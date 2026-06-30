@@ -31,27 +31,164 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { EmployeeId } from "@/components/studio/employees/types";
+import type { PlatformId } from "@/components/studio/media";
+
+/** Outcome Intelligence categories (Sprint 63T). */
+export type OutcomeCategory = "Growth" | "Sales" | "Branding" | "Performance" | "Seasonal" | "Retention";
+
+export const OUTCOME_CATEGORIES: OutcomeCategory[] = [
+  "Growth",
+  "Sales",
+  "Branding",
+  "Performance",
+  "Seasonal",
+  "Retention",
+];
 
 export interface Outcome {
   id: string;
   label: string;
   icon: LucideIcon;
   description: string;
+  /* ── Outcome Intelligence (Sprint 63T) ── */
+  category: OutcomeCategory;
+  /** Expected KPIs this outcome moves. */
+  kpis: string[];
+  /** Recommended AI employees for this outcome (reused Employees registry). */
+  employees: EmployeeId[];
+  /** Estimated end-to-end duration. */
+  duration: string;
+  /** What the campaign ships. */
+  deliverables: string[];
+  /** Recommended placements. */
+  platforms: PlatformId[];
+  /** Defaults that auto-populate the Command Center brief on selection. */
+  objective: string;
+  audience: string;
 }
 
 export const OUTCOMES: Outcome[] = [
-  { id: "increase-roas", label: "Increase ROAS", icon: TrendingUp, description: "Squeeze more return from current spend." },
-  { id: "launch-product", label: "Launch Product", icon: Rocket, description: "Go to market with a full campaign." },
-  { id: "festival-campaign", label: "Create Festival Campaign", icon: PartyPopper, description: "Seasonal, on-brand creative at scale." },
-  { id: "get-leads", label: "Get More Leads", icon: UserPlus, description: "Drive qualified sign-ups." },
-  { id: "beat-competitor", label: "Beat Competitor", icon: Swords, description: "Out-create a named rival." },
-  { id: "ugc-campaign", label: "Generate UGC Campaign", icon: Users, description: "Authentic creator-style ads." },
-  { id: "increase-ctr", label: "Increase CTR", icon: MousePointerClick, description: "Sharper hooks, higher click-through." },
-  { id: "recover-campaign", label: "Recover Declining Campaign", icon: Activity, description: "Heal fatigue, restore performance." },
+  {
+    id: "increase-roas",
+    label: "Increase ROAS",
+    icon: TrendingUp,
+    description: "Squeeze more return from current spend.",
+    category: "Performance",
+    kpis: ["ROAS", "CPA", "Conversion rate"],
+    employees: ["media-buyer", "creative-director", "finance"],
+    duration: "5–7 days",
+    deliverables: ["3 hook variants", "Budget reallocation plan", "Performance forecast"],
+    platforms: ["meta", "reels", "tiktok"],
+    objective: "Conversions",
+    audience: "High-intent purchasers",
+  },
+  {
+    id: "launch-product",
+    label: "Launch Product",
+    icon: Rocket,
+    description: "Go to market with a full campaign.",
+    category: "Sales",
+    kpis: ["Revenue", "New customers", "AOV"],
+    employees: ["ceo", "creative-director", "copywriter", "media-buyer"],
+    duration: "10–14 days",
+    deliverables: ["Launch creative set", "Landing page", "Phased media plan"],
+    platforms: ["meta", "reels", "youtube", "tiktok"],
+    objective: "Sales",
+    audience: "New prospective buyers",
+  },
+  {
+    id: "festival-campaign",
+    label: "Create Festival Campaign",
+    icon: PartyPopper,
+    description: "Seasonal, on-brand creative at scale.",
+    category: "Seasonal",
+    kpis: ["Reach", "Engagement rate", "Revenue"],
+    employees: ["creative-director", "brand-guardian", "automation"],
+    duration: "7–10 days",
+    deliverables: ["Seasonal creative pack", "Story/Reel set", "Promo offer copy"],
+    platforms: ["reels", "tiktok", "shorts"],
+    objective: "Engagement",
+    audience: "Seasonal shoppers",
+  },
+  {
+    id: "get-leads",
+    label: "Get More Leads",
+    icon: UserPlus,
+    description: "Drive qualified sign-ups.",
+    category: "Growth",
+    kpis: ["Leads", "Cost per lead", "Lead quality"],
+    employees: ["media-buyer", "copywriter", "automation"],
+    duration: "5–7 days",
+    deliverables: ["Lead-gen creative", "Form / landing page", "Audience segments"],
+    platforms: ["meta", "youtube"],
+    objective: "Lead generation",
+    audience: "Qualified prospects",
+  },
+  {
+    id: "beat-competitor",
+    label: "Beat Competitor",
+    icon: Swords,
+    description: "Out-create a named rival.",
+    category: "Branding",
+    kpis: ["Share of voice", "CTR", "Brand lift"],
+    employees: ["creative-director", "media-buyer", "brand-guardian"],
+    duration: "7–10 days",
+    deliverables: ["Competitive angle deck", "Differentiated hooks", "Comparison creative"],
+    platforms: ["meta", "youtube", "reels"],
+    objective: "Brand awareness",
+    audience: "Competitor's audience",
+  },
+  {
+    id: "ugc-campaign",
+    label: "Generate UGC Campaign",
+    icon: Users,
+    description: "Authentic creator-style ads.",
+    category: "Branding",
+    kpis: ["Engagement rate", "CTR", "Watch time"],
+    employees: ["creative-director", "copywriter", "automation"],
+    duration: "5–8 days",
+    deliverables: ["UGC scripts", "Creator-style videos", "Caption set"],
+    platforms: ["tiktok", "reels", "shorts"],
+    objective: "Engagement",
+    audience: "Social-native viewers",
+  },
+  {
+    id: "increase-ctr",
+    label: "Increase CTR",
+    icon: MousePointerClick,
+    description: "Sharper hooks, higher click-through.",
+    category: "Performance",
+    kpis: ["CTR", "Hook rate", "CPC"],
+    employees: ["creative-director", "copywriter", "media-buyer"],
+    duration: "3–5 days",
+    deliverables: ["Hook test matrix", "Thumb-stopping openers", "Caption variants"],
+    platforms: ["reels", "tiktok", "shorts"],
+    objective: "Traffic",
+    audience: "Cold scrollers",
+  },
+  {
+    id: "recover-campaign",
+    label: "Recover Declining Campaign",
+    icon: Activity,
+    description: "Heal fatigue, restore performance.",
+    category: "Retention",
+    kpis: ["Frequency", "ROAS", "Fatigue score"],
+    employees: ["media-buyer", "creative-director", "finance"],
+    duration: "4–6 days",
+    deliverables: ["Fatigue diagnosis", "Refresh creative", "Pacing adjustment"],
+    platforms: ["meta", "reels"],
+    objective: "Conversions",
+    audience: "Existing reached audience",
+  },
 ];
 
 export function outcomeById(id: string): Outcome | undefined {
   return OUTCOMES.find((o) => o.id === id);
+}
+
+/** Outcomes belonging to a category (preserves declaration order). Deterministic. */
+export function outcomesByCategory(category: OutcomeCategory): Outcome[] {
+  return OUTCOMES.filter((o) => o.category === category);
 }
 
 /** One step of the assembled plan, owned by an AI employee. */
