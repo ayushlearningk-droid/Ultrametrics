@@ -13,7 +13,7 @@
  */
 
 import { createDefaultAdapterRegistry } from "@/lib/ai/generation/adapter-registry";
-import { selectProvider } from "@/lib/ai/generation/orchestrator";
+import { selectLiveProvider } from "@/lib/ai/generation/live-routing";
 import type { ExecutionResult } from "@/lib/ai/generation/execute-provider";
 import type { AspectRatio, AssetType, GenerationRequest } from "@/lib/ai/generation/types";
 import type { PlatformId } from "@/components/studio/media";
@@ -69,17 +69,19 @@ export async function executeGeneration(result: GenerationResult): Promise<void>
   const jobs: Job[] = [];
   creatives.forEach((creative) => {
     const request = buildRequest(creative);
-    const selection = selectProvider(registry, request, { strategy: "balanced", preferredProviderId: preferred });
-    if (!selection.chosen) {
-      setAssetExecution(creative.id, { status: "failed", progress: 0, error: selection.reason, errorCode: "no_provider" });
+    // Live Provider Routing (Sprint 64P): filter to executable/live providers,
+    // then rank. No live provider → honest structured error (no disabled fallback).
+    const selection = selectLiveProvider(registry, request, { preferredProviderId: preferred });
+    if (!selection.ok || !selection.providerId) {
+      setAssetExecution(creative.id, { status: "failed", progress: 0, error: selection.reason, errorCode: selection.errorCode ?? "no_live_provider_available" });
       return;
     }
-    const providerId = selection.chosen.providerId;
+    const providerId = selection.providerId;
 
     let fallbackReason: string | undefined;
     let routingConfidence: number;
     if (preferred && providerId !== preferred) {
-      fallbackReason = `Preferred provider "${preferred}" is incompatible with ${request.assetType} · ${request.aspectRatio}; auto-routed to "${providerId}".`;
+      fallbackReason = `Preferred provider "${preferred}" is not live for ${request.assetType} · ${request.aspectRatio}; routed to live provider "${providerId}".`;
       routingConfidence = 0.6;
     } else if (preferred) {
       routingConfidence = 1;

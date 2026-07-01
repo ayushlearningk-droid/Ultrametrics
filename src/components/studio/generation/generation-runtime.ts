@@ -195,12 +195,16 @@ function buildCreative(campaignId: string, input: GenerationInput, outcomeLabel:
   return zCreativePlan.parse(plan);
 }
 
-/** One creative task per target platform, alternating video / image. */
+/**
+ * One creative task per target platform. The first creative is IMAGE-first so the
+ * single live provider (OpenAI Images) can execute it (Sprint 64Q); the remaining
+ * assets keep the original alternating pattern.
+ */
 function buildAssets(campaignId: string, input: GenerationInput, creative: CreativePlan): AssetPlan {
   const assets: AssetSpec[] = input.platforms.map((platform, i) => ({
     id: `${campaignId}-as${i + 1}`,
     title: `${creative.headlines[i % creative.headlines.length]} · ${platform}`,
-    kind: i % 2 === 0 ? "video" : "image",
+    kind: i === 0 ? "image" : i % 2 === 0 ? "video" : "image",
     platform,
     ownerId: TASK_OWNERS[i % TASK_OWNERS.length],
   }));

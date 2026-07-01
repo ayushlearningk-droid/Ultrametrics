@@ -78,15 +78,58 @@ export function ExportDrawer() {
   if (!isOpen) return null;
 
   const creative = selected ? resolveCreative(selected) : undefined;
-  // Export is available only when a REAL produced asset exists (Sprint 64K).
-  // Placeholder execution media (placeholder:// scheme) is never exportable.
-  const ready =
-    !!creative?.execution?.mediaUrl && !creative.execution.mediaUrl.startsWith("placeholder://");
   const format = FORMATS.find((f) => f.id === formatId) ?? FORMATS[0];
   const baseName = name.trim() || creative?.title || gen?.campaignPlan.name || "asset";
   const filename = `${slug(baseName)}-${resolution}${watermark ? "-wm" : ""}.${format.ext}`;
 
-  const prepare = () => setPrepared(filename);
+  // Real generated assets in the current generation (Sprint 64O) — no placeholders.
+  const realAssets = (gen?.creatives ?? []).filter(
+    (c) => c.execution?.status === "completed" && !!c.execution.mediaUrl && !c.execution.mediaUrl.startsWith("placeholder://")
+  );
+  const ready = realAssets.length > 0;
+
+  // Build the export package on the server and download the ZIP. No client zipping.
+  const runExport = async () => {
+    if (!gen || realAssets.length === 0) return;
+    const payload = {
+      name: baseName,
+      prompt: gen.input.brief,
+      assets: realAssets.map((c) => ({
+        id: c.id,
+        title: c.title,
+        url: c.execution!.mediaUrl!,
+        provider: c.execution!.provider,
+        resolution: c.execution!.resolution,
+        mimeType: c.execution!.mimeType,
+        latencyMs: c.execution!.latencyMs,
+        cost: c.execution!.cost,
+        seed: c.execution!.seed,
+        generationTimeMs: c.execution!.generationTimeMs,
+      })),
+      generation: { campaignPlan: gen.campaignPlan, creativePlan: gen.creativePlan, timeline: gen.timeline, activity: gen.activity, execution: gen.execution },
+      brand: { dna: gen.input.dna, brandAssets: gen.input.brandAssets },
+      metadata: { format: format.id, resolution, watermark, providerPreference: gen.input.providerPreference, outcomeId: gen.input.outcomeId },
+    };
+    try {
+      const res = await fetch("/api/studio/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!res.ok) {
+        setPrepared(null);
+        return;
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `${slug(baseName)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      setPrepared(`${slug(baseName)}.zip`);
+    } catch {
+      setPrepared(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Export Center">
@@ -194,7 +237,7 @@ export function ExportDrawer() {
               {prepared && (
                 <div className="flex items-center gap-2 rounded-[var(--studio-radius-md)] bg-brand/10 px-3 py-2 type-caption text-foreground">
                   <Check className="h-3.5 w-3.5 shrink-0 text-brand" />
-                  <span className="truncate">Prepared <span className="font-semibold">{prepared}</span> · {format.label}</span>
+                  <span className="truncate">Downloaded <span className="font-semibold">{prepared}</span></span>
                 </div>
               )}
               {!ready && (
@@ -202,7 +245,7 @@ export function ExportDrawer() {
               )}
               <button
                 type="button"
-                onClick={prepare}
+                onClick={() => void runExport()}
                 disabled={!ready}
                 className={cn(
                   "studio-focusable flex items-center justify-center gap-2 rounded-[var(--studio-radius-md)] px-4 py-2.5 type-body font-semibold transition-transform",
@@ -211,7 +254,7 @@ export function ExportDrawer() {
                     : "cursor-not-allowed bg-brand/15 text-brand opacity-60"
                 )}
               >
-                <Upload className="h-4 w-4" /> Prepare export
+                <Upload className="h-4 w-4" /> Export ZIP
               </button>
             </div>
           </>
