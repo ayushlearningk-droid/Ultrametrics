@@ -98,7 +98,12 @@ export function composePrompt(ctx: PromptContext): ComposedPrompt {
     ),
     section("Background", "Modern, uncluttered, contextually relevant setting with subtle brand-appropriate cues."),
     section("Camera & quality", "Photorealistic, 8K, 35mm DSLR, ultra-detailed, commercial advertising quality."),
-    refs.length ? `Reference material:\nUse the ${refs.length} provided reference image(s) to match product identity, styling and palette.` : null,
+    refs.length
+      ? `Reference material:\nMatch the identity, styling and palette of the provided reference image(s): ${refs
+          .map((r) => r.name)
+          .filter(Boolean)
+          .join(", ")}. Keep the real product(s) faithful to these references.`
+      : null,
     brandAssetLabels.length ? `Brand assets:\nStay on-brand with: ${brandAssetLabels.join(", ")}.` : null,
     logo ? "Brand logo:\nA brand logo asset is available — reserve clean, uncrowded space for logo placement; do not distort, recolor, or invent a logo." : null,
     restrictions.length ? `Brand restrictions:\n${restrictions.map((r) => `- ${r}`).join("\n")}` : null,

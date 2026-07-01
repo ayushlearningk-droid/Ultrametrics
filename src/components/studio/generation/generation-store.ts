@@ -71,13 +71,29 @@ export function selectAsset(id: string | null): void {
  * No executor, no providers, no timers — a future executor calls these.
  * ─────────────────────────────────────────────────────────────────────────── */
 
+/**
+ * Asset synchronization (Sprint 65.1) — mirror a completed execution's real,
+ * persisted media URL onto the creative's renderable MediaSource. Every studio
+ * surface (Movie · Canvas · Creatives · Inspector · Queue · Approval) renders
+ * `media.src`; without this the generated asset is stored on `execution.mediaUrl`
+ * but never displayed. Provider-agnostic: any provider that sets `mediaUrl` shows
+ * everywhere. No-op until the asset completes with a real URL.
+ */
+function syncMedia(creative: GenerationResult["creatives"][number]): GenerationResult["creatives"][number] {
+  const exec = creative.execution;
+  if (!exec || exec.status !== "completed" || !exec.mediaUrl) return creative;
+  if (creative.media.src === exec.mediaUrl) return creative;
+  const poster = creative.media.kind === "video" ? exec.thumbnailUrl ?? creative.media.poster : creative.media.poster;
+  return { ...creative, media: { ...creative.media, src: exec.mediaUrl, poster } };
+}
+
 /** Patch one asset's execution state and re-derive the generation summary. */
 export function setAssetExecution(assetId: string, patch: Partial<AssetExecution>): void {
   if (!current) return;
   let updated: GenerationResult["creatives"][number] | undefined;
   const creatives = current.creatives.map((c) => {
     if (c.id !== assetId) return c;
-    updated = { ...c, execution: { ...(c.execution ?? initialAssetExecution()), ...patch } };
+    updated = syncMedia({ ...c, execution: { ...(c.execution ?? initialAssetExecution()), ...patch } });
     return updated;
   });
   if (!updated) return;
@@ -97,7 +113,13 @@ export function setCurrentJob(assetId: string | null): void {
 /** Reset all execution back to the honest queued state (e.g. before a re-run). */
 export function resetExecution(): void {
   if (!current) return;
-  const creatives = current.creatives.map((c) => ({ ...c, execution: initialAssetExecution() }));
+  // Clear the mirrored generated media too (Sprint 65.1) so a re-run shows an
+  // honest empty frame while queued, not the previous run's asset.
+  const creatives = current.creatives.map((c) => ({
+    ...c,
+    media: c.media.src ? { ...c.media, src: undefined, poster: undefined } : c.media,
+    execution: initialAssetExecution(),
+  }));
   current = { ...current, creatives, execution: deriveGenerationExecution(creatives, null) };
   registerCreatives(creatives);
   emit();
