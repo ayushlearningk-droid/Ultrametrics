@@ -32,32 +32,40 @@ interface WorkforceView {
   assetId?: string;
 }
 
-/** Derive one employee's live view from the Generation Runtime. Pure. */
+/**
+ * Derive one employee's live view from REAL execution (Sprint 64AC) — never from
+ * fabricated activity. An employee is tied to the creatives they own; their state
+ * reflects those assets' real execution (Standing by · Generating · Completed).
+ * Pure.
+ */
 function viewFor(id: EmployeeId, gen: GenerationResult | null): WorkforceView {
   if (!gen) {
     return { idle: true, task: "Awaiting brief", progressStage: "—", status: "Idle", ready: false, dependency: null, activity: "Idle", stage: null };
   }
-  const acts = gen.activity.filter((a) => a.authorId === id);
-  const latest = acts[acts.length - 1];
-  if (!latest) {
-    return { idle: true, task: "Standing by", progressStage: "—", status: "Idle", ready: false, dependency: null, activity: "No assigned stage", stage: null };
+  const owned = gen.creatives.filter((c) => c.ownerId === id);
+  if (owned.length === 0) {
+    return { idle: true, task: "Standing by", progressStage: "—", status: "Idle", ready: false, dependency: null, activity: "No assigned work", stage: null };
   }
-  const stage = latest.stage ?? null;
-  const tlIdx = stage ? gen.timeline.findIndex((t) => t.stage === stage) : -1;
-  const tl = tlIdx >= 0 ? gen.timeline[tlIdx] : undefined;
-  const dependency = tlIdx > 0 ? gen.timeline[tlIdx - 1].ownerId : null;
-  const ready = tl?.status === "ready";
-  return {
-    idle: false,
-    task: latest.title,
-    progressStage: stage ?? "—",
-    status: ready ? "Ready" : "Complete",
-    ready: true,
-    dependency,
-    activity: latest.description,
-    stage,
-    assetId: latest.assetId,
-  };
+
+  const running = owned.find((c) => c.execution?.status === "running");
+  if (running) {
+    return { idle: false, task: "Generating creative", progressStage: "Creative Generated", status: "Working", ready: false, dependency: null, activity: `Generating ${running.title}`, stage: "Creative Generated", assetId: running.id };
+  }
+
+  const terminal = (s: string | undefined) => s === "completed" || s === "failed" || s === "cancelled";
+  const allTerminal = owned.every((c) => terminal(c.execution?.status));
+  const completed = owned.filter((c) => c.execution?.status === "completed");
+  const failed = owned.filter((c) => c.execution?.status === "failed" || c.execution?.status === "cancelled");
+
+  if (allTerminal && completed.length > 0) {
+    return { idle: false, task: "Completed", progressStage: "Creative Generated", status: "Complete", ready: true, dependency: null, activity: `Completed ${completed.length} asset${completed.length === 1 ? "" : "s"}`, stage: "Creative Generated", assetId: completed[0].id };
+  }
+  if (allTerminal && failed.length > 0) {
+    return { idle: false, task: "Failed", progressStage: "Creative Generated", status: "Failed", ready: false, dependency: null, activity: `${failed.length} asset${failed.length === 1 ? "" : "s"} failed`, stage: "Creative Generated", assetId: failed[0].id };
+  }
+
+  // Queued — honest idle until execution starts.
+  return { idle: true, task: "Standing by", progressStage: "—", status: "Idle", ready: false, dependency: null, activity: "Queued", stage: null };
 }
 
 function WorkforceCard({ id, view }: { id: EmployeeId; view: WorkforceView }) {

@@ -20,7 +20,6 @@ import { outcomeById } from "@/components/studio/outcomes/outcomes-data";
 import type { CreativeItem } from "@/components/studio/creative/creative-data";
 import type { QueueItem } from "@/components/studio/queue/queue-data";
 import type { ApprovalItem } from "@/components/studio/approval/approval-data";
-import { MOVIE_LABEL } from "@/components/studio/movie/movie-runtime";
 import { employeeName } from "@/components/studio/employees/employees-data";
 import { buildMetaPayload, buildGooglePayload } from "./connectors";
 import { initialAssetExecution, initialGenerationExecution, type GenerationExecution } from "./execution";
@@ -315,78 +314,36 @@ export function generate(rawInput: GenerationInput): GenerationResult {
 
   const stages: GenerationStage[] = GENERATION_STAGES.map((name) => ({ name, status: "complete" }));
 
-  // Production Live Timeline (Sprint 63V): 12 deterministic events, cumulative
-  // times derived from each stage's duration (no timers), each linked to a
-  // generated asset so selecting it opens the Inspector.
-  let cursor = BASE;
-  const timeline: LiveTimelineEvent[] = LIVE_TIMELINE.map((s, i) => {
-    const at = cursor;
-    cursor += s.durationSec * 1000;
-    return {
-      id: `${campaignId}-lt${i + 1}`,
-      at,
-      ownerId: s.ownerId,
-      stage: s.stage,
-      status: s.ready ? "ready" : "complete",
-      durationSec: s.durationSec,
-      detail: s.movieStageId ? MOVIE_LABEL[s.movieStageId] : undefined,
-      assetId: creatives.length ? creatives[i % creatives.length].id : undefined,
-    };
-  });
+  // Timeline & Activity are PURE PROJECTIONS of real execution (Sprint 64AC).
+  // The runtime no longer fabricates events (no BASE clock, no hardcoded
+  // durations, no fake research/ROAS/CPA/hook activity). They start empty; the
+  // feed projects real events from each asset's execution state plus the
+  // appended approval / regeneration events. The store is the single source of truth.
+  const timeline: LiveTimelineEvent[] = [];
+  const activity: ActivityEvent[] = [];
 
-  // AI Activity Bus (Sprint 63W): deterministic events emitted by the runtime,
-  // each anchored to a Live Timeline stage (reusing its timestamp + linked
-  // asset). No timers, no notifications — pure derivation.
-  const tlByStage = new Map(timeline.map((t) => [t.stage, t]));
-  const assetCount = assetPlan.assets.length;
-  const activitySpec: { authorId: EmployeeId; category: string; title: string; description: string; stage: string }[] = [
-    { authorId: "creative-director", category: "Research", title: "Finished competitor research", description: "Mapped rival angles and gaps.", stage: "Competitor Analysis" },
-    { authorId: "media-buyer", category: "Forecast", title: "Predicted ROAS", description: `Modeled expected return for ${input.audience}.`, stage: "Audience Analysis" },
-    { authorId: "finance", category: "Finance", title: "Calculated CPA", description: "Set the target cost per acquisition.", stage: "Strategy Built" },
-    { authorId: "creative-director", category: "Creative", title: "Generated hooks", description: `Drafted ${creativePlan.hooks.length} problem-first hooks.`, stage: "Hooks Generated" },
-    { authorId: "automation", category: "Creative", title: "Created storyboard", description: "Sequenced the shots.", stage: "Storyboard Generated" },
-    { authorId: "copywriter", category: "Copy", title: "Wrote ad copy", description: `${creativePlan.headlines.length} headlines, ${creativePlan.descriptions.length} descriptions.`, stage: "Copy Generated" },
-    { authorId: "automation", category: "Creative", title: "Generated creative", description: `Produced ${assetCount} assets.`, stage: "Creative Generated" },
-    { authorId: "automation", category: "Connector", title: "Prepared Meta payload", description: "Built a PAUSED campaign payload (not published).", stage: "Creative Generated" },
-    { authorId: "automation", category: "Queue", title: "Queue created", description: `${assetCount} creative tasks queued.`, stage: "Queue Created" },
-    { authorId: REVIEWER, category: "Approval", title: "Approval requested", description: `Sent ${approvalPlan.items.length} assets to review.`, stage: "Approval Requested" },
-    { authorId: "ceo", category: "Ready", title: "Campaign ready", description: "Brief to render — ready to launch.", stage: "Campaign Ready" },
-  ];
-  const activity: ActivityEvent[] = activitySpec.map((a, i) => {
-    const tl = tlByStage.get(a.stage);
-    return {
-      id: `${campaignId}-ac${i + 1}`,
-      authorId: a.authorId,
-      at: tl?.at ?? BASE,
-      category: a.category,
-      title: a.title,
-      description: a.description,
-      assetId: tl?.assetId,
-      stage: a.stage,
-    };
-  });
-
-  // AI Explainability Layer (Sprint 63Y): one complete explanation per timeline
-  // decision, grounded in campaign facts only. Reuses the timeline (stage,
-  // employee, timestamp, asset) and the per-stage elaboration. Deterministic.
+  // AI Explainability Layer (Sprint 63Y · decoupled from the timeline in 64AC).
+  // Built directly from the deterministic stage spec — NOT from fabricated
+  // timeline events — so the Explain panel + War Room keep working while the
+  // timeline itself is real-execution-only. Grounded in campaign facts.
   const evidence = [
     `Outcome: ${outcomeLabel}`,
     `Audience: ${input.audience}`,
     `Budget: $${input.budget.toLocaleString()}`,
     `Placements: ${input.platforms.join(", ")}`,
   ];
-  const explanations: DecisionExplanation[] = timeline.map((t) => {
-    const elab = EXPLAIN_ELAB[t.stage] ?? EXPLAIN_FALLBACK;
+  const explanations: DecisionExplanation[] = LIVE_TIMELINE.map((s, i) => {
+    const elab = EXPLAIN_ELAB[s.stage] ?? EXPLAIN_FALLBACK;
     return {
-      id: `${campaignId}-ex-${t.id}`,
-      stage: t.stage,
-      sourceEmployeeId: t.ownerId,
-      why: `${employeeName(t.ownerId)} ran "${t.stage}" to move ${campaignPlan.name} toward ${outcomeLabel} for ${input.audience}.`,
+      id: `${campaignId}-ex${i + 1}`,
+      stage: s.stage,
+      sourceEmployeeId: s.ownerId,
+      why: `${employeeName(s.ownerId)} ran "${s.stage}" to move ${campaignPlan.name} toward ${outcomeLabel} for ${input.audience}.`,
       evidence,
       confidence: elab.confidence,
       alternatives: elab.alternatives,
       businessImpact: elab.impact,
-      assetId: t.assetId,
+      assetId: creatives.length ? creatives[i % creatives.length].id : undefined,
     };
   });
 
