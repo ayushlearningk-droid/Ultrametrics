@@ -78,6 +78,10 @@ export function ExportDrawer() {
   if (!isOpen) return null;
 
   const creative = selected ? resolveCreative(selected) : undefined;
+  // Export is available only when a REAL produced asset exists (Sprint 64K).
+  // Placeholder execution media (placeholder:// scheme) is never exportable.
+  const ready =
+    !!creative?.execution?.mediaUrl && !creative.execution.mediaUrl.startsWith("placeholder://");
   const format = FORMATS.find((f) => f.id === formatId) ?? FORMATS[0];
   const baseName = name.trim() || creative?.title || gen?.campaignPlan.name || "asset";
   const filename = `${slug(baseName)}-${resolution}${watermark ? "-wm" : ""}.${format.ext}`;
@@ -112,6 +116,9 @@ export function ExportDrawer() {
               </div>
               <p className="truncate type-caption font-semibold text-foreground">{creative.title}</p>
               <p className="truncate type-caption text-foreground-muted">{filename}</p>
+              {creative.execution?.mediaUrl && (
+                <p className="truncate type-caption text-foreground-muted">Source: {creative.execution.mediaUrl}</p>
+              )}
             </div>
 
             {/* Formats */}
@@ -190,10 +197,19 @@ export function ExportDrawer() {
                   <span className="truncate">Prepared <span className="font-semibold">{prepared}</span> · {format.label}</span>
                 </div>
               )}
+              {!ready && (
+                <p className="type-caption text-foreground-muted">No generated assets available.</p>
+              )}
               <button
                 type="button"
                 onClick={prepare}
-                className="studio-focusable flex items-center justify-center gap-2 rounded-[var(--studio-radius-md)] bg-brand px-4 py-2.5 type-body font-semibold text-[hsl(var(--brand-foreground))] transition-transform hover:scale-[1.01] active:scale-100"
+                disabled={!ready}
+                className={cn(
+                  "studio-focusable flex items-center justify-center gap-2 rounded-[var(--studio-radius-md)] px-4 py-2.5 type-body font-semibold transition-transform",
+                  ready
+                    ? "bg-brand text-[hsl(var(--brand-foreground))] hover:scale-[1.01] active:scale-100"
+                    : "cursor-not-allowed bg-brand/15 text-brand opacity-60"
+                )}
               >
                 <Upload className="h-4 w-4" /> Prepare export
               </button>

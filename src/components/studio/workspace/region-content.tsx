@@ -9,8 +9,6 @@
  */
 
 import { CompanyDashboard } from "@/components/studio/employees/company-dashboard";
-import { ConversationBus } from "@/components/studio/employees/conversation-bus";
-import { EmployeeTimeline } from "@/components/studio/employees/employee-timeline";
 import { EmployeeSpotlight } from "@/components/studio/movie/employee-spotlight";
 import { ExecutionPath } from "@/components/studio/movie/execution-path";
 import { ApprovalCenter } from "@/components/studio/approval/approval-center";
@@ -56,15 +54,25 @@ function CanvasRegion() {
   );
 }
 
-/* Generated campaign (Sprint 63O) flows into these regions via the store; they
-   fall back to the deterministic sample data when no campaign was generated. */
+/** Honest empty state before any generation (Sprint 64K) — never sample data. */
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="studio-card px-6 py-12 text-center">
+      <p className="type-caption text-foreground-muted">{text}</p>
+    </div>
+  );
+}
+
+/* Generated campaign (Sprint 63O) flows into these regions via the store. Before
+   any generation they show an honest empty state — never sample data. */
 function CreativeRegion() {
   const gen = useGeneration();
+  if (!gen) return <EmptyState text="No creative generated yet." />;
   // AI War Room (Sprint 63.4) sits above the reused Creative Browser.
   return (
     <div className="flex flex-col gap-6">
       <CreativeWarRoom />
-      <CreativeBrowser source={gen?.creatives} />
+      <CreativeBrowser source={gen.creatives} />
     </div>
   );
 }
@@ -81,29 +89,44 @@ function InspectorRegion() {
 
 function QueueRegion() {
   const gen = useGeneration();
-  return <GenerationQueue source={gen?.queueItems} />;
+  if (!gen) return <EmptyState text="No queue yet." />;
+  // Queue status is derived from each asset's execution state (Sprint 64.3).
+  const source = gen.queueItems.map((q) => {
+    const ex = gen.creatives.find((c) => c.id === q.creativeId)?.execution;
+    return ex ? { ...q, status: ex.status } : q;
+  });
+  return <GenerationQueue source={source} />;
 }
 
 function ApprovalRegion() {
   const gen = useGeneration();
-  return <ApprovalCenter source={gen?.approvalItems} />;
+  if (!gen) return <EmptyState text="No approvals yet." />;
+  // Only completed creatives reach approval (Sprint 64.3).
+  const source = gen.approvalItems.filter(
+    (a) => gen.creatives.find((c) => c.id === a.creativeId)?.execution?.status === "completed"
+  );
+  return <ApprovalCenter source={source} />;
 }
 
 function TimelineRegion() {
+  // Execution events only (Sprint 64H) — honest empty state before generation.
+  const gen = useGeneration();
+  if (!gen) return <EmptyState text="No execution history yet." />;
   return (
     <div className="flex flex-col gap-3">
       <GenerationTimeline />
-      <EmployeeTimeline />
     </div>
   );
 }
 
 function ActivityRegion() {
+  // Execution-derived activity only (Sprint 64H) — honest empty state otherwise.
+  const gen = useGeneration();
+  if (!gen) return <EmptyState text="No activity yet." />;
   return (
     <div className="flex h-full min-h-[280px] flex-col gap-3">
       <DreamMode />
       <GenerationActivity />
-      <ConversationBus />
     </div>
   );
 }

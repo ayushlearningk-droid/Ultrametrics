@@ -10,6 +10,7 @@ import type { PlatformId } from "@/components/studio/media";
 import type { Brief } from "@/components/studio/composer/composer-context";
 import { DEFAULT_BRAND_DNA, toDnaImprint, type MarketingDNAProfile } from "@/components/studio/dna/brand-dna";
 import { DEFAULT_WORKSPACE_MEMORY, type WorkspaceMemory } from "@/components/studio/memory/workspace-memory-context";
+import type { ReferenceAsset } from "./generation-store";
 import type { GenerationInput } from "./schemas";
 
 export interface CommandSelection {
@@ -41,7 +42,9 @@ export function buildGenerationInput(
   brief: Brief,
   command: CommandSelection,
   dna: MarketingDNAProfile = DEFAULT_BRAND_DNA,
-  memory: WorkspaceMemory = DEFAULT_WORKSPACE_MEMORY
+  memory: WorkspaceMemory = DEFAULT_WORKSPACE_MEMORY,
+  referenceAssets: ReferenceAsset[] = [],
+  providerPreference: string | null = null
 ): GenerationInput {
   return {
     brief: brief.offer.trim(),
@@ -52,11 +55,16 @@ export function buildGenerationInput(
     audience: brief.audience ?? memory.audience ?? dna.targetAudience,
     budget: brief.budget,
     platforms: brief.platform ? [brief.platform] : DEFAULT_PLATFORMS,
-    product: command.attachments.map((a) => a.name),
+    // Real uploaded reference images (Sprint 65.0) — names + data URLs.
+    product: referenceAssets.length ? referenceAssets.map((r) => r.name) : command.attachments.map((a) => a.name),
+    referenceImages: referenceAssets.map((r) => ({ name: r.name, kind: r.kind, dataUrl: r.dataUrl })),
+    // Brand assets (Sprint 64B) — from the active Marketing DNA.
+    brandAssets: dna.brandAssets.map((a) => ({ id: a.id, label: a.label, kind: a.kind })),
     knowledge: command.knowledge,
     skills: command.skills,
     connectors: command.connectors,
     model: command.model,
+    providerPreference: providerPreference ?? undefined,
     dna: toDnaImprint(dna),
     memory: { ...memory },
   };

@@ -22,10 +22,20 @@ export const zGenerationInput = z.object({
   budget: z.number().nonnegative(),
   platforms: z.array(zPlatform).min(1),
   product: z.array(z.string()),
+  /* Real uploaded reference images (Sprint 65.0) — data URLs, not mock names. */
+  referenceImages: z
+    .array(z.object({ name: z.string(), kind: z.enum(["image", "video"]), dataUrl: z.string() }))
+    .optional(),
+  /* Brand assets (Sprint 64B) — the active Marketing DNA's brand asset set. */
+  brandAssets: z
+    .array(z.object({ id: z.string(), label: z.string(), kind: z.string() }))
+    .optional(),
   knowledge: z.array(z.string()),
   skills: z.array(z.string()),
   connectors: z.array(z.string()),
   model: z.string(),
+  /* Preferred provider id (Sprint 64C) — UI selection; undefined = auto-route. */
+  providerPreference: z.string().optional(),
   /* Marketing DNA imprint (Sprint 63R) — the brand brain every campaign inherits. */
   dna: z
     .object({

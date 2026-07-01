@@ -16,6 +16,7 @@ import type { CreativeItem } from "@/components/studio/creative/creative-data";
 import { InspectorProvider, useInspector } from "./inspector-context";
 import { InspectorPreview } from "./inspector-preview";
 import { InspectorMetadata } from "./inspector-metadata";
+import { InspectorExecution } from "./inspector-execution";
 import { InspectorForecast } from "./inspector-forecast";
 import { InspectorPerformance } from "./inspector-performance";
 import { InspectorVersions } from "./inspector-versions";
@@ -73,7 +74,8 @@ function Body() {
       ) : (
         <div className="flex flex-col gap-4">
           <InspectorPreview item={asset} />
-          <InspectorActions item={asset} />
+          <InspectorActions />
+          <InspectorExecution item={asset} />
           <InspectorMetadata item={asset} />
           <InspectorPerformance item={asset} />
           <InspectorForecast item={asset} />

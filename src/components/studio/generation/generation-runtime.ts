@@ -23,6 +23,8 @@ import type { ApprovalItem } from "@/components/studio/approval/approval-data";
 import { MOVIE_LABEL } from "@/components/studio/movie/movie-runtime";
 import { employeeName } from "@/components/studio/employees/employees-data";
 import { buildMetaPayload, buildGooglePayload } from "./connectors";
+import { initialAssetExecution, initialGenerationExecution, type GenerationExecution } from "./execution";
+import { buildGenerationPayload, type GenerationPayload } from "./payload";
 import {
   zGenerationInput,
   zCampaignPlan,
@@ -62,6 +64,10 @@ export interface GenerationResult {
   timeline: LiveTimelineEvent[];
   activity: ActivityEvent[];
   explanations: DecisionExplanation[];
+  /** Async execution summary (Sprint 64.1) — the store updates this during execution. */
+  execution: GenerationExecution;
+  /** Provider Marketplace input payload (Sprint 64B) — prompt + references + brand assets. */
+  payload: GenerationPayload;
 }
 
 /** AI Explainability Layer (Sprint 63Y) — a complete explanation per decision. */
@@ -270,6 +276,8 @@ export function generate(rawInput: GenerationInput): GenerationResult {
     objective: input.objective,
     language: "English",
     dnaVersion,
+    // Honest pre-execution state (Sprint 64.1) — queued, no media until produced.
+    execution: initialAssetExecution(),
     history: [{ at: BASE + i * 3_600_000, text: `Generated for ${campaignPlan.name}` }],
   }));
 
@@ -396,5 +404,7 @@ export function generate(rawInput: GenerationInput): GenerationResult {
     timeline,
     activity,
     explanations,
+    execution: initialGenerationExecution(creatives.length),
+    payload: buildGenerationPayload(input),
   };
 }

@@ -67,7 +67,7 @@ export function CreativeQuickPreview() {
 
           <div className="flex items-center justify-between border-t border-white/[0.06] pt-3">
             <span className="type-caption text-foreground-muted">{item.variants} variants · v{item.version}</span>
-            <CreativeActions item={item} onPreview={() => undefined} />
+            <CreativeActions onPreview={() => undefined} />
           </div>
         </div>
       </div>

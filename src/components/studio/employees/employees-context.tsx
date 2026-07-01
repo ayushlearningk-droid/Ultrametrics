@@ -11,14 +11,11 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
   useReducer,
 } from "react";
 import { initState, reducer, allEmployeeViews } from "./runtime";
 import type { ConversationMessage, EmployeeView, EmployeesState, TimelineEvent } from "./types";
-
-const TICK_MS = 600;
 
 interface EmployeesContextValue {
   state: EmployeesState;
@@ -37,11 +34,8 @@ const EmployeesContext = createContext<EmployeesContextValue | null>(null);
 export function EmployeesProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, initState);
 
-  useEffect(() => {
-    if (state.status !== "running") return;
-    const id = window.setInterval(() => dispatch({ type: "TICK" }), TICK_MS);
-    return () => window.clearInterval(id);
-  }, [state.status]);
+  // Sprint 64H: the scripted TICK timer is removed — the Execution Runtime is the
+  // only source of truth. Nothing auto-advances; no timer-driven fake progress.
 
   const value = useMemo<EmployeesContextValue>(
     () => ({

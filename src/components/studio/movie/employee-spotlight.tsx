@@ -33,7 +33,7 @@ export function EmployeeSpotlight() {
         <CheckCircle2 className="h-10 w-10 text-brand" />
         <h2 className="text-2xl font-bold tracking-tight text-foreground">Campaign complete</h2>
         <p className="type-body text-foreground-muted">
-          The team finished — brief to render. Run it again to watch the movie.
+          Execution finished — brief to render.
         </p>
       </div>
     );
@@ -42,7 +42,7 @@ export function EmployeeSpotlight() {
   if (!movie.currentOwnerId) {
     return (
       <div className="studio-hero flex min-h-[280px] items-center justify-center p-10">
-        <p className="type-body text-foreground-muted">Paused — resume to keep the team working.</p>
+        <p className="type-body text-foreground-muted">Generate a campaign to begin execution.</p>
       </div>
     );
   }

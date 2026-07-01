@@ -33,7 +33,7 @@ export function CreativeRow({ item }: { item: CreativeItem }) {
           ))}
         </div>
       )}
-      <CreativeActions item={item} onPreview={() => setPreviewId(item.id)} />
+      <CreativeActions onPreview={() => setPreviewId(item.id)} />
     </div>
   );
 }

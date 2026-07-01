@@ -8,6 +8,7 @@
 
 import type { MediaSource, PerformanceMetric, PlatformId } from "@/components/studio/media";
 import type { EmployeeId } from "@/components/studio/employees/types";
+import type { AssetExecution } from "@/components/studio/generation/execution";
 
 export type CreativeStatusId = "generated" | "pending" | "approved" | "archived";
 export type CreativeFilter =
@@ -48,6 +49,8 @@ export interface CreativeItem {
   language?: string;
   /** Marketing DNA version that produced this asset (Sprint 63R). */
   dnaVersion?: string;
+  /** Async execution state (Sprint 64.1) — present on generated creatives. */
+  execution?: AssetExecution;
   history?: { at: number; text: string }[];
 }
 

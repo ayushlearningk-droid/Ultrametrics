@@ -15,8 +15,7 @@ import { cn } from "@/lib/utils";
 import { useComposer } from "@/components/studio/composer/composer-context";
 import { ComposerSection } from "@/components/studio/composer/composer-primitives";
 import { OutcomeSelector, BrandSelector } from "@/components/studio/composer/selectors";
-import { useCommand } from "./command-context";
-import { ProductUpload } from "./product-upload";
+import { ReferenceUpload, ingestFiles } from "./product-upload";
 import { ModelSelector, VoiceSelector, KnowledgeSelector, SkillsSelector, ConnectorsSelector, MemorySelector } from "./tool-selectors";
 
 function GenerateCampaign({ onGenerate }: { onGenerate: () => void }) {
@@ -40,23 +39,15 @@ function GenerateCampaign({ onGenerate }: { onGenerate: () => void }) {
 
 export function CommandComposer({ onGenerate }: { onGenerate: () => void }) {
   const { brief, setField, ready } = useComposer();
-  const { addAttachment } = useCommand();
 
+  // Real reference-image input (Sprint 65.0): drop on the card or Ctrl+V paste.
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    Array.from(e.dataTransfer.files).forEach((f) =>
-      addAttachment({ name: f.name, kind: f.type.startsWith("video") ? "video" : "image" })
-    );
+    ingestFiles(e.dataTransfer.files);
   };
 
   const onPaste = (e: React.ClipboardEvent) => {
-    const files = e.clipboardData.files;
-    if (files.length > 0) {
-      Array.from(files).forEach((f) => addAttachment({ name: f.name || "Pasted media", kind: f.type.startsWith("video") ? "video" : "image" }));
-      return;
-    }
-    const text = e.clipboardData.getData("text");
-    if (/^https?:\/\//.test(text.trim())) addAttachment({ name: text.trim(), kind: "url" });
+    if (e.clipboardData.files.length > 0) ingestFiles(e.clipboardData.files);
   };
 
   return (
@@ -86,7 +77,7 @@ export function CommandComposer({ onGenerate }: { onGenerate: () => void }) {
             placeholder="Describe the campaign, paste a product link, or drop a product image…"
             className="w-full resize-none bg-transparent px-2 py-1 type-body leading-relaxed text-foreground outline-none placeholder:text-foreground-muted"
           />
-          <ProductUpload />
+          <ReferenceUpload />
         </div>
 
         {/* Outcome-first */}

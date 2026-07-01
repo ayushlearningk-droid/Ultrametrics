@@ -54,8 +54,10 @@ export function DreamMode() {
   const { showRegion } = useRegions();
   if (!gen) return null;
 
-  const images = gen.creatives.filter((c) => c.media.kind === "image");
-  const videos = gen.creatives.filter((c) => c.media.kind === "video");
+  // Only completed creatives count as produced work (Sprint 64.3).
+  const done = gen.creatives.filter((c) => c.execution?.status === "completed");
+  const images = done.filter((c) => c.media.kind === "image");
+  const videos = done.filter((c) => c.media.kind === "video");
   const approvalsWaiting = gen.approvalItems.filter((a) => a.status === "pending").length;
 
   const openAsset = (id?: string) => {

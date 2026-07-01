@@ -11,7 +11,7 @@
  * explanation content is produced deterministically by the Generation Runtime.
  */
 
-import { Lightbulb, X, ShieldCheck, CheckCircle2, GitBranch, TrendingUp } from "lucide-react";
+import { Lightbulb, X, ShieldCheck, CheckCircle2, GitBranch, TrendingUp, Server } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EMPLOYEE_ICON, employeeName } from "@/components/studio/employees/employees-data";
 import { useGeneration } from "./generation-store";
@@ -53,6 +53,8 @@ export function ExplanationOverlay() {
 
   const ex = gen.explanations.find((e) => e.stage === stage) ?? gen.explanations[0];
   const Icon = EMPLOYEE_ICON[ex.sourceEmployeeId];
+  // Routing outcome for the asset this decision produced (Sprint 64D).
+  const routing = ex.assetId ? gen.creatives.find((c) => c.id === ex.assetId)?.execution : undefined;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal="true" aria-label={`Decision explanation: ${ex.stage}`}>
@@ -100,6 +102,20 @@ export function ExplanationOverlay() {
         <Section icon={<TrendingUp className="h-3.5 w-3.5 text-brand" />} title="Business impact">
           <p className="type-caption text-foreground">{ex.businessImpact}</p>
         </Section>
+
+        {routing?.provider && (
+          <Section icon={<Server className="h-3.5 w-3.5 text-brand" />} title="Routing">
+            <div className="flex flex-col gap-1.5">
+              <p className="type-caption text-foreground">
+                Selected provider: <span className="font-semibold">{routing.provider}</span>
+              </p>
+              <p className="type-caption text-foreground-muted">Fallback reason: {routing.fallbackReason ?? "None — preferred/auto route honored."}</p>
+              <p className="type-caption text-foreground-muted">
+                Routing confidence: {routing.routingConfidence != null ? `${Math.round(routing.routingConfidence * 100)}%` : "—"}
+              </p>
+            </div>
+          </Section>
+        )}
       </div>
     </div>
   );

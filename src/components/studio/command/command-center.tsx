@@ -26,7 +26,9 @@ import { VideoPreviewCard, CreativeThumbnail } from "@/components/studio/media";
 import { useComposer } from "@/components/studio/composer/composer-context";
 import { buildGenerationInput } from "@/components/studio/generation/build-input";
 import { generate } from "@/components/studio/generation/generation-runtime";
-import { setGeneration } from "@/components/studio/generation/generation-store";
+import { setGeneration, useReferenceAssets, useProviderPreference } from "@/components/studio/generation/generation-store";
+import { executeGeneration } from "@/components/studio/generation/executor";
+import { ProviderMarketplace } from "@/components/studio/providers/provider-marketplace";
 import { BrandDnaProvider, useBrandDna } from "@/components/studio/dna/brand-dna-context";
 import { MarketingDNA, ActiveBrandDnaSummary } from "@/components/studio/dna/marketing-dna";
 import { WorkspaceMemoryProvider, useWorkspaceMemory } from "@/components/studio/memory/workspace-memory-context";
@@ -80,14 +82,20 @@ function Body({ onOpen }: { onOpen: () => void }) {
   const { model, knowledge, skills, connectors, attachments } = useCommand();
   const dna = useBrandDna();
   const { memory } = useWorkspaceMemory();
+  const referenceAssets = useReferenceAssets();
+  const providerPreference = useProviderPreference();
 
   // "Generate Campaign" executes the real Generation Runtime with the active
-  // Marketing DNA (Sprint 63R) and editable Workspace Memory (Sprint 63S)
-  // injected, then opens the workspace where the generated plans appear across
-  // every region.
+  // Marketing DNA (Sprint 63R), Workspace Memory (Sprint 63S), reference images
+  // (Sprint 65.0) and provider preference (Sprint 64C) injected.
   const handleGenerate = () => {
-    const input = buildGenerationInput(brief, { model, knowledge, skills, connectors, attachments }, dna, memory);
-    setGeneration(generate(input));
+    const input = buildGenerationInput(brief, { model, knowledge, skills, connectors, attachments }, dna, memory, referenceAssets, providerPreference);
+    const result = generate(input);
+    setGeneration(result);
+    // Execution spine (Sprint 64M): route each asset through the orchestrator and
+    // execute on the server (OpenAI Images live). Async — the store advances in
+    // real time; fire-and-forget so the workspace opens immediately.
+    void executeGeneration(result);
     onOpen();
   };
 
@@ -120,6 +128,13 @@ function Body({ onOpen }: { onOpen: () => void }) {
       <Reveal>
         <Section label="AI Memory">
           <MemoryPanel />
+        </Section>
+      </Reveal>
+
+      {/* Provider Marketplace — the single provider catalog + action surface */}
+      <Reveal>
+        <Section label="Providers">
+          <ProviderMarketplace />
         </Section>
       </Reveal>
 

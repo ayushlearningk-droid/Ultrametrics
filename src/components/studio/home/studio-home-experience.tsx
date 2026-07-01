@@ -16,7 +16,7 @@
  * runtime, no architecture change.
  */
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Sun, Moon, Sparkles, ArrowRight, Settings2, Home as HomeIcon, Compass } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StudioSection, PremiumCard } from "./primitives";
@@ -31,11 +31,11 @@ import { SessionsProvider } from "@/components/studio/sessions/sessions-context"
 import { SessionsPanel } from "@/components/studio/sessions/sessions-panel";
 import { OUTCOMES, outcomeById, type Outcome } from "@/components/studio/outcomes/outcomes-data";
 import { EMPLOYEES, EMPLOYEE_ICON } from "@/components/studio/employees/employees-data";
-import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
-import { SAMPLE_SESSIONS } from "@/components/studio/sessions/sessions-data";
 import { buildGenerationInput } from "@/components/studio/generation/build-input";
 import { generate } from "@/components/studio/generation/generation-runtime";
-import { setGeneration, useGeneration } from "@/components/studio/generation/generation-store";
+import { setGeneration, useGeneration, useReferenceAssets, useProviderPreference } from "@/components/studio/generation/generation-store";
+import { executeGeneration } from "@/components/studio/generation/executor";
+import { ReferenceUpload, ingestFiles } from "@/components/studio/command/product-upload";
 import { CreativeThumbnail } from "@/components/studio/media";
 import { InspirationLibrary } from "./inspiration-library";
 import type { InspirationCard } from "./inspiration-data";
@@ -53,15 +53,17 @@ function StatPill({ label, value }: { label: string; value: number | string }) {
 }
 
 function GoodMorning() {
-  // Deterministic overnight digest from the existing sample records (honest — no
-  // fabricated AI activity, no timers).
-  const digest = useMemo(() => {
-    const active = SAMPLE_SESSIONS.filter((s) => s.status === "active").length;
-    const completed = SAMPLE_SESSIONS.filter((s) => s.status === "completed").length;
-    const assets = SAMPLE_SESSIONS.reduce((n, s) => n + s.assets, 0);
-    const pending = SAMPLE_CREATIVES.filter((c) => c.status === "pending").length;
-    return { active, completed, assets, pending };
-  }, []);
+  // Derived only from the Generation/Execution Store (Sprint 64K) — never SAMPLE_*.
+  const gen = useGeneration();
+  const digest = gen
+    ? {
+        completed: gen.execution.completedJobs,
+        total: gen.execution.totalJobs,
+        images: gen.creatives.filter((c) => c.media.kind === "image" && c.execution?.status === "completed").length,
+        videos: gen.creatives.filter((c) => c.media.kind === "video" && c.execution?.status === "completed").length,
+        pending: gen.approvalItems.filter((a) => a.status === "pending").length,
+      }
+    : null;
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -72,27 +74,33 @@ function GoodMorning() {
           Good morning
         </span>
         <h1 className="relative text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-          Your AI company has been working.
+          Your AI company is ready.
         </h1>
         <p className="relative max-w-xl type-body text-foreground-muted">
-          Pick an outcome below — the team decides the creative, copy, audience and placements for you.
+          Add a prompt and pick an outcome — the team decides the creative, copy, audience and placements for you.
         </p>
       </div>
 
       <PremiumCard className="flex flex-col gap-3 p-5">
         <span className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
           <Moon className="h-3.5 w-3.5 text-brand" />
-          While you were sleeping
+          {digest ? "Latest run" : "Getting started"}
         </span>
-        <div className="flex flex-wrap gap-2">
-          <StatPill label="active campaigns" value={digest.active} />
-          <StatPill label="completed" value={digest.completed} />
-          <StatPill label="assets generated" value={digest.assets} />
-          <StatPill label="awaiting approval" value={digest.pending} />
-        </div>
-        <p className="mt-auto type-caption text-foreground-muted">
-          A deterministic digest of your workspace — resume any session below to continue.
-        </p>
+        {digest ? (
+          <>
+            <div className="flex flex-wrap gap-2">
+              <StatPill label="jobs completed" value={`${digest.completed}/${digest.total}`} />
+              <StatPill label="images" value={digest.images} />
+              <StatPill label="videos" value={digest.videos} />
+              <StatPill label="awaiting approval" value={digest.pending} />
+            </div>
+            <p className="mt-auto type-caption text-foreground-muted">Derived from your latest generation.</p>
+          </>
+        ) : (
+          <p className="mt-auto type-caption text-foreground-muted">
+            No campaigns yet — add a prompt and pick an outcome to start your first generation.
+          </p>
+        )}
       </PremiumCard>
     </div>
   );
@@ -114,15 +122,26 @@ function OutcomePrompt({ onGenerate }: { onGenerate: (outcomeId: string) => void
         <h2 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">{PROMPT_QUESTION}</h2>
       </div>
 
-      <div className="studio-glass relative p-3">
+      <div
+        className="studio-glass relative flex flex-col gap-3 p-3"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          ingestFiles(e.dataTransfer.files);
+        }}
+      >
         <textarea
           value={brief.offer}
           onChange={(e) => setField("offer", e.target.value)}
+          onPaste={(e) => {
+            if (e.clipboardData.files.length > 0) ingestFiles(e.clipboardData.files);
+          }}
           rows={2}
           aria-label="Add context for the outcome (optional)"
-          placeholder="Add context (optional) — then choose an outcome. The AI picks the tools."
+          placeholder="Add context (optional), drop or paste reference images — then choose an outcome."
           className="w-full resize-none bg-transparent px-2 py-1 type-body leading-relaxed text-foreground outline-none placeholder:text-foreground-muted"
         />
+        <ReferenceUpload />
       </div>
 
       <div className="relative flex flex-wrap gap-2">
@@ -188,11 +207,22 @@ function HomeBody({ onOpen, onAdvanced }: { onOpen: () => void; onAdvanced: () =
   const dna = useBrandDna();
   const { memory } = useWorkspaceMemory();
   const gen = useGeneration();
+  const referenceAssets = useReferenceAssets();
+  const providerPreference = useProviderPreference();
 
   // Selecting an outcome runs the real Generation Runtime (the AI decides the
   // tools), then opens the fully-synchronized workspace.
   const handleGenerate = (outcomeId: string) => {
     const o = outcomeById(outcomeId);
+    // Populate the brief from the chosen outcome.
+    setField("outcome", outcomeId);
+    if (o) {
+      setField("objective", o.objective);
+      setField("audience", o.audience);
+      setField("platform", o.platforms[0]);
+    }
+    // Require a prompt before generating — aligns with the Command Center gate.
+    if (!brief.offer.trim()) return;
     const overrideBrief = {
       ...brief,
       outcome: outcomeId,
@@ -200,8 +230,12 @@ function HomeBody({ onOpen, onAdvanced }: { onOpen: () => void; onAdvanced: () =
       audience: o?.audience ?? brief.audience,
       platform: o?.platforms[0] ?? brief.platform,
     };
-    const input = buildGenerationInput(overrideBrief, { model, knowledge, skills, connectors, attachments }, dna, memory);
-    setGeneration(generate(input));
+    const input = buildGenerationInput(overrideBrief, { model, knowledge, skills, connectors, attachments }, dna, memory, referenceAssets, providerPreference);
+    const result = generate(input);
+    setGeneration(result);
+    // Execution spine (Sprint 64M): route each asset through the orchestrator and
+    // execute on the server (OpenAI Images live). Async, fire-and-forget.
+    void executeGeneration(result);
     onOpen();
   };
 

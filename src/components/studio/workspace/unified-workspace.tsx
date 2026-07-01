@@ -11,10 +11,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import {
-  OutcomeEngineProvider,
-  useOutcome,
-} from "@/components/studio/outcomes/outcome-engine";
+import { OutcomeEngineProvider } from "@/components/studio/outcomes/outcome-engine";
 import { MovieProvider, useMovie } from "@/components/studio/movie/movie-context";
 import { useGeneration } from "@/components/studio/generation/generation-store";
 import { ExplanationOverlay } from "@/components/studio/generation/explanation-panel";
@@ -24,44 +21,25 @@ import { WorkspaceDock } from "./workspace-dock";
 
 /** Wires outcome selection → runtime start → approval reveal. Deterministic. */
 function Orchestrator() {
-  const { outcome } = useOutcome();
   const gen = useGeneration();
-  const { reset: startRun, pause, isComplete } = useMovie();
+  const { isComplete } = useMovie();
   const { showRegion } = useRegions();
-  const prevOutcome = useRef<string | null>(null);
   const prevGen = useRef<string | null>(null);
 
-  // Idle until an outcome is chosen (the team "wakes up" on selection).
-  useEffect(() => {
-    pause();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Outcome selected → (re)start the team: movie begins, employees wake,
-  // activity + timeline flow.
-  useEffect(() => {
-    const id = outcome?.id ?? null;
-    if (id && id !== prevOutcome.current) startRun();
-    prevOutcome.current = id;
-  }, [outcome, startRun]);
-
-  // Campaign generated (Sprint 63P/63S) → play the live AI Movie of the team
-  // building it AND surface the runtime flow automatically: the queued jobs,
-  // the new creatives, and the review item appear without any manual docking
-  // (Inspector is already in the right zone). Reuses showRegion — hidden→zone
-  // only, so it never disturbs a layout the operator has already arranged.
+  // Campaign generated (Sprint 64H) → surface the execution flow: the queued jobs
+  // and new creatives. The Movie/Team are execution-driven now — nothing is
+  // "started"; they advance only as execution advances. Reuses showRegion
+  // (hidden→zone only), never disturbing an arranged layout.
   useEffect(() => {
     const id = gen?.id ?? null;
     if (id && id !== prevGen.current) {
-      startRun();
       showRegion("queue", "float");
       showRegion("creative", "float");
-      showRegion("approval", "float");
     }
     prevGen.current = id;
-  }, [gen, startRun, showRegion]);
+  }, [gen, showRegion]);
 
-  // Run complete → approval appears.
+  // Approval appears only after execution completes.
   useEffect(() => {
     if (isComplete) showRegion("approval", "float");
   }, [isComplete, showRegion]);

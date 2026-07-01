@@ -1,53 +1,25 @@
 "use client";
 
 /**
- * Production Creative Browser — CreativeActions (Sprint 63).
- * Bookmark · Quick preview · Variants · Approve. Preview is functional; the rest
- * are inert (no backend). Keyboard + focus. Token-based.
+ * Production Creative Browser — CreativeActions (Sprint 63 · stabilized 64K).
+ * Only the working action (Quick preview) is rendered. Unconnected actions
+ * (bookmark / variants / approve) are not shown — no disabled placeholders.
  */
 
-import { Bookmark, Eye, GitBranch, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { CreativeItem } from "./creative-data";
+import { Eye } from "lucide-react";
 
-function ActionBtn({
-  icon: Icon,
-  label,
-  onClick,
-  active,
-  inert,
-}: {
-  icon: typeof Eye;
-  label: string;
-  onClick?: () => void;
-  active?: boolean;
-  inert?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={inert ? `${label} — not available yet` : label}
-      disabled={inert}
-      title={inert ? `${label} — not available yet` : label}
-      onClick={onClick}
-      className={cn(
-        "studio-focusable flex h-7 w-7 items-center justify-center rounded-[var(--studio-radius-sm)] transition-colors",
-        active ? "text-brand" : "text-foreground-muted hover:bg-white/[0.06] hover:text-foreground",
-        inert && "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-foreground-muted"
-      )}
-    >
-      <Icon className="h-3.5 w-3.5" fill={active ? "currentColor" : "none"} />
-    </button>
-  );
-}
-
-export function CreativeActions({ item, onPreview }: { item: CreativeItem; onPreview: () => void }) {
+export function CreativeActions({ onPreview }: { onPreview: () => void }) {
   return (
     <div className="flex items-center gap-0.5">
-      <ActionBtn icon={Bookmark} label={item.bookmarked ? "Bookmarked" : "Bookmark"} active={item.bookmarked} inert />
-      <ActionBtn icon={Eye} label="Quick preview" onClick={onPreview} />
-      <ActionBtn icon={GitBranch} label={`${item.variants} variants`} inert />
-      <ActionBtn icon={Check} label="Approve" active={item.status === "approved"} inert />
+      <button
+        type="button"
+        aria-label="Quick preview"
+        title="Quick preview"
+        onClick={onPreview}
+        className="studio-focusable flex h-7 w-7 items-center justify-center rounded-[var(--studio-radius-sm)] text-foreground-muted transition-colors hover:bg-white/[0.06] hover:text-foreground"
+      >
+        <Eye className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

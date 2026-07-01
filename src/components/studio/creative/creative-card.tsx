@@ -7,6 +7,7 @@
 
 import { cn } from "@/lib/utils";
 import { CreativeThumbnail, PlatformBadge, PerformanceBadge } from "@/components/studio/media";
+import { EXECUTION_LABEL } from "@/components/studio/generation/execution";
 import { useCreativeBrowser } from "./creative-context";
 import { CreativeStatus } from "./creative-status";
 import { CreativeMetadata } from "./creative-metadata";
@@ -28,6 +29,17 @@ export function CreativeCard({ item }: { item: CreativeItem }) {
             ))}
           </div>
         )}
+        {/* Execution status from the Generation Store (Sprint 64.3). */}
+        {item.execution && (
+          <span
+            className={cn(
+              "absolute bottom-2.5 right-2.5 chip",
+              item.execution.status === "completed" ? "chip-emerald" : item.execution.status === "failed" ? "chip-red" : "chip-slate"
+            )}
+          >
+            {EXECUTION_LABEL[item.execution.status]}
+          </span>
+        )}
       </div>
       <div className="flex flex-col gap-2 p-3">
         <p className="truncate type-body font-semibold text-foreground">{item.title}</p>
@@ -38,7 +50,7 @@ export function CreativeCard({ item }: { item: CreativeItem }) {
               <span key={t} className={cn("chip chip-slate")}>#{t}</span>
             ))}
           </div>
-          <CreativeActions item={item} onPreview={() => setPreviewId(item.id)} />
+          <CreativeActions onPreview={() => setPreviewId(item.id)} />
         </div>
       </div>
     </div>
