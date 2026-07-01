@@ -51,7 +51,9 @@ export async function executeOpenAIImage(
     const res = await fetch(OPENAI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: "dall-e-3", prompt, n: 1, size, quality, response_format: "url" }),
+      // Only officially supported dall-e-3 params. `response_format` is no longer
+      // accepted (Unknown parameter) and `url` is already the default return shape.
+      body: JSON.stringify({ model: "dall-e-3", prompt, n: 1, size, quality }),
     });
     const generationTimeMs = Date.now() - started;
 
