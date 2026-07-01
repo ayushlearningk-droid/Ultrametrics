@@ -30,15 +30,11 @@ export interface QueueItem {
   dnaVersion?: string;
 }
 
-export const SAMPLE_QUEUE: QueueItem[] = [
-  { id: "q1", creativeId: "cr2", outcomeId: "increase-roas", stageId: "s-script", assignedId: "copywriter", priority: "high", etaSec: 12, status: "running", budget: 8000 },
-  { id: "q2", creativeId: "cr4", outcomeId: "launch-product", assignedId: "creative-director", priority: "normal", etaSec: 30, status: "queued", budget: 4000 },
-  { id: "q3", creativeId: "cr6", outcomeId: "ugc-campaign", stageId: "s-hook", assignedId: "creative-director", priority: "low", etaSec: 20, status: "paused", budget: 5500 },
-  { id: "q4", creativeId: "cr1", outcomeId: "increase-ctr", assignedId: "automation", priority: "high", etaSec: 0, status: "completed", budget: 8000 },
-  { id: "q5", creativeId: "cr3", outcomeId: "recover-campaign", stageId: "s-render", assignedId: "automation", priority: "normal", etaSec: 0, status: "failed", budget: 6500 },
-  { id: "q6", creativeId: "cr8", outcomeId: "increase-ctr", assignedId: "media-buyer", priority: "normal", etaSec: 45, status: "queued", budget: 7000 },
-  { id: "q7", creativeId: "cr7", outcomeId: "festival-campaign", assignedId: "ceo", priority: "low", etaSec: 0, status: "cancelled", budget: 3000 },
-];
+/**
+ * No sample queue (Sprint 64V). Queue items come only from the Generation Store,
+ * with live status derived from each asset's real execution — never hardcoded.
+ */
+export const SAMPLE_QUEUE: QueueItem[] = [];
 
 export const QUEUE_STATUSES: QueueStatus[] = ["running", "queued", "paused", "completed", "failed", "cancelled"];
 

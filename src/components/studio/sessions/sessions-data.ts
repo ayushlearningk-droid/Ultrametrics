@@ -26,16 +26,12 @@ export interface WorkspaceSession {
 
 /** Fixed clock base — keeps the module deterministic (no Date.now). */
 export const SESSION_BASE = Date.parse("2026-06-28T09:00:00Z");
-const H = 3_600_000;
 
-export const SAMPLE_SESSIONS: WorkspaceSession[] = [
-  { id: "ses-1", outcomeId: "increase-roas", status: "active", startedAt: SESSION_BASE, lastActivity: SESSION_BASE + 2 * H, employees: ["media-buyer", "creative-director", "finance"], stage: "Generating Assets", assets: 3 },
-  { id: "ses-2", outcomeId: "ugc-campaign", status: "active", startedAt: SESSION_BASE - 6 * H, lastActivity: SESSION_BASE + H, employees: ["creative-director", "copywriter", "automation"], stage: "Reviewing", assets: 5 },
-  { id: "ses-3", outcomeId: "launch-product", status: "completed", startedAt: SESSION_BASE - 28 * H, lastActivity: SESSION_BASE - 20 * H, employees: ["ceo", "creative-director", "copywriter", "media-buyer"], stage: "Approved", assets: 8 },
-  { id: "ses-4", outcomeId: "increase-ctr", status: "completed", startedAt: SESSION_BASE - 52 * H, lastActivity: SESSION_BASE - 48 * H, employees: ["creative-director", "copywriter", "media-buyer"], stage: "Approved", assets: 4 },
-  { id: "ses-5", outcomeId: "recover-campaign", status: "failed", startedAt: SESSION_BASE - 14 * H, lastActivity: SESSION_BASE - 12 * H, employees: ["media-buyer", "creative-director", "finance"], stage: "Building Campaign", assets: 0 },
-  { id: "ses-6", outcomeId: "festival-campaign", status: "completed", startedAt: SESSION_BASE - 74 * H, lastActivity: SESSION_BASE - 70 * H, employees: ["creative-director", "brand-guardian", "automation"], stage: "Approved", assets: 6 },
-];
+/**
+ * No sample sessions (Sprint 64V). Sessions are created from real studio runs —
+ * never hardcoded campaigns.
+ */
+export const SAMPLE_SESSIONS: WorkspaceSession[] = [];
 
 export const SESSION_STATUSES: Exclude<SessionStatus, "archived">[] = ["active", "completed", "failed"];
 

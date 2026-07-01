@@ -9,9 +9,15 @@
  * changing any component.
  */
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { resolveCreative } from "@/components/studio/creative/creative-data";
 import { EMPLOYEES, employeeName } from "@/components/studio/employees/employees-data";
+import {
+  setCreativeStatus,
+  recordApprovalEvent,
+  getCurrentGeneration,
+} from "@/components/studio/generation/generation-store";
+import { executeGeneration } from "@/components/studio/generation/executor";
 import type { EmployeeId } from "@/components/studio/employees/types";
 import {
   SAMPLE_APPROVALS,
@@ -45,6 +51,7 @@ interface ApprovalValue {
   requestChanges: (id: string) => void;
   schedule: (id: string) => void;
   assignReviewer: (id: string) => void;
+  regenerate: (id: string) => void;
   addComment: (id: string, text: string) => void;
   titleOf: (id: string) => string;
 }
@@ -65,14 +72,53 @@ export function ApprovalCenterProvider({
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const decide = (id: string, status: ApprovalStatus, note: string) =>
+  // Keep the queue in sync with the live source (Sprint 64Y): as real creatives
+  // finish executing they appear here automatically, without wiping existing
+  // decisions/comments on items already in review.
+  useEffect(() => {
+    setItems((prev) => {
+      const known = new Set(prev.map((i) => i.id));
+      const additions = source.filter((s) => !known.has(s.id));
+      return additions.length ? [...prev, ...additions] : prev;
+    });
+  }, [source]);
+
+  /** Decide + propagate to the Generation Store so the whole campaign reflects it. */
+  const decide = (id: string, status: ApprovalStatus, note: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    // Campaign update: mirror the decision onto the real creative (gallery ·
+    // inspector · canvas · gallery all read this). Activity + Timeline get a real event.
+    if (status === "approved") setCreativeStatus(item.creativeId, "approved");
+    else if (status === "rejected") setCreativeStatus(item.creativeId, "archived");
+    recordApprovalEvent(item.creativeId, note, `${titleOf(item.creativeId)} — ${note.toLowerCase()}.`);
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, status, history: [...i.history, { id: uid("h"), at: Date.now(), text: note }] } : i
+      )
+    );
+  };
+
+  /** Regenerate a new version of the asset through the live pipeline (Sprint 64Y). */
+  const regenerate = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    const gen = getCurrentGeneration();
+    if (gen) void executeGeneration(gen, [item.creativeId]);
+    recordApprovalEvent(item.creativeId, "Regenerated", `${titleOf(item.creativeId)} — regenerating a new version.`);
     setItems((prev) =>
       prev.map((i) =>
         i.id === id
-          ? { ...i, status, history: [...i.history, { id: uid("h"), at: Date.now(), text: note }] }
+          ? {
+              ...i,
+              version: i.version + 1,
+              status: "pending",
+              history: [...i.history, { id: uid("h"), at: Date.now(), text: `Regenerated (v${i.version + 1})` }],
+            }
           : i
       )
     );
+  };
 
   const value = useMemo<ApprovalValue>(() => {
     const visible = sortApprovals(searchApprovals(filterApprovals(items, filter), query, titleOf));
@@ -91,6 +137,7 @@ export function ApprovalCenterProvider({
       reject: (id) => decide(id, "rejected", "Rejected"),
       requestChanges: (id) => decide(id, "needs-changes", "Changes requested"),
       schedule: (id) => decide(id, "scheduled", "Scheduled for review"),
+      regenerate,
       assignReviewer: (id) =>
         setItems((prev) =>
           prev.map((i) => {
@@ -108,6 +155,9 @@ export function ApprovalCenterProvider({
         ),
       titleOf,
     };
+    // decide/regenerate are recreated each render over fresh `items`; the memo
+    // recomputes when items changes, so they are intentionally not deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, filter, query, selectedId, loading]);
 
   return <ApprovalContext.Provider value={value}>{children}</ApprovalContext.Provider>;

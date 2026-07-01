@@ -10,14 +10,14 @@
 
 import { CompanyDashboard } from "@/components/studio/employees/company-dashboard";
 import { EmployeeSpotlight } from "@/components/studio/movie/employee-spotlight";
-import { ExecutionPath } from "@/components/studio/movie/execution-path";
+import { ProductionStages } from "@/components/studio/movie/production-stages";
 import { ApprovalCenter } from "@/components/studio/approval/approval-center";
 import { OutcomePicker } from "@/components/studio/outcomes/outcome-picker";
 import { OutcomePlan } from "@/components/studio/outcomes/outcome-plan";
 import { useOutcome } from "@/components/studio/outcomes/outcome-engine";
 import { StudioCanvas } from "@/components/studio/canvas/studio-canvas";
-import { CreativeBrowser } from "@/components/studio/creative/creative-browser";
 import { CreativeWarRoom } from "@/components/studio/creative/creative-war-room";
+import { CreativeGallery } from "@/components/studio/generation/creative-gallery";
 import { AssetInspector } from "@/components/studio/inspector/asset-inspector";
 import { GenerationQueue } from "@/components/studio/queue/generation-queue";
 import { useGeneration, useSelectedAsset } from "@/components/studio/generation/generation-store";
@@ -35,7 +35,7 @@ function MovieRegion() {
   return (
     <div className="flex flex-col gap-4 p-1">
       <EmployeeSpotlight />
-      <ExecutionPath />
+      <ProductionStages />
     </div>
   );
 }
@@ -72,7 +72,7 @@ function CreativeRegion() {
   return (
     <div className="flex flex-col gap-6">
       <CreativeWarRoom />
-      <CreativeBrowser source={gen.creatives} />
+      <CreativeGallery />
     </div>
   );
 }

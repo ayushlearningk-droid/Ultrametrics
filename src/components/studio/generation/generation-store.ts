@@ -9,8 +9,8 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { registerCreatives } from "@/components/studio/creative/creative-data";
-import type { GenerationResult } from "./generation-runtime";
+import { registerCreatives, type CreativeStatusId } from "@/components/studio/creative/creative-data";
+import type { GenerationResult, ActivityEvent, LiveTimelineEvent } from "./generation-runtime";
 import {
   initialAssetExecution,
   deriveGenerationExecution,
@@ -57,6 +57,44 @@ export function clearGeneration(): void {
   emit();
 }
 
+/** Read the active generation non-reactively (for actions outside React). */
+export function getCurrentGeneration(): GenerationResult | null {
+  return current;
+}
+
+let eventSeq = 0;
+/**
+ * Record a real approval decision as live Activity + Timeline events (Sprint 64Y)
+ * with a real timestamp, linked to the asset. Keeps the Activity and Timeline
+ * feeds truthful — approvals now appear there as they happen.
+ */
+export function recordApprovalEvent(assetId: string, title: string, description: string): void {
+  if (!current) return;
+  const at = Date.now();
+  const key = `apv-${eventSeq++}`;
+  const activity: ActivityEvent = {
+    id: `ac-${key}`,
+    authorId: "brand-guardian",
+    at,
+    category: "Approval",
+    title,
+    description,
+    assetId,
+    stage: "Approval Requested",
+  };
+  const timeline: LiveTimelineEvent = {
+    id: `lt-${key}`,
+    at,
+    ownerId: "brand-guardian",
+    stage: title,
+    status: "complete",
+    durationSec: 0,
+    assetId,
+  };
+  current = { ...current, activity: [...current.activity, activity], timeline: [...current.timeline, timeline] };
+  emit();
+}
+
 /** Focus one generated asset across all regions (Timeline · Activity · Queue · Approval · Inspector). */
 export function selectAsset(id: string | null): void {
   if (id === selectedAssetId) return;
@@ -99,6 +137,25 @@ export function setAssetExecution(assetId: string, patch: Partial<AssetExecution
   if (!updated) return;
   const execution = deriveGenerationExecution(creatives, current.execution.currentJobId);
   current = { ...current, creatives, execution };
+  registerCreatives([updated]);
+  emit();
+}
+
+/**
+ * Approve / reject a generated creative (Sprint 64X — Creative Gallery). Patches
+ * the creative's review status in the single source of truth and keeps the
+ * registry in sync. Presentation-state transition only — no publishing.
+ */
+export function setCreativeStatus(assetId: string, status: CreativeStatusId): void {
+  if (!current) return;
+  let updated: GenerationResult["creatives"][number] | undefined;
+  const creatives = current.creatives.map((c) => {
+    if (c.id !== assetId) return c;
+    updated = { ...c, status };
+    return updated;
+  });
+  if (!updated) return;
+  current = { ...current, creatives };
   registerCreatives([updated]);
   emit();
 }

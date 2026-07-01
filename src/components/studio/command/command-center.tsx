@@ -21,12 +21,11 @@ import { EMPLOYEES, EMPLOYEE_ICON } from "@/components/studio/employees/employee
 import { OutcomeLibrary } from "@/components/studio/outcomes/outcome-library";
 import { SessionsProvider } from "@/components/studio/sessions/sessions-context";
 import { SessionsPanel } from "@/components/studio/sessions/sessions-panel";
-import { SAMPLE_CREATIVES } from "@/components/studio/creative/creative-data";
 import { VideoPreviewCard, CreativeThumbnail } from "@/components/studio/media";
 import { useComposer } from "@/components/studio/composer/composer-context";
 import { buildGenerationInput } from "@/components/studio/generation/build-input";
 import { generate } from "@/components/studio/generation/generation-runtime";
-import { setGeneration, useReferenceAssets, useProviderPreference } from "@/components/studio/generation/generation-store";
+import { setGeneration, useGeneration, useReferenceAssets, useProviderPreference } from "@/components/studio/generation/generation-store";
 import { executeGeneration } from "@/components/studio/generation/executor";
 import { ProviderMarketplace } from "@/components/studio/providers/provider-marketplace";
 import { BrandDnaProvider, useBrandDna } from "@/components/studio/dna/brand-dna-context";
@@ -84,6 +83,7 @@ function Body({ onOpen }: { onOpen: () => void }) {
   const { memory } = useWorkspaceMemory();
   const referenceAssets = useReferenceAssets();
   const providerPreference = useProviderPreference();
+  const gen = useGeneration();
 
   // "Generate Campaign" executes the real Generation Runtime with the active
   // Marketing DNA (Sprint 63R), Workspace Memory (Sprint 63S), reference images
@@ -99,9 +99,12 @@ function Body({ onOpen }: { onOpen: () => void }) {
     onOpen();
   };
 
-  const campaigns = SAMPLE_CREATIVES.filter((c) => c.status === "approved").slice(0, 3);
-  const resuming = SAMPLE_CREATIVES.filter((c) => c.recent).slice(0, 3);
-  const assets = SAMPLE_CREATIVES.slice(0, 6);
+  // Landing surfaces show ONLY the real active campaign from the Generation Store
+  // (Sprint 64V) — never hardcoded samples. Empty until the user generates.
+  const recent = gen?.creatives ?? [];
+  const campaigns = recent.slice(0, 3);
+  const resuming = recent.slice(0, 3);
+  const assets = recent.slice(0, 6);
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-12 px-4 py-10 md:px-10 md:py-14">
@@ -155,37 +158,49 @@ function Body({ onOpen }: { onOpen: () => void }) {
       {/* Recent campaigns */}
       <Reveal>
         <Section label="Recent campaigns">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            {campaigns.map((c) => (
-              <button key={c.id} type="button" onClick={onOpen} className="studio-focusable w-full text-left">
-                <VideoPreviewCard title={c.title} subtitle="Open campaign" platform={c.platform} metrics={c.metrics} />
-              </button>
-            ))}
-          </div>
+          {campaigns.length === 0 ? (
+            <p className="type-caption text-foreground-muted">No campaigns yet — generate one above to begin.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              {campaigns.map((c) => (
+                <button key={c.id} type="button" onClick={onOpen} className="studio-focusable w-full text-left">
+                  <VideoPreviewCard title={c.title} subtitle="Open campaign" platform={c.platform} metrics={c.metrics} />
+                </button>
+              ))}
+            </div>
+          )}
         </Section>
       </Reveal>
 
       {/* Continue working */}
       <Reveal>
         <Section label="Continue working">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            {resuming.map((c) => (
-              <button key={c.id} type="button" onClick={onOpen} className="studio-focusable w-full text-left">
-                <VideoPreviewCard title={c.title} subtitle="Resume editing" platform={c.platform} />
-              </button>
-            ))}
-          </div>
+          {resuming.length === 0 ? (
+            <p className="type-caption text-foreground-muted">Nothing in progress yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              {resuming.map((c) => (
+                <button key={c.id} type="button" onClick={onOpen} className="studio-focusable w-full text-left">
+                  <VideoPreviewCard title={c.title} subtitle="Resume editing" platform={c.platform} />
+                </button>
+              ))}
+            </div>
+          )}
         </Section>
       </Reveal>
 
       {/* Recent assets */}
       <Reveal>
         <Section label="Recent assets">
-          <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-            {assets.map((c) => (
-              <CreativeThumbnail key={c.id} media={c.media} aspect="square" />
-            ))}
-          </div>
+          {assets.length === 0 ? (
+            <p className="type-caption text-foreground-muted">No assets yet — generated creatives appear here.</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+              {assets.map((c) => (
+                <CreativeThumbnail key={c.id} media={c.media} aspect="square" />
+              ))}
+            </div>
+          )}
         </Section>
       </Reveal>
 

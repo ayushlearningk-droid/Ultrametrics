@@ -6,7 +6,7 @@
  * Decisions mutate presentation state. Keyboard + focus.
  */
 
-import { Check, X, MessageSquareWarning, UserPlus, CalendarClock, Eye, type LucideIcon } from "lucide-react";
+import { Check, X, MessageSquareWarning, UserPlus, CalendarClock, RefreshCw, Eye, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApproval } from "./approval-context";
 import type { ApprovalItem } from "./approval-data";
@@ -29,7 +29,7 @@ function Btn({ icon: Icon, label, onClick, tone }: { icon: LucideIcon; label: st
 }
 
 export function ApprovalActions({ item }: { item: ApprovalItem }) {
-  const { approve, reject, requestChanges, assignReviewer, schedule, setSelectedId } = useApproval();
+  const { approve, reject, requestChanges, assignReviewer, schedule, regenerate, setSelectedId } = useApproval();
   const terminal = item.status === "approved" || item.status === "rejected" || item.status === "expired";
   return (
     <div className="flex items-center gap-0.5">
@@ -42,6 +42,7 @@ export function ApprovalActions({ item }: { item: ApprovalItem }) {
           <Btn icon={CalendarClock} label="Schedule approval" onClick={() => schedule(item.id)} />
         </>
       )}
+      <Btn icon={RefreshCw} label="Regenerate" tone="brand" onClick={() => regenerate(item.id)} />
       <Btn icon={Eye} label="View details" onClick={() => setSelectedId(item.id)} />
     </div>
   );

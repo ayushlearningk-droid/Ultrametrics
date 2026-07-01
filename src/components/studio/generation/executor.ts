@@ -63,8 +63,10 @@ interface Job {
  * Execute a generation against the server route and record it in the store.
  * Async: assets go queued → running → (completed | failed) in real time.
  */
-export async function executeGeneration(result: GenerationResult): Promise<void> {
-  const creatives = result.creatives;
+export async function executeGeneration(result: GenerationResult, creativeIds?: string[]): Promise<void> {
+  // Optional filter (Sprint 64X): regenerate / remix a single asset by re-running
+  // only its creative through the same live pipeline. Reuses everything below.
+  const creatives = creativeIds ? result.creatives.filter((c) => creativeIds.includes(c.id)) : result.creatives;
   if (creatives.length === 0) return;
 
   const preferred = result.input.providerPreference ?? undefined;

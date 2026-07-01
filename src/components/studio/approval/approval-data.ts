@@ -43,16 +43,11 @@ export interface ApprovalItem {
   dnaVersion?: string;
 }
 
-const T = (d: number) => Date.parse(`2026-06-${String(d).padStart(2, "0")}T10:00:00Z`);
-
-export const SAMPLE_APPROVALS: ApprovalItem[] = [
-  { id: "a1", creativeId: "cr2", outcomeId: "increase-roas", assignedId: "copywriter", reviewerId: "brand-guardian", priority: "high", status: "pending", budget: 8000, version: 1, comments: [{ id: "c1", authorId: "media-buyer", text: "Strong hook — predicted lift looks good.", at: T(20) }], history: [{ id: "h1", at: T(20), text: "Submitted by Quill" }] },
-  { id: "a2", creativeId: "cr3", outcomeId: "recover-campaign", assignedId: "automation", reviewerId: "creative-director", priority: "normal", status: "needs-changes", budget: 6500, version: 2, comments: [{ id: "c2", authorId: "creative-director", text: "Tighten the first 2 seconds.", at: T(19) }], history: [{ id: "h2", at: T(18), text: "Submitted" }, { id: "h3", at: T(19), text: "Changes requested by Theo" }] },
-  { id: "a3", creativeId: "cr1", outcomeId: "increase-ctr", assignedId: "creative-director", reviewerId: "ceo", priority: "high", status: "approved", budget: 8000, version: 3, comments: [], history: [{ id: "h4", at: T(20), text: "Submitted" }, { id: "h5", at: T(20), text: "Brand check passed" }, { id: "h6", at: T(20), text: "Approved by Atlas" }] },
-  { id: "a4", creativeId: "cr6", outcomeId: "ugc-campaign", assignedId: "creative-director", reviewerId: "brand-guardian", priority: "low", status: "scheduled", budget: 5500, version: 1, comments: [], history: [{ id: "h7", at: T(17), text: "Scheduled for review" }], scheduledAt: T(24) },
-  { id: "a5", creativeId: "cr5", outcomeId: "launch-product", assignedId: "media-buyer", reviewerId: "finance", priority: "normal", status: "rejected", budget: 9000, version: 4, comments: [{ id: "c3", authorId: "finance", text: "Over budget for the expected lift.", at: T(15) }], history: [{ id: "h8", at: T(14), text: "Submitted" }, { id: "h9", at: T(15), text: "Rejected by Sol" }] },
-  { id: "a6", creativeId: "cr7", outcomeId: "festival-campaign", assignedId: "creative-director", reviewerId: "ceo", priority: "low", status: "expired", budget: 3000, version: 5, comments: [], history: [{ id: "h10", at: T(10), text: "Submitted" }, { id: "h11", at: T(13), text: "Review window expired" }] },
-];
+/**
+ * No sample approvals (Sprint 64V). Approvals come only from the Generation
+ * Store — real generated creatives that completed execution — never hardcoded.
+ */
+export const SAMPLE_APPROVALS: ApprovalItem[] = [];
 
 export const APPROVAL_STATUSES: ApprovalStatus[] = ["pending", "needs-changes", "scheduled", "approved", "rejected", "expired"];
 
