@@ -14,10 +14,12 @@
 
 import { createDefaultAdapterRegistry } from "@/lib/ai/generation/adapter-registry";
 import { selectLiveProvider } from "@/lib/ai/generation/live-routing";
+import { composePrompt } from "@/lib/ai/generation/prompt-composer";
 import type { ExecutionResult } from "@/lib/ai/generation/execute-provider";
 import type { AspectRatio, AssetType, GenerationRequest } from "@/lib/ai/generation/types";
 import type { PlatformId } from "@/components/studio/media";
 import type { CreativeItem } from "@/components/studio/creative/creative-data";
+import type { GenerationInput } from "./schemas";
 import type { GenerationResult } from "./generation-runtime";
 import { setAssetExecution, setCurrentJob } from "./generation-store";
 
@@ -31,13 +33,18 @@ const ASPECT_BY_PLATFORM: Record<PlatformId, AspectRatio> = {
   youtube: "16:9",
 };
 
-function buildRequest(creative: CreativeItem): GenerationRequest {
+function buildRequest(creative: CreativeItem, input: GenerationInput): GenerationRequest {
   const assetType: AssetType = creative.media.kind === "video" ? "video" : "image";
+  const aspectRatio: AspectRatio = ASPECT_BY_PLATFORM[creative.platform] ?? "1:1";
+  // Compose a full creative prompt from workspace data (Sprint 64T) — replaces
+  // the bare title that made models render typography.
+  const { prompt, negativePrompt } = composePrompt({ input, creative, assetType, aspectRatio });
   return {
     providerId: "",
     assetType,
-    prompt: creative.title,
-    aspectRatio: ASPECT_BY_PLATFORM[creative.platform] ?? "1:1",
+    prompt,
+    aspectRatio,
+    negativePrompt: negativePrompt || undefined,
     durationSec: assetType === "video" ? 15 : undefined,
     batch: 1,
   };
@@ -68,7 +75,7 @@ export async function executeGeneration(result: GenerationResult): Promise<void>
 
   const jobs: Job[] = [];
   creatives.forEach((creative) => {
-    const request = buildRequest(creative);
+    const request = buildRequest(creative, result.input);
     // Live Provider Routing (Sprint 64P): filter to executable/live providers,
     // then rank. No live provider → honest structured error (no disabled fallback).
     const selection = selectLiveProvider(registry, request, { preferredProviderId: preferred });
