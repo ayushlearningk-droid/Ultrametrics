@@ -12,8 +12,8 @@
  * No new runtime, no redesign — presentation + existing store mutators only.
  */
 
-import { useState } from "react";
-import { Download, RefreshCw, Sparkles, Check, X, Eye, Clock, Coins, Cpu, History } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, RefreshCw, Sparkles, Check, X, Eye, Clock, Coins, Cpu, History, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreativeThumbnail } from "@/components/studio/media";
 import { EXECUTION_LABEL } from "./execution";
@@ -153,25 +153,63 @@ function PreviewModal({ creative, gen, onClose }: { creative: CreativeItem; gen:
 
 function GalleryCard({ creative, gen, onPreview }: { creative: CreativeItem; gen: GenerationResult; onPreview: () => void }) {
   const ex = creative.execution;
+  const status = ex?.status ?? "queued";
+  const completed = status === "completed" && !!ex?.mediaUrl;
+  const failed = status === "failed" || status === "cancelled";
+
+  // Subtle entrance — the card fades/rises in as it appears in the Gallery.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const r = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(r);
+  }, []);
+
   return (
-    <div className="studio-card flex flex-col gap-2.5 p-3">
-      <button
-        type="button"
-        onClick={() => {
-          selectAsset(creative.id);
-          onPreview();
-        }}
-        title="Preview"
-        className="studio-focusable group relative overflow-hidden rounded-[var(--studio-radius-md)]"
-      >
-        <CreativeThumbnail media={creative.media} aspect={creative.media.kind === "video" ? "video" : "square"} />
-        <span className="absolute right-2 top-2">
-          <span className={cn("chip", STATUS_TONE[ex?.status ?? "queued"])}>{EXECUTION_LABEL[ex?.status ?? "queued"]}</span>
-        </span>
-        <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-          <Eye className="h-5 w-5 text-white" />
-        </span>
-      </button>
+    <div
+      className={cn(
+        "studio-card flex flex-col gap-2.5 p-3 transition-all duration-500",
+        mounted ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+      )}
+    >
+      {completed ? (
+        <button
+          type="button"
+          onClick={() => {
+            selectAsset(creative.id);
+            onPreview();
+          }}
+          title="Preview"
+          className="studio-focusable group relative overflow-hidden rounded-[var(--studio-radius-md)]"
+        >
+          <CreativeThumbnail media={creative.media} aspect={creative.media.kind === "video" ? "video" : "square"} />
+          {/* Success celebration — a brief breathing check on the fresh asset. */}
+          <span className="studio-breathe absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-brand text-[hsl(var(--brand-foreground))] shadow">
+            <Check className="h-3.5 w-3.5" />
+          </span>
+          <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+            <Eye className="h-5 w-5 text-white" />
+          </span>
+        </button>
+      ) : failed ? (
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-[var(--studio-radius-md)] border border-red-400/30 bg-red-400/[0.06] p-3 text-center">
+          <AlertTriangle className="h-5 w-5 text-red-400" />
+          <p className="max-w-full truncate type-caption text-foreground-muted">{ex?.error ?? "Generation failed."}</p>
+          <button
+            type="button"
+            onClick={() => void executeGeneration(gen, [creative.id])}
+            className="studio-focusable inline-flex items-center gap-1.5 rounded-[var(--studio-radius-sm)] bg-brand px-3 py-1.5 type-caption font-semibold text-[hsl(var(--brand-foreground))] transition-transform hover:scale-[1.02] active:scale-100"
+          >
+            <RefreshCw className="h-3 w-3" /> Retry
+          </button>
+        </div>
+      ) : (
+        // Beautiful skeleton while queued / generating (real state — no fake timer).
+        <div className="relative aspect-square w-full animate-pulse overflow-hidden rounded-[var(--studio-radius-md)] bg-white/[0.06]">
+          <span className="absolute inset-0 flex items-center justify-center type-caption text-foreground-muted">
+            {status === "running" ? "Generating…" : "Queued"}
+          </span>
+        </div>
+      )}
 
       <p className="truncate type-caption font-semibold text-foreground">{creative.title}</p>
 

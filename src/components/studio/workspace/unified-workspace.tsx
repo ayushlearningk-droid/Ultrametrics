@@ -19,6 +19,8 @@ import { ExportDrawer } from "@/components/studio/generation/export-center";
 import { RegionManagerProvider, useRegions } from "./region-manager";
 import { WorkspaceDock } from "./workspace-dock";
 import { WorkspaceGuide } from "./workspace-guide";
+import { GenerationBanner } from "./generation-banner";
+import { CampaignReady } from "./campaign-ready";
 
 /** Progressive reveal (Sprint 64AA): surfaces regions only as real work reaches
  * them — Movie when the AI team starts, Gallery + Inspector when the first asset
@@ -26,7 +28,7 @@ import { WorkspaceGuide } from "./workspace-guide";
  * never disturbing an arranged layout. Purely UI sequencing over the store. */
 function Orchestrator() {
   const gen = useGeneration();
-  const { showRegion } = useRegions();
+  const { showRegion, setCollapsed } = useRegions();
   const prevGen = useRef<string | null>(null);
   const revealed = useRef<{ assets: boolean }>({ assets: false });
 
@@ -39,9 +41,10 @@ function Orchestrator() {
     if (id && id !== prevGen.current) {
       revealed.current = { assets: false };
       showRegion("movie", "center");
+      setCollapsed("movie", false); // fresh campaign → Movie expanded again
     }
     prevGen.current = id;
-  }, [id, showRegion]);
+  }, [id, showRegion, setCollapsed]);
 
   // First asset produced → reveal the Gallery (center column, below the Movie).
   useEffect(() => {
@@ -51,10 +54,14 @@ function Orchestrator() {
     }
   }, [completed, showRegion]);
 
-  // Run complete → reveal Approval (center column).
+  // Run complete → reveal Approval, and minimize the Movie so the Gallery + the
+  // Campaign Ready summary become the primary focus (Sprint 64AZ).
   useEffect(() => {
-    if (status === "completed") showRegion("approval", "center");
-  }, [status, showRegion]);
+    if (status === "completed") {
+      showRegion("approval", "center");
+      setCollapsed("movie", true);
+    }
+  }, [status, showRegion, setCollapsed]);
 
   return null;
 }
@@ -66,7 +73,14 @@ export function UnifiedWorkspace() {
         <RegionManagerProvider>
           <Orchestrator />
           <div className="mx-auto w-full max-w-[1600px] px-3 py-5 md:px-6">
-            <WorkspaceGuide />
+            {/* One sticky region: guided stage nav + live generation banner. */}
+            <div className="sticky top-0 z-30 -mx-3 mb-4 border-b border-white/[0.06] bg-[hsl(222_44%_5%)]/85 backdrop-blur md:-mx-6">
+              <WorkspaceGuide />
+              <GenerationBanner />
+            </div>
+            <div className="mb-4">
+              <CampaignReady />
+            </div>
             <WorkspaceDock />
           </div>
           {/* AI Explainability Layer (Sprint 63Y) — single overlay for every surface. */}

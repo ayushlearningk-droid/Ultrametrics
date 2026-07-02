@@ -112,6 +112,7 @@ interface RegionManagerValue {
   setZone: (id: RegionId, zone: Zone) => void;
   showRegion: (id: RegionId, zone: Zone) => void;
   toggleCollapse: (id: RegionId) => void;
+  setCollapsed: (id: RegionId, collapsed: boolean) => void;
   setFloat: (id: RegionId, patch: Partial<FloatRect>) => void;
   setLeftW: (w: number) => void;
   setRightW: (w: number) => void;
@@ -169,6 +170,7 @@ export function RegionManagerProvider({ children }: { children: React.ReactNode 
       setZone: (id, zone) => patch(id, (r) => ({ ...r, zone })),
       showRegion: (id, zone) => patch(id, (r) => (r.zone === "hidden" ? { ...r, zone } : r)),
       toggleCollapse: (id) => patch(id, (r) => ({ ...r, collapsed: !r.collapsed })),
+      setCollapsed: (id, collapsed) => patch(id, (r) => (r.collapsed === collapsed ? r : { ...r, collapsed })),
       setFloat: (id, p) => patch(id, (r) => ({ ...r, float: { ...r.float, ...p } })),
       setLeftW: (w) => setLeftWState(Math.max(240, Math.min(520, w))),
       setRightW: (w) => setRightWState(Math.max(260, Math.min(560, w))),

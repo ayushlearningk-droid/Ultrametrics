@@ -76,7 +76,7 @@ export function WorkspaceGuide() {
   };
 
   return (
-    <div className="sticky top-0 z-30 -mx-3 mb-4 flex flex-col gap-2 border-b border-white/[0.06] bg-[hsl(222_44%_5%)]/85 px-3 py-2.5 backdrop-blur md:-mx-6 md:px-6">
+    <div className="flex flex-col gap-2 px-3 py-2.5 md:px-6">
       {/* Breadcrumb — always visible */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 type-caption text-foreground-muted">
         {BREADCRUMB.map((b, i) => (
