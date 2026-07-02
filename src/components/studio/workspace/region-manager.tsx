@@ -67,20 +67,26 @@ export interface RegionDef {
   defaultOrder: number;
 }
 
+/**
+ * Guided defaults (Sprint 64AB): a single center column — Movie, then Gallery,
+ * then Approval — revealed progressively by the Orchestrator. Every other region
+ * is hidden ("advanced") until the user opts in. This replaces the floating
+ * multi-panel dashboard with a linear, guided workflow.
+ */
 export const REGION_DEFS: RegionDef[] = [
-  { id: "outcome", title: "Outcome", icon: Target, defaultZone: "left", defaultOrder: 0 },
+  { id: "outcome", title: "Outcome", icon: Target, defaultZone: "hidden", defaultOrder: 0 },
   { id: "movie", title: "AI Movie", icon: Clapperboard, defaultZone: "center", defaultOrder: 0 },
-  { id: "employees", title: "AI Employees", icon: Users, defaultZone: "center", defaultOrder: 1 },
-  { id: "activity", title: "Activity", icon: Radio, defaultZone: "right", defaultOrder: 0 },
-  { id: "timeline", title: "Timeline", icon: History, defaultZone: "right", defaultOrder: 1 },
-  { id: "approval", title: "Approval", icon: CheckCircle2, defaultZone: "hidden", defaultOrder: 0 },
-  { id: "canvas", title: "Canvas", icon: LayoutGrid, defaultZone: "hidden", defaultOrder: 0 },
-  { id: "creative", title: "Creatives", icon: Images, defaultZone: "hidden", defaultOrder: 0 },
-  { id: "inspector", title: "Inspector", icon: PanelRight, defaultZone: "right", defaultOrder: 2 },
-  { id: "queue", title: "Queue", icon: ListChecks, defaultZone: "hidden", defaultOrder: 0 },
+  { id: "employees", title: "AI Employees", icon: Users, defaultZone: "hidden", defaultOrder: 1 },
+  { id: "activity", title: "Activity", icon: Radio, defaultZone: "hidden", defaultOrder: 3 },
+  { id: "timeline", title: "Timeline", icon: History, defaultZone: "hidden", defaultOrder: 4 },
+  { id: "approval", title: "Approval", icon: CheckCircle2, defaultZone: "hidden", defaultOrder: 2 },
+  { id: "canvas", title: "Canvas", icon: LayoutGrid, defaultZone: "hidden", defaultOrder: 5 },
+  { id: "creative", title: "Creatives", icon: Images, defaultZone: "hidden", defaultOrder: 1 },
+  { id: "inspector", title: "Inspector", icon: PanelRight, defaultZone: "hidden", defaultOrder: 6 },
+  { id: "queue", title: "Queue", icon: ListChecks, defaultZone: "hidden", defaultOrder: 7 },
 ];
 
-const STORAGE_KEY = "um:studio:workspace:v1";
+const STORAGE_KEY = "um:studio:workspace:v2";
 const DEFAULT_LEFT_W = 320;
 const DEFAULT_RIGHT_W = 340;
 
@@ -98,6 +104,9 @@ interface RegionManagerValue {
   regions: RegionState[];
   leftW: number;
   rightW: number;
+  /** Advanced mode (Sprint 64AB): reveals the region toolbar + advanced panels. */
+  advanced: boolean;
+  setAdvanced: (v: boolean) => void;
   defOf: (id: RegionId) => RegionDef;
   toggleVisible: (id: RegionId) => void;
   setZone: (id: RegionId, zone: Zone) => void;
@@ -115,6 +124,7 @@ export function RegionManagerProvider({ children }: { children: React.ReactNode 
   const [regions, setRegions] = useState<RegionState[]>(defaultRegions);
   const [leftW, setLeftWState] = useState(DEFAULT_LEFT_W);
   const [rightW, setRightWState] = useState(DEFAULT_RIGHT_W);
+  const [advanced, setAdvanced] = useState(false);
 
   // Load persisted layout after mount (avoids hydration mismatch).
   useEffect(() => {
@@ -151,6 +161,8 @@ export function RegionManagerProvider({ children }: { children: React.ReactNode 
       regions,
       leftW,
       rightW,
+      advanced,
+      setAdvanced,
       defOf,
       toggleVisible: (id) =>
         patch(id, (r) => (r.zone === "hidden" ? { ...r, zone: defOf(id).defaultZone } : { ...r, zone: "hidden" })),
@@ -171,7 +183,7 @@ export function RegionManagerProvider({ children }: { children: React.ReactNode 
         }
       },
     }),
-    [regions, leftW, rightW, defOf, patch]
+    [regions, leftW, rightW, advanced, defOf, patch]
   );
 
   return <RegionManagerContext.Provider value={value}>{children}</RegionManagerContext.Provider>;

@@ -12,37 +12,49 @@
 
 import { useEffect, useRef } from "react";
 import { OutcomeEngineProvider } from "@/components/studio/outcomes/outcome-engine";
-import { MovieProvider, useMovie } from "@/components/studio/movie/movie-context";
+import { MovieProvider } from "@/components/studio/movie/movie-context";
 import { useGeneration } from "@/components/studio/generation/generation-store";
 import { ExplanationOverlay } from "@/components/studio/generation/explanation-panel";
 import { ExportDrawer } from "@/components/studio/generation/export-center";
 import { RegionManagerProvider, useRegions } from "./region-manager";
 import { WorkspaceDock } from "./workspace-dock";
+import { WorkspaceGuide } from "./workspace-guide";
 
-/** Wires outcome selection → runtime start → approval reveal. Deterministic. */
+/** Progressive reveal (Sprint 64AA): surfaces regions only as real work reaches
+ * them — Movie when the AI team starts, Gallery + Inspector when the first asset
+ * exists, Approval when the run completes. Reuses showRegion (hidden→zone only),
+ * never disturbing an arranged layout. Purely UI sequencing over the store. */
 function Orchestrator() {
   const gen = useGeneration();
-  const { isComplete } = useMovie();
   const { showRegion } = useRegions();
   const prevGen = useRef<string | null>(null);
+  const revealed = useRef<{ assets: boolean }>({ assets: false });
 
-  // Campaign generated (Sprint 64H) → surface the execution flow: the queued jobs
-  // and new creatives. The Movie/Team are execution-driven now — nothing is
-  // "started"; they advance only as execution advances. Reuses showRegion
-  // (hidden→zone only), never disturbing an arranged layout.
+  const id = gen?.id ?? null;
+  const status = gen?.execution.status ?? null;
+  const completed = gen?.execution.completedJobs ?? 0;
+
+  // New campaign → the AI team starts. Reveal the Movie in the guided center column.
   useEffect(() => {
-    const id = gen?.id ?? null;
     if (id && id !== prevGen.current) {
-      showRegion("queue", "float");
-      showRegion("creative", "float");
+      revealed.current = { assets: false };
+      showRegion("movie", "center");
     }
     prevGen.current = id;
-  }, [gen, showRegion]);
+  }, [id, showRegion]);
 
-  // Approval appears only after execution completes.
+  // First asset produced → reveal the Gallery (center column, below the Movie).
   useEffect(() => {
-    if (isComplete) showRegion("approval", "float");
-  }, [isComplete, showRegion]);
+    if (completed > 0 && !revealed.current.assets) {
+      revealed.current.assets = true;
+      showRegion("creative", "center");
+    }
+  }, [completed, showRegion]);
+
+  // Run complete → reveal Approval (center column).
+  useEffect(() => {
+    if (status === "completed") showRegion("approval", "center");
+  }, [status, showRegion]);
 
   return null;
 }
@@ -54,6 +66,7 @@ export function UnifiedWorkspace() {
         <RegionManagerProvider>
           <Orchestrator />
           <div className="mx-auto w-full max-w-[1600px] px-3 py-5 md:px-6">
+            <WorkspaceGuide />
             <WorkspaceDock />
           </div>
           {/* AI Explainability Layer (Sprint 63Y) — single overlay for every surface. */}

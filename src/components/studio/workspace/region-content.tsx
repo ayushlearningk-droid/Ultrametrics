@@ -54,11 +54,12 @@ function CanvasRegion() {
   );
 }
 
-/** Honest empty state before any generation (Sprint 64K) — never sample data. */
-function EmptyState({ text }: { text: string }) {
+/** Honest empty state (Sprint 64AA): explains why it's empty + what happens next. */
+function EmptyState({ title, hint }: { title: string; hint: string }) {
   return (
-    <div className="studio-card px-6 py-12 text-center">
-      <p className="type-caption text-foreground-muted">{text}</p>
+    <div className="studio-card flex flex-col gap-1 px-6 py-12 text-center">
+      <p className="type-body font-semibold text-foreground">{title}</p>
+      <p className="type-caption text-foreground-muted">{hint}</p>
     </div>
   );
 }
@@ -67,7 +68,7 @@ function EmptyState({ text }: { text: string }) {
    any generation they show an honest empty state — never sample data. */
 function CreativeRegion() {
   const gen = useGeneration();
-  if (!gen) return <EmptyState text="No creative generated yet." />;
+  if (!gen) return <EmptyState title="No creatives yet" hint="Describe a campaign on Home and press Generate — creatives appear here as your AI team produces them." />;
   // AI War Room (Sprint 63.4) sits above the reused Creative Browser.
   return (
     <div className="flex flex-col gap-6">
@@ -89,7 +90,7 @@ function InspectorRegion() {
 
 function QueueRegion() {
   const gen = useGeneration();
-  if (!gen) return <EmptyState text="No queue yet." />;
+  if (!gen) return <EmptyState title="Queue is empty" hint="Generation jobs show here with live status once a campaign starts." />;
   // Queue status is derived from each asset's execution state (Sprint 64.3).
   const source = gen.queueItems.map((q) => {
     const ex = gen.creatives.find((c) => c.id === q.creativeId)?.execution;
@@ -100,7 +101,7 @@ function QueueRegion() {
 
 function ApprovalRegion() {
   const gen = useGeneration();
-  if (!gen) return <EmptyState text="No approvals yet." />;
+  if (!gen) return <EmptyState title="Nothing to review yet" hint="Completed creatives arrive here for approval once generation finishes." />;
   // Only completed creatives reach approval (Sprint 64.3).
   const source = gen.approvalItems.filter(
     (a) => gen.creatives.find((c) => c.id === a.creativeId)?.execution?.status === "completed"
@@ -111,7 +112,7 @@ function ApprovalRegion() {
 function TimelineRegion() {
   // Execution events only (Sprint 64H) — honest empty state before generation.
   const gen = useGeneration();
-  if (!gen) return <EmptyState text="No execution history yet." />;
+  if (!gen) return <EmptyState title="No execution history yet" hint="Each step your AI team runs will appear here in real time with timestamps." />;
   return (
     <div className="flex flex-col gap-3">
       <GenerationTimeline />
@@ -122,7 +123,7 @@ function TimelineRegion() {
 function ActivityRegion() {
   // Execution-derived activity only (Sprint 64H) — honest empty state otherwise.
   const gen = useGeneration();
-  if (!gen) return <EmptyState text="No activity yet." />;
+  if (!gen) return <EmptyState title="No activity yet" hint="Your AI team's actions — research, generation, approvals — stream here live." />;
   return (
     <div className="flex h-full min-h-[280px] flex-col gap-3">
       <DreamMode />

@@ -61,7 +61,7 @@ function ZoneColumn({ regions, width }: { regions: RegionState[]; width?: number
 }
 
 export function WorkspaceDock() {
-  const { regions, leftW, rightW, setLeftW, setRightW, toggleVisible, reset } = useRegions();
+  const { regions, leftW, rightW, setLeftW, setRightW, toggleVisible, reset, advanced } = useRegions();
   const leftWRef = useRef(leftW);
   leftWRef.current = leftW;
   const rightWRef = useRef(rightW);
@@ -96,7 +96,9 @@ export function WorkspaceDock() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Toolbar — region toggles + reset */}
+      {/* Toolbar — region toggles + reset. Hidden in the guided (default) view;
+          revealed only in Advanced mode to reduce visual noise (Sprint 64AB). */}
+      {advanced && (
       <div className="studio-glass flex flex-wrap items-center gap-1.5 p-1.5">
         {REGION_DEFS.map((d) => {
           const r = regions.find((x) => x.id === d.id)!;
@@ -126,6 +128,7 @@ export function WorkspaceDock() {
           <RotateCcw className="h-3.5 w-3.5" /> Reset layout
         </button>
       </div>
+      )}
 
       {/* Dock body */}
       <div className="relative flex min-h-[78vh] gap-0">

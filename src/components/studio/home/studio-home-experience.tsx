@@ -17,7 +17,7 @@
  */
 
 import { useState } from "react";
-import { Sun, Moon, Sparkles, ArrowRight, Settings2, Home as HomeIcon, Compass } from "lucide-react";
+import { Sparkles, ArrowRight, Settings2, Home as HomeIcon, Compass, Users, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StudioSection, PremiumCard } from "./primitives";
 import { ExploreExperience } from "./explore-experience";
@@ -35,81 +35,67 @@ import { buildGenerationInput } from "@/components/studio/generation/build-input
 import { generate } from "@/components/studio/generation/generation-runtime";
 import { setGeneration, useGeneration, useReferenceAssets, useProviderPreference } from "@/components/studio/generation/generation-store";
 import { executeGeneration } from "@/components/studio/generation/executor";
+import { EXECUTION_LABEL, type ExecutionStatus } from "@/components/studio/generation/execution";
 import { ReferenceUpload, ingestFiles } from "@/components/studio/command/product-upload";
 import { CreativeThumbnail } from "@/components/studio/media";
 import { InspirationLibrary } from "./inspiration-library";
 import type { InspirationCard } from "./inspiration-data";
 
-/* The outcome-first prompt never asks "Create Image / Video / Avatar". */
-const PROMPT_QUESTION = "What outcome do you want to achieve?";
-
-function StatPill({ label, value }: { label: string; value: number | string }) {
+/** Product hero — what AI Studio is, understood in 15 seconds. */
+function Hero() {
   return (
-    <span className="inline-flex items-baseline gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1">
-      <span className="type-caption font-semibold tabular-nums text-foreground">{value}</span>
-      <span className="type-caption text-foreground-muted">{label}</span>
-    </span>
-  );
-}
-
-function GoodMorning() {
-  // Derived only from the Generation/Execution Store (Sprint 64K) — never SAMPLE_*.
-  const gen = useGeneration();
-  const digest = gen
-    ? {
-        completed: gen.execution.completedJobs,
-        total: gen.execution.totalJobs,
-        images: gen.creatives.filter((c) => c.media.kind === "image" && c.execution?.status === "completed").length,
-        videos: gen.creatives.filter((c) => c.media.kind === "video" && c.execution?.status === "completed").length,
-        pending: gen.approvalItems.filter((a) => a.status === "pending").length,
-      }
-    : null;
-
-  return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
-      <div className="studio-hero relative flex flex-col gap-2 overflow-hidden p-6 md:p-7">
-        <div aria-hidden className="studio-ambient pointer-events-none absolute inset-0 opacity-60" />
-        <span className="relative flex items-center gap-1.5 type-eyebrow text-foreground-muted">
-          <Sun className="h-3.5 w-3.5 text-brand" />
-          Good morning
-        </span>
-        <h1 className="relative text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-          Your AI company is ready.
-        </h1>
-        <p className="relative max-w-xl type-body text-foreground-muted">
-          Add a prompt and pick an outcome — the team decides the creative, copy, audience and placements for you.
-        </p>
-      </div>
-
-      <PremiumCard className="flex flex-col gap-3 p-5">
-        <span className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
-          <Moon className="h-3.5 w-3.5 text-brand" />
-          {digest ? "Latest run" : "Getting started"}
-        </span>
-        {digest ? (
-          <>
-            <div className="flex flex-wrap gap-2">
-              <StatPill label="jobs completed" value={`${digest.completed}/${digest.total}`} />
-              <StatPill label="images" value={digest.images} />
-              <StatPill label="videos" value={digest.videos} />
-              <StatPill label="awaiting approval" value={digest.pending} />
-            </div>
-            <p className="mt-auto type-caption text-foreground-muted">Derived from your latest generation.</p>
-          </>
-        ) : (
-          <p className="mt-auto type-caption text-foreground-muted">
-            No campaigns yet — add a prompt and pick an outcome to start your first generation.
-          </p>
-        )}
-      </PremiumCard>
+    <div className="studio-hero relative flex flex-col gap-3 overflow-hidden p-6 md:p-8">
+      <div aria-hidden className="studio-ambient pointer-events-none absolute inset-0 opacity-60" />
+      <span className="relative flex items-center gap-1.5 type-eyebrow text-foreground-muted">
+        <Sparkles className="h-3.5 w-3.5 text-brand" />
+        AI Marketing Operating System
+      </span>
+      <h1 className="relative max-w-2xl text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+        Describe one campaign. Your AI Marketing Team builds everything.
+      </h1>
+      <p className="relative max-w-xl type-body text-foreground-muted">
+        Research · Copy · Creatives · Videos · Campaign · Export. One prompt. Complete campaign.
+      </p>
     </div>
   );
 }
 
-/** The outcome-first prompt + example outcomes. Selecting one runs generation. */
-function OutcomePrompt({ onGenerate }: { onGenerate: (outcomeId: string) => void }) {
+/** How it works — three steps so a first-timer knows what happens after Generate. */
+function HowItWorks() {
+  const steps = [
+    { n: "1", icon: Sparkles, title: "Describe Campaign", desc: "Tell us the goal in one line." },
+    { n: "2", icon: Users, title: "AI Team Builds", desc: "Research, copy, creatives and video — automatically." },
+    { n: "3", icon: Download, title: "Review & Export", desc: "Approve the results and export your campaign." },
+  ];
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {steps.map((s) => (
+        <PremiumCard key={s.n} className="flex flex-col gap-2 p-5">
+          <div className="flex items-center gap-2">
+            <span className="studio-tile flex h-8 w-8 items-center justify-center text-brand">
+              <s.icon className="h-4 w-4" />
+            </span>
+            <span className="type-caption font-semibold text-foreground-muted">Step {s.n}</span>
+          </div>
+          <p className="type-body font-semibold text-foreground">{s.title}</p>
+          <p className="type-caption text-foreground-muted">{s.desc}</p>
+        </PremiumCard>
+      ))}
+    </div>
+  );
+}
+
+/** Concrete example prompts — clicking populates the prompt (does not generate). */
+const EXAMPLE_PROMPTS = [
+  "Launch a Diwali grocery campaign",
+  "Generate Meta ads for protein powder",
+  "Create a fashion sale campaign",
+  "Generate reels for Rajmandir Hypermarket",
+];
+
+/** The prompt-first campaign starter. "Generate Campaign" runs the real runtime. */
+function OutcomePrompt({ onGenerateCampaign, preparing, canGenerate }: { onGenerateCampaign: () => void; preparing: boolean; canGenerate: boolean }) {
   const { brief, setField } = useComposer();
-  const examples = OUTCOMES.slice(0, 7);
 
   return (
     <div className="studio-hero relative flex flex-col gap-4 overflow-hidden p-6 md:p-7">
@@ -117,9 +103,9 @@ function OutcomePrompt({ onGenerate }: { onGenerate: (outcomeId: string) => void
       <div className="relative flex flex-col gap-1.5">
         <span className="flex items-center gap-1.5 type-eyebrow text-foreground-muted">
           <Sparkles className="h-3.5 w-3.5 text-brand" />
-          Outcome-first
+          Start here
         </span>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">{PROMPT_QUESTION}</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">Describe your campaign</h2>
       </div>
 
       <div
@@ -137,27 +123,45 @@ function OutcomePrompt({ onGenerate }: { onGenerate: (outcomeId: string) => void
             if (e.clipboardData.files.length > 0) ingestFiles(e.clipboardData.files);
           }}
           rows={2}
-          aria-label="Add context for the outcome (optional)"
-          placeholder="Add context (optional), drop or paste reference images — then choose an outcome."
+          aria-label="Describe your campaign"
+          placeholder="Describe your campaign — e.g. Launch a Diwali grocery campaign. Drop or paste reference images."
           className="w-full resize-none bg-transparent px-2 py-1 type-body leading-relaxed text-foreground outline-none placeholder:text-foreground-muted"
         />
         <ReferenceUpload />
       </div>
 
+      {/* Example prompts — populate the prompt */}
       <div className="relative flex flex-wrap gap-2">
-        {examples.map((o) => (
+        {EXAMPLE_PROMPTS.map((p) => (
           <button
-            key={o.id}
+            key={p}
             type="button"
-            onClick={() => onGenerate(o.id)}
+            onClick={() => setField("offer", p)}
             className="studio-card studio-card-interactive studio-focusable inline-flex items-center gap-2 px-3 py-2 text-left"
           >
-            <o.icon className="h-4 w-4 text-brand" />
-            <span className="type-caption font-semibold text-foreground">{o.label}</span>
-            <ArrowRight className="h-3.5 w-3.5 text-foreground-muted" />
+            <Sparkles className="h-3.5 w-3.5 text-brand" />
+            <span className="type-caption font-semibold text-foreground">{p}</span>
           </button>
         ))}
       </div>
+
+      {/* Primary action */}
+      <button
+        type="button"
+        onClick={onGenerateCampaign}
+        disabled={!canGenerate || preparing}
+        aria-label="Generate campaign"
+        className={cn(
+          "studio-focusable relative inline-flex w-fit items-center justify-center gap-2 rounded-[var(--studio-radius-md)] px-5 py-2.5 type-body font-semibold transition-transform",
+          !canGenerate || preparing
+            ? "cursor-not-allowed bg-brand/15 text-brand opacity-60"
+            : "bg-brand text-[hsl(var(--brand-foreground))] hover:scale-[1.01] active:scale-100"
+        )}
+      >
+        <Sparkles className="h-4 w-4" />
+        {preparing ? "Preparing AI Team…" : "Generate Campaign"}
+        {!preparing && <ArrowRight className="h-4 w-4" />}
+      </button>
     </div>
   );
 }
@@ -209,6 +213,7 @@ function HomeBody({ onOpen, onAdvanced }: { onOpen: () => void; onAdvanced: () =
   const gen = useGeneration();
   const referenceAssets = useReferenceAssets();
   const providerPreference = useProviderPreference();
+  const [preparing, setPreparing] = useState(false);
 
   // Selecting an outcome runs the real Generation Runtime (the AI decides the
   // tools), then opens the fully-synchronized workspace.
@@ -237,6 +242,14 @@ function HomeBody({ onOpen, onAdvanced }: { onOpen: () => void; onAdvanced: () =
     // execute on the server (OpenAI Images live). Async, fire-and-forget.
     void executeGeneration(result);
     onOpen();
+  };
+
+  // Prompt-first primary action: generate using the typed prompt with a sensible
+  // default outcome (architecture unchanged — still outcome-driven underneath).
+  const handleGenerateCampaign = () => {
+    if (!brief.offer.trim()) return;
+    setPreparing(true);
+    handleGenerate(brief.outcome || OUTCOMES[0].id);
   };
 
   // Clicking an inspiration card POPULATES the outcome prompt only — it never
@@ -292,9 +305,11 @@ function HomeBody({ onOpen, onAdvanced }: { onOpen: () => void; onAdvanced: () =
         <ExploreExperience onSelect={handleExplore} />
       ) : (
       <>
-      <GoodMorning />
+      <Hero />
 
-      <OutcomePrompt onGenerate={handleGenerate} />
+      <HowItWorks />
+
+      <OutcomePrompt onGenerateCampaign={handleGenerateCampaign} preparing={preparing} canGenerate={!!brief.offer.trim()} />
 
       <StudioSection label="Quick outcomes" description="Pick a result — the AI assembles the campaign.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -306,16 +321,37 @@ function HomeBody({ onOpen, onAdvanced }: { onOpen: () => void; onAdvanced: () =
 
       <InspirationLibrary onSelect={handleInspire} />
 
-      <StudioSection label="Recent generations" description="Your latest generated assets.">
+      <StudioSection label="Recent campaigns" description="Your latest campaigns — open to review and export.">
         {recentGenerated.length === 0 ? (
           <PremiumCard className="px-6 py-10 text-center">
-            <p className="type-caption text-foreground-muted">No generations yet — pick an outcome above to create your first campaign.</p>
+            <p className="type-body font-semibold text-foreground">No campaigns yet</p>
+            <p className="type-caption text-foreground-muted">Describe a campaign above and press Generate — your results will appear here.</p>
           </PremiumCard>
         ) : (
-          <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-            {recentGenerated.map((c) => (
-              <CreativeThumbnail key={c.id} media={c.media} aspect="square" />
-            ))}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {recentGenerated.slice(0, 8).map((c) => {
+              const status = (c.execution?.status ?? "queued") as ExecutionStatus;
+              return (
+                <PremiumCard key={c.id} className="flex flex-col gap-2 p-3">
+                  <div className="overflow-hidden rounded-[var(--studio-radius-md)]">
+                    <CreativeThumbnail media={c.media} aspect="square" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="min-w-0 flex-1 truncate type-caption font-semibold text-foreground">{c.title}</p>
+                    <span className={cn("chip shrink-0", status === "completed" ? "chip-emerald" : status === "failed" ? "chip-red" : "chip-slate")}>
+                      {EXECUTION_LABEL[status]}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onOpen}
+                    className="studio-focusable inline-flex items-center justify-center gap-1.5 rounded-[var(--studio-radius-sm)] border border-white/[0.08] px-3 py-1.5 type-caption text-foreground-muted transition-colors hover:bg-white/[0.05] hover:text-foreground"
+                  >
+                    Open <ArrowRight className="h-3 w-3" />
+                  </button>
+                </PremiumCard>
+              );
+            })}
           </div>
         )}
       </StudioSection>
